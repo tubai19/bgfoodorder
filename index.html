@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bake & Grill - Order Online</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #d62828;
+      --secondary-color: #f77f00;
+      --light-bg: #fff8f0;
+      --light-accent: #ffe5d9;
+      --dark-text: #222;
+      --medium-text: #555;
+      --light-text: #777;
+      --success-color: #2e7d32;
+      --error-color: #c62828;
+      --warning-color: #ff8f00;
+    }
+    
+    html { 
+      scroll-behavior: smooth; 
+      font-size: 16px;
+    }
+    
+    * { 
+      box-sizing: border-box; 
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--light-bg);
+      color: var(--dark-text);
+      line-height: 1.6;
+    }
+    
+    .container {
+      padding: 1rem;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      padding: 1.5rem 0;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 1.5rem;
+    }
+    
+    .logo {
+      font-size: 2rem;
+      color: var(--primary-color);
+      margin-bottom: 0.5rem;
+    }
+    
+    .tagline {
+      color: var(--secondary-color);
+      font-style: italic;
+    }
+    
+    #searchContainer {
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    
+    #searchInput {
+      padding: 0.75rem 1.25rem;
+      width: 100%;
+      max-width: 500px;
+      border-radius: 25px;
+      border: 1px solid var(--primary-color);
+      font-size: 1rem;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    
+    #searchInput:focus {
+      box-shadow: 0 0 5px rgba(214, 40, 40, 0.5);
+    }
+    
+    #tabs {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      gap: 0.5rem;
+    }
+    
+    #tabs button {
+      flex: 1 1 auto;
+      min-width: 120px;
+      max-width: 200px;
+      text-align: center;
+      background: var(--light-accent);
+      color: var(--dark-text);
+      border: 1px solid var(--primary-color);
+      padding: 0.5rem 0.875rem;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+    
+    #tabs button:hover,
+    #tabs button.active {
+      background: var(--primary-color);
+      color: white;
+    }
+    
+    .category {
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin: 1.5rem 0 0.75rem;
+      color: var(--primary-color);
+      text-align: center;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px dashed var(--primary-color);
+    }
+    
+    .item {
+      background: white;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      position: relative;
+    }
+    
+    .item:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    .item h3 { 
+      margin: 0 0 0.375rem; 
+      color: var(--dark-text);
+      font-size: 1.1rem;
+    }
+    
+    .item small {
+      display: block;
+      color: var(--light-text);
+      margin-bottom: 0.375rem;
+      font-size: 0.875rem;
+    }
+    
+    .item p.desc {
+      font-size: 0.875rem;
+      color: var(--medium-text);
+      margin: 0.25rem 0 0.625rem;
+    }
+    
+    .variants {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .variants label {
+      display: inline-block;
+      background: #fbe9e7;
+      padding: 0.375rem 0.75rem;
+      border-radius: 5px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .variants label:hover {
+      background: var(--primary-color);
+      color: white;
+    }
+    
+    #cart {
+      background: #fff3f0;
+      padding: 1rem;
+      border-radius: 10px;
+      margin-top: 1.5rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    #cart h3 {
+      margin-bottom: 0.75rem;
+      color: var(--primary-color);
+    }
+    
+    #cart ul {
+      list-style: none;
+    }
+    
+    #cart li {
+      font-size: 0.9375rem;
+      margin-bottom: 0.5rem;
+      padding: 0.25rem 0;
+      border-bottom: 1px dashed #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .remove-btn {
+      background: #ffb3b3;
+      border: none;
+      border-radius: 4px;
+      padding: 0.25rem 0.5rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    
+    .remove-btn:hover {
+      background: var(--primary-color);
+      color: white;
+    }
+    
+    .form-section {
+      background: #fff3f0;
+      padding: 1.5rem;
+      border-radius: 10px;
+      margin-top: 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .form-input {
+      margin-bottom: 1rem;
+    }
+    
+    .form-input label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-weight: 500;
+    }
+    
+    .form-input input,
+    .form-input select,
+    .form-input button {
+      padding: 0.75rem;
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+    
+    .form-input button {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    
+    .form-input button:hover {
+      background: #a4161a;
+    }
+    
+    .delivery-info {
+      background: #fff3f0;
+      padding: 1rem;
+      border-radius: 10px;
+      margin: 1rem 0;
+      border-left: 4px solid var(--primary-color);
+    }
+    
+    .delivery-info h4 {
+      margin-top: 0;
+      color: var(--primary-color);
+      margin-bottom: 0.5rem;
+    }
+    
+    .delivery-info ul {
+      padding-left: 1.25rem;
+    }
+    
+    .delivery-info li {
+      margin-bottom: 0.25rem;
+    }
+    
+    #locationStatus {
+      padding: 0.5rem;
+      border-radius: 5px;
+      margin: 0.5rem 0;
+      text-align: center;
+      font-size: 0.875rem;
+    }
+    
+    .location-loading {
+      background: #fff3e0;
+      color: var(--primary-color);
+    }
+    
+    .location-success {
+      background: #e8f5e9;
+      color: var(--success-color);
+    }
+    
+    .location-error {
+      background: #ffebee;
+      color: var(--error-color);
+    }
+    
+    #liveTotal {
+      text-align: center;
+      font-weight: bold;
+      font-size: 1.125rem;
+      color: var(--primary-color);
+      margin-bottom: 1rem;
+      padding: 0.5rem;
+      background: white;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.7);
+      overflow: auto;
+    }
+    
+    .modal-content {
+      background-color: var(--light-bg);
+      margin: 10% auto;
+      padding: 1.5rem;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      animation: modalopen 0.3s;
+    }
+    
+    @keyframes modalopen {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    
+    .modal-header h2 {
+      color: var(--primary-color);
+      margin: 0;
+      font-size: 1.5rem;
+    }
+    
+    .close-modal {
+      color: #aaa;
+      font-size: 1.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+    
+    .close-modal:hover {
+      color: var(--primary-color);
+    }
+    
+    .order-summary {
+      margin-bottom: 1.5rem;
+    }
+    
+    .order-summary-item {
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px dashed #ddd;
+    }
+    
+    .modal-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.5rem;
+      gap: 1rem;
+    }
+    
+    .modal-btn {
+      padding: 0.625rem 1.25rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      flex: 1;
+      transition: all 0.3s ease;
+    }
+    
+    .confirm-btn {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+    }
+    
+    .confirm-btn:hover {
+      background: #a4161a;
+    }
+    
+    .cancel-btn {
+      background: #f5f5f5;
+      color: #333;
+      border: 1px solid #ccc;
+    }
+    
+    .cancel-btn:hover {
+      background: #e0e0e0;
+    }
+    
+    .no-results {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--light-text);
+      font-style: italic;
+      background: white;
+      border-radius: 10px;
+      margin: 1rem 0;
+    }
+    
+    .download-btn {
+      background: var(--secondary-color);
+      color: white;
+      border: none;
+      padding: 0.625rem 1.25rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 1rem;
+      width: 100%;
+      transition: background 0.3s ease;
+    }
+    
+    .download-btn:hover {
+      background: #e67300;
+    }
+
+    /* New styles for disabled combo items */
+    .disabled-item {
+      opacity: 0.6;
+      pointer-events: none;
+      position: relative;
+    }
+
+    .disabled-item::after {
+      content: "Not available for delivery";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.8rem;
+    }
+    
+    @media (max-width: 768px) {
+      html {
+        font-size: 15px;
+      }
+      
+      #tabs button {
+        min-width: 100px;
+        padding: 0.5rem;
+        font-size: 0.875rem;
+      }
+      
+      .item {
+        padding: 0.75rem;
+      }
+      
+      .item h3 {
+        font-size: 1rem;
+      }
+      
+      .item small {
+        font-size: 0.8125rem;
+      }
+      
+      .modal-content {
+        margin: 20% auto;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      html {
+        font-size: 14px;
+      }
+      
+      .container {
+        padding: 0.75rem;
+      }
+      
+      .modal-content {
+        width: 95%;
+      }
+      
+      .modal-buttons {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="logo">Bake & Grill</div>
+    <div class="tagline">Delicious food delivered to your doorstep</div>
+  </header>
+
+  <div class="container">
+    <div id="searchContainer">
+      <input type="text" id="searchInput" placeholder="🔍 Search for items (name or description)...">
+    </div>
+    
+    <div class="delivery-info">
+      <h4>🚚 Delivery Information</h4>
+      <ul>
+        <li>Minimum order for delivery: <strong>₹200</strong></li>
+        <li>Delivery charges:
+          <ul>
+            <li>Free for orders under 4km</li>
+            <li>₹20 for 4-6km</li>
+            <li>₹30 for 6-8km</li>
+            <li>Free for orders above ₹500</li>
+            <li>Delivery only available within 8km radius</li>
+          </ul>
+        </li>
+        <li>Delivery time estimate: 20 minutes preparation + 8 minutes per km travel</li>
+      </ul>
+      <div id="locationStatus" class="location-loading" style="display:none;">
+        Calculating your distance from the restaurant...
+      </div>
+    </div>
+
+    <div id="tabs"></div>
+    <div id="menuContainer"></div>
+    
+    <div id="cart">
+      <h3>🛒 Your Cart</h3>
+      <ul id="cartItems"></ul>
+    </div>
+  </div>
+
+  <div class="container form-section">
+    <div id="liveTotal">💰 Total Bill: ₹0</div>
+    
+    <div class="form-input">
+      <label for="customerName">Your Name</label>
+      <input type="text" id="customerName" placeholder="Enter your name" required>
+    </div>
+    
+    <div class="form-input">
+      <label for="phoneNumber">Phone Number</label>
+      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required>
+    </div>
+    
+    <div class="form-input">
+      <label for="orderType">Order Type</label>
+      <select id="orderType">
+        <option value="Delivery" selected>Home Delivery</option>
+        <option value="Pickup">Pickup</option>
+        <option value="Table">Table Booking</option>
+      </select>
+    </div>
+    
+    <div class="form-input" id="deliveryAddressContainer" style="display: none;">
+      <label>📍 Your Location (Auto-detected)</label>
+      <div id="locationDetails" style="background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem;">
+        <div id="locationText">Detecting your location...</div>
+        <div id="locationMapLink" style="margin-top: 0.5rem;"></div>
+        <div id="deliveryEstimate" style="margin-top: 0.5rem; font-weight: bold;"></div>
+      </div>
+      <button id="refreshLocationBtn" style="background: #34a853; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer; width: 100%;">
+        🔄 Refresh Location
+      </button>
+      <input type="hidden" id="deliveryLatitude">
+      <input type="hidden" id="deliveryLongitude">
+    </div>
+    
+    <div id="deliveryChargeDisplay" style="text-align:center; margin:1rem 0; font-weight:bold;"></div>
+    
+    <div class="form-input">
+      <button onclick="confirmOrder()">Place Order</button>
+    </div>
+  </div>
+
+  <div id="orderConfirmationModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Confirm Your Order</h2>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="order-summary" id="orderConfirmationDetails">
+        <!-- Order details will be inserted here -->
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-btn cancel-btn" id="cancelOrderBtn">Cancel</button>
+        <button class="modal-btn confirm-btn" id="confirmOrderBtn">Confirm & Send via WhatsApp</button>
+      </div>
+      <button class="download-btn" id="downloadBillBtn" style="display:none;">Download Bill</button>
+    </div>
+  </div>
+
+  <script>
+    const { jsPDF } = window.jspdf;
+    
+    const RESTAURANT_LOCATION = {
+      lat: 22.4723,
+      lng: 88.3088
+    };
+
+    const fullMenu = {
+      "Veg Pizzas": [
+        {
+          name: "Farmhouse Special",
+          nameBn: "চিজের বাগানবাড়ি",
+          desc: "Onion, capsicum, tomato, green chili, spicy sauce",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 339, "Family Bite": 449 }
+        },
+        {
+          name: "Spicy Veggie Blast",
+          nameBn: "ঝাল ঝাল সবজির রহস্য",
+          desc: "Onion, capsicum, tomato, green chili, spicy sauce",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 339, "Family Bite": 449 }
+        },
+        {
+          name: "Desi Delight",
+          nameBn: "দেশি তারকা",
+          desc: "Paneer tikka, onion, green chili, coriander",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 349, "Family Bite": 469 }
+        },
+        {
+          name: "Cheese Overload",
+          nameBn: "চিজে ভরা বন্যা",
+          desc: "Triple cheese blend: mozzarella, cheddar, cream",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 359, "Family Bite": 499 }
+        },
+        {
+          name: "Classic Margherita",
+          nameBn: "শুধু চিজ়",
+          desc: "Sauce, mozzarella cheese",
+          variants: { "Ekla Bite": 99, "Bondhu Bite": 179, "Family Bite": 219 }
+        },
+        {
+          name: "Corn Capsicum",
+          nameBn: "কর্ন ক্যাপসিকাম",
+          desc: "Sweet corn, capsicum, oregano, cheese",
+          variants: { "Ekla Bite": 139, "Bondhu Bite": 289, "Family Bite": 399 }
+        },
+        {
+          name: "Mushroom Magic",
+          nameBn: "মাশরুম ম্যাজিক",
+          desc: "Mushroom, onion, garlic butter, cheese",
+          variants: { "Ekla Bite": 149, "Bondhu Bite": 389, "Family Bite": 439 }
+        },
+        {
+          name: "Veggie Treat",
+          nameBn: "ভেজি ট্রিট",
+          desc: "Onion, capsicum, tomato, corn, black olives",
+          variants: { "Ekla Bite": 179, "Bondhu Bite": 369, "Family Bite": 489 }
+        },
+        {
+          name: "Italian Garden",
+          nameBn: "ইতালিয়ান গার্ডেন",
+          desc: "Zucchini, cherry tomato, bell peppers",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 379, "Family Bite": 489 }
+        },
+        {
+          name: "Veg Hawaiian",
+          nameBn: "ভেজ হাওয়াইয়ান",
+          desc: "Pineapple, capsicum, onion, cheese",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 279, "Family Bite": 479 }
+        },
+        {
+          name: "Peri Peri Veg",
+          nameBn: "পেরি পেরি ভেজ",
+          desc: "Onion, capsicum, corn, peri peri sauce",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 359, "Family Bite": 479 }
+        },
+        {
+          name: "Mexican Veg",
+          nameBn: "মেক্সিকান ভেজ",
+          desc: "Jalapeño, bell peppers, corn, chipotle sauce",
+          variants: { "Ekla Bite": 179, "Bondhu Bite": 409, "Family Bite": 489 }
+        },
+        {
+          name: "Chili Cheese Bomb",
+          nameBn: "চিলি চিজ বোম",
+          desc: "Green chili, red chili flakes, extra cheese",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 299, "Family Bite": 489 }
+        },
+        {
+          name: "BBQ Veg Lovers",
+          nameBn: "বিবিকিউ ভেজ লাভার্স",
+          desc: "BBQ sauce, onion, paneer, sweet corn",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 299, "Family Bite": 469 }
+        },
+        {
+          name: "Veggie Volcano",
+          nameBn: "ভেজি ভলকানো",
+          desc: "Hot sauce, jalapeño, onion, bell pepper",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 299, "Family Bite": 489 }
+        },
+        {
+          name: "Veggie Foursome",
+          nameBn: "ভেজি ফোরসম",
+          desc: "Capsicum, onion, tomato, corn",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 279, "Family Bite": 439 }
+        },
+        {
+          name: "Spinach & Corn",
+          nameBn: "স্পিনাচ অ্যান্ড কর্ন",
+          desc: "Spinach, corn, mozzarella",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 279, "Family Bite": 439 }
+        }
+      ],
+      "Paneer Specials": [
+        {
+          name: "Classic Paneer",
+          nameBn: "ক্লাসিক পনির",
+          desc: "Soft paneer cubes, onion, tomato, capsicum",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 299, "Family Bite": 449 }
+        },
+        {
+          name: "Paneer Supreme",
+          nameBn: "পনিরে প্রেমগাথা",
+          desc: "Paneer cubes, onion, capsicum, olives, cheese",
+          variants: { "Ekla Bite": 179, "Bondhu Bite": 369, "Family Bite": 489 }
+        },
+        {
+          name: "Peri Peri Paneer",
+          nameBn: "পনিরের পেরি পটাকা",
+          desc: "Spicy peri peri paneer, onion, capsicum",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 519 }
+        },
+        {
+          name: "Tandoori Paneer",
+          nameBn: "তন্দুরির ঠেলা পনিরের খেলা",
+          desc: "Tandoori paneer, bell pepper, onion, tandoori sauce",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 339, "Family Bite": 529 }
+        },
+        {
+          name: "Achari Paneer",
+          nameBn: "আচারী পনিরের যুগলবন্দী",
+          desc: "Pickled masala paneer, onion, chili, mustard drizzle",
+          variants: { "Ekla Bite": 179, "Bondhu Bite": 319, "Family Bite": 509 }
+        },
+        {
+          name: "Paneer Corn Delight",
+          nameBn: "পনির ভুট্টার মিষ্টি মুখ",
+          desc: "Paneer, sweet corn, cheese, capsicum",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 309, "Family Bite": 489 }
+        },
+        {
+          name: "Schezwan Paneer",
+          nameBn: "লাল ঝাল পনির",
+          desc: "Schezwan sauce base, paneer, capsicum, onion",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 329, "Family Bite": 529 }
+        }
+      ],
+      "Non-Veg Pizzas": [
+        {
+          name: "Chicken Keema Pizza",
+          nameBn: "চিকেন কিমা পিজ্জা",
+          desc: "Spicy chicken keema, onion, green chili",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 509 }
+        },
+        {
+          name: "BBQ Chicken Pizza",
+          nameBn: "বিবিকিউ চিকেন পিজ্জা",
+          desc: "Barbecue chicken, capsicum, onion",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 299, "Family Bite": 469 }
+        },
+        {
+          name: "Chicken Sausage Pizza",
+          nameBn: "চিকেন সসেজ পিজ্জা",
+          desc: "Chicken sausage slices, onion, jalapeños",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 509 }
+        },
+        {
+          name: "Tandoori Chicken Pizza",
+          nameBn: "তন্দুরি চিকেন পিজ্জা",
+          desc: "Tandoori chicken, red chili flakes, onion",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 489 }
+        },
+        {
+          name: "Chicken Peri Peri",
+          nameBn: "চিকেন পেরি পেরি",
+          desc: "Spicy peri peri chicken, capsicum, onion",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 489 }
+        },
+        {
+          name: "Cheese & Chicken Mix",
+          nameBn: "চিজ অ্যান্ড চিকেন মিক্স",
+          desc: "Mozzarella cheese & Chicken",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 489 }
+        },
+        {
+          name: "Onion Chicken Pizza",
+          nameBn: "অনিয়ন চিকেন পিজ্জা",
+          desc: "Black pepper chicken, cheese, onion",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 319, "Family Bite": 499 }
+        },
+        {
+          name: "Schezwan Chicken Pizza",
+          nameBn: "সেজওয়ান চিকেন পিজ্জা",
+          desc: "Spicy schezwan chicken, onion, capsicum",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 319, "Family Bite": 499 }
+        },
+        {
+          name: "Chicken Delight Mix",
+          nameBn: "চিকেন ডিলাইট মিক্স",
+          desc: "Chicken chunks, capsicum, onion, tomato",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 509 }
+        },
+        {
+          name: "Garden Chicken Feast",
+          nameBn: "গার্ডেন চিকেন ফিস্ট",
+          desc: "Chicken sausage, sweet corn, onion, bell pepper",
+          variants: { "Ekla Bite": 189, "Bondhu Bite": 349, "Family Bite": 529 }
+        },
+        {
+          name: "Peri Veg Chicken",
+          nameBn: "পেরি ভেজ চিকেন",
+          desc: "Peri-peri chicken, paneer cubes, capsicum",
+          variants: { "Ekla Bite": 179, "Bondhu Bite": 339, "Family Bite": 559 }
+        },
+        {
+          name: "Chicken Tikka Olive",
+          nameBn: "চিকেন টিক্কা অলিভ",
+          desc: "Chicken tikka, paneer, black olives",
+          variants: { "Ekla Bite": 179, "Bondhu Bite": 319, "Family Bite": 559 }
+        },
+        {
+          name: "Corn Chicken Cheese",
+          nameBn: "কর্ন চিকেন চিজ",
+          desc: "Sweet corn, shredded chicken, cheese",
+          variants: { "Ekla Bite": 149, "Bondhu Bite": 259, "Family Bite": 489 }
+        },
+        {
+          name: "Spicy Mixed Fusion",
+          nameBn: "স্পাইসি মিক্সড ফিউশন",
+          desc: "Chicken, green chili, onion, capsicum",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 309, "Family Bite": 489 }
+        },
+        {
+          name: "Hawaiian Mix Pizza",
+          nameBn: "হাওয়াইয়ান মিক্স পিজ্জা",
+          desc: "Chicken, pineapple, sweet corn, capsicum",
+          variants: { "Ekla Bite": 179, "Bondhu Bite": 319, "Family Bite": 559 }
+        },
+        {
+          name: "Fiery Veg Chicken",
+          nameBn: "ফায়ারি ভেজ চিকেন",
+          desc: "Spicy chicken, jalapeno, onion, cheese",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 289, "Family Bite": 509 }
+        },
+        {
+          name: "Tomato Chicken Supreme",
+          nameBn: "টমেটো চিকেন সুপ্রিম",
+          desc: "Chicken, tomato, onion",
+          variants: { "Ekla Bite": 169, "Bondhu Bite": 319, "Family Bite": 499 }
+        },
+        {
+          name: "Corny Chicken Twist",
+          nameBn: "কর্নি চিকেন টুইস্ট",
+          desc: "Chicken tikka, sweet corn, capsicum",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 299, "Family Bite": 529 }
+        },
+        {
+          name: "BBQ Veg Chicken",
+          nameBn: "বিবিকিউ ভেজ চিকেন",
+          desc: "BBQ chicken, onion, jalapeno",
+          variants: { "Ekla Bite": 159, "Bondhu Bite": 319, "Family Bite": 519 }
+        },
+        {
+          name: "Desi Fusion Pizza",
+          nameBn: "দেশি ফিউশন পিজ্জা",
+          desc: "Chicken keema, green chili, paneer, onion",
+          variants: { "Ekla Bite": 199, "Bondhu Bite": 349, "Family Bite": 529 }
+        },
+        {
+          name: "Chicken Paradise Pizza",
+          nameBn: "চিকেন প্যারাডাইস পিজ্জা",
+          desc: "Grilled Chicken, onion, capsicum, corn, red paprika, black olives",
+          variants: { "Ekla Bite": 219, "Bondhu Bite": 399, "Family Bite": 609 }
+        }
+      ],
+      "Burgers": [
+        {
+          name: "Veg Burger",
+          nameBn: "ভেজ বার্গার",
+          desc: "Classic veg patty with fresh veggies",
+          variants: { "Regular": 40 }
+        },
+        {
+          name: "Cheese Veg Burger",
+          nameBn: "চিজ ভেজ বার্গার",
+          desc: "Veg burger with cheese slice",
+          variants: { "Regular": 69 }
+        },
+        {
+          name: "Paneer Tikka Burger",
+          nameBn: "পনির টিক্কা বার্গার",
+          desc: "Paneer tikka patty with veggies",
+          variants: { "Regular": 69 }
+        },
+        {
+          name: "Classic Chicken Burger",
+          nameBn: "ক্লাসিক চিকেন বার্গার",
+          desc: "Classic chicken patty with fresh veggies",
+          variants: { "Regular": 79 }
+        },
+        {
+          name: "Cheese Chicken Burger",
+          nameBn: "চিজ চিকেন বার্গার",
+          desc: "Chicken burger with cheese slice",
+          variants: { "Regular": 99 }
+        },
+        {
+          name: "Tandoori Chicken Chunk",
+          nameBn: "তন্দুরি চিকেন চাঙ্ক",
+          desc: "Tandoori chicken pieces in burger",
+          variants: { "Regular": 59 }
+        },
+        {
+          name: "Peri Peri Chicken Crunch",
+          nameBn: "পেরি পেরি চিকেন ক্রাঞ্চ",
+          desc: "Spicy peri peri chicken burger",
+          variants: { "Regular": 69 }
+        },
+        {
+          name: "BBQ Chicken Bites Burger",
+          nameBn: "বিবিকিউ চিকেন বাইটস বার্গার",
+          desc: "BBQ flavored chicken pieces in burger",
+          variants: { "Regular": 79 }
+        },
+        {
+          name: "Cheese Burst Chicken Piece",
+          nameBn: "চিজ বার্স্ট চিকেন পিস",
+          desc: "Cheesy chicken patty burger",
+          variants: { "Regular": 79 }
+        },
+        {
+          name: "Grilled Chicken Pieces Burger",
+          nameBn: "গ্রিলড চিকেন পিসেস বার্গার",
+          desc: "Grilled chicken pieces in burger",
+          variants: { "Regular": 49 }
+        },
+        {
+          name: "Schezwan Chicken Piece",
+          nameBn: "সেজওয়ান চিকেন পিস",
+          desc: "Spicy schezwan chicken burger",
+          variants: { "Regular": 79 }
+        }
+      ],
+      "Sandwiches": [
+        {
+          name: "Normal Veg Sandwich",
+          nameBn: "নরমাল ভেজ স্যান্ডউইচ",
+          desc: "Basic veg sandwich with chutney",
+          variants: { "Regular": 20 }
+        },
+        {
+          name: "Cheese Veg Sandwich",
+          nameBn: "চিজ ভেজ স্যান্ডউইচ",
+          desc: "Grilled veg sandwich with cheese",
+          variants: { "Regular": 29 }
+        },
+        {
+          name: "Cheese & Corn Sandwich",
+          nameBn: "চিজ অ্যান্ড কর্ন স্যান্ডউইচ",
+          desc: "Cheese and sweet corn sandwich",
+          variants: { "Regular": 49 }
+        },
+        {
+          name: "Paneer Sandwich",
+          nameBn: "পনির স্যান্ডউইচ",
+          desc: "Paneer sandwich with veggies",
+          variants: { "Regular": 45 }
+        },
+        {
+          name: "Cheesy Paneer Sandwich",
+          nameBn: "চিজি পনির স্যান্ডউইচ",
+          desc: "Cheesy paneer sandwich",
+          variants: { "Regular": 49 }
+        },
+        {
+          name: "Cheesy Corn Paneer Sandwich",
+          nameBn: "চিজি কর্ন পনির স্যান্ডউইচ",
+          desc: "Cheese, corn and paneer sandwich",
+          variants: { "Regular": 69 }
+        },
+        {
+          name: "Normal Chicken Sandwich",
+          nameBn: "নরমাল চিকেন স্যান্ডউইচ",
+          desc: "Basic chicken sandwich",
+          variants: { "Regular": 39 }
+        },
+        {
+          name: "Cheese Chicken Sandwich",
+          nameBn: "চিজ চিকেন স্যান্ডউইচ",
+          desc: "Cheesy chicken sandwich",
+          variants: { "Regular": 59 }
+        },
+        {
+          name: "Paneer Chicken Sandwich",
+          nameBn: "পনির চিকেন স্যান্ডউইচ",
+          desc: "Paneer and chicken sandwich",
+          variants: { "Regular": 65 }
+        },
+        {
+          name: "Cheesy Paneer Chicken",
+          nameBn: "চিজি পনির চিকেন",
+          desc: "Cheesy paneer and chicken sandwich",
+          variants: { "Regular": 79 }
+        },
+        {
+          name: "Corn Chicken Sandwich",
+          nameBn: "কর্ন চিকেন স্যান্ডউইচ",
+          desc: "Corn and chicken sandwich",
+          variants: { "Regular": 55 }
+        },
+        {
+          name: "Cheesy Corn Chicken Sandwich",
+          nameBn: "চিজি কর্ন চিকেন স্যান্ডউইচ",
+          desc: "Cheese, corn and chicken sandwich",
+          variants: { "Regular": 69 }
+        }
+      ],
+      "Quick Bites": [
+        {
+          name: "French Fries",
+          nameBn: "ফ্রেঞ্চ ফ্রাই",
+          desc: "Crispy fried potatoes",
+          variants: { "Small": 39, "Medium": 69, "Large": 89 }
+        },
+        {
+          name: "Onion Rings",
+          nameBn: "অনিয়ন রিংস",
+          desc: "Crispy fried onion rings",
+          variants: { "Small": 29, "Medium": 49, "Large": 59 }
+        },
+        {
+          name: "Chicken Pops",
+          nameBn: "চিকেন পপস",
+          desc: "Crispy chicken popcorn",
+          variants: { "Regular": 49 }
+        },
+        {
+          name: "Peri Fire Shots",
+          nameBn: "পেরি ফায়ার শটস",
+          desc: "Spicy peri peri chicken bites",
+          variants: { "Regular": 59 }
+        },
+        {
+          name: "Schezwan Fire Bites",
+          nameBn: "সেজওয়ান ফায়ার বাইটস",
+          desc: "Spicy schezwan chicken bites",
+          variants: { "Regular": 59 }
+        },
+        {
+          name: "Tandoor Tikka Cuts",
+          nameBn: "তন্দুর টিক্কা কাটস",
+          desc: "Tandoori chicken pieces",
+          variants: { "Regular": 59 }
+        },
+        {
+          name: "Smoky BBQ Bites",
+          nameBn: "স্মোকি বিবিকিউ বাইটস",
+          desc: "BBQ flavored chicken bites",
+          variants: { "Regular": 59 }
+        }
+      ],
+      "Dips": [
+        {
+          name: "Normal Mayo",
+          nameBn: "নরমাল মায়ো",
+          variants: { "Regular": 15 }
+        },
+        {
+          name: "Garlic Dip",
+          nameBn: "গার্লিক ডিপ",
+          variants: { "Regular": 25 }
+        },
+        {
+          name: "Sweet & Tangy Dip",
+          nameBn: "সুইট অ্যান্ড ট্যাঙ্গি ডিপ",
+          variants: { "Regular": 20 }
+        },
+        {
+          name: "Tandoori Dip",
+          nameBn: "তন্দুরি ডিপ",
+          variants: { "Regular": 20 }
+        },
+        {
+          name: "BBQ Dip",
+          nameBn: "বিবিকিউ ডিপ",
+          variants: { "Regular": 20 }
+        },
+        {
+          name: "Peri Peri Dip",
+          nameBn: "পেরি পেরি ডিপ",
+          variants: { "Regular": 20 }
+        }
+      ],
+      "Combos": [
+        {
+          name: "Veg Pizza Combo 1",
+          nameBn: "ভেজ পিজ্জা কম্বো ১",
+          desc: "1 Corn Capsicum Pizza (Ekla) + Drink + 1 Dip",
+          variants: { "Combo": 159 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Veg Pizza Combo 2",
+          nameBn: "ভেজ পিজ্জা কম্বো ২",
+          desc: "1 Margherita Pizza (Bondhu) + Drink + 2 Dips",
+          variants: { "Combo": 219 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Veg Burger Combo",
+          nameBn: "ভেজ বার্গার কম্বো",
+          desc: "1 Veg Burger + Small French Fries + Drink + 1 Dip",
+          variants: { "Combo": 159 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Paneer Pizza Combo",
+          nameBn: "পনির পিজ্জা কম্বো",
+          desc: "1 Paneer Supreme Pizza (Ekla) + Drink + 1 Dip",
+          variants: { "Combo": 199 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Paneer Pizza Combo 2",
+          nameBn: "পনির পিজ্জা কম্বো ২",
+          desc: "1 Peri Peri Pizza (Bondhu) + Drink + 2 Dips",
+          variants: { "Combo": 349 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Tandoori Pack",
+          nameBn: "তন্দুরি প্যাক",
+          desc: "1 Tandoori Chicken Chunk Burger + Small Fries + Drink + 1 Dip",
+          variants: { "Combo": 139 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Chicken Pizza Combo 1",
+          nameBn: "চিকেন পিজ্জা কম্বো ১",
+          desc: "1 Cheese Chicken Mix Pizza (Ekla) + Drink + 1 Dip",
+          variants: { "Combo": 199 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Chicken Pizza Combo 2",
+          nameBn: "চিকেন পিজ্জা কম্বো ২",
+          desc: "1 Onion Chicken Pizza (Bondhu) + Drink + 2 Dips",
+          variants: { "Combo": 359 },
+          deliveryAvailable: false
+        },
+        {
+          name: "Chicken Burger Combo",
+          nameBn: "চিকেন বার্গার কম্বো",
+          desc: "2 Classic Chicken Burgers + Medium Fries + 2 Drinks + 2 Dips",
+          variants: { "Combo": 199 },
+          deliveryAvailable: false
+        }
+      ]
+    };
+
+    const selectedItems = [];
+    const tabsDiv = document.getElementById("tabs");
+    const container = document.getElementById("menuContainer");
+    const totalBill = document.getElementById("liveTotal");
+    const cartList = document.getElementById("cartItems");
+    const searchInput = document.getElementById("searchInput");
+    const deliveryChargeDisplay = document.getElementById("deliveryChargeDisplay");
+    const locationStatus = document.getElementById("locationStatus");
+    const deliveryAddressContainer = document.getElementById("deliveryAddressContainer");
+    const orderTypeSelect = document.getElementById("orderType");
+    let currentCategory = null;
+    const MIN_DELIVERY_ORDER = 200;
+    let deliveryDistance = null;
+    let isLocationFetching = false;
+    let userLocation = null;
+    let watchId = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeTabs();
+      if (orderTypeSelect.value === 'Delivery') {
+        startLocationTracking();
+      }
+    });
+
+    function initializeTabs() {
+      for (const category in fullMenu) {
+        const tabBtn = document.createElement("button");
+        tabBtn.textContent = category;
+        tabBtn.onclick = () => {
+          searchInput.value = '';
+          renderCategory(category);
+          document.getElementById("menuContainer").scrollIntoView({ behavior: 'smooth' });
+        };
+        tabsDiv.appendChild(tabBtn);
+      }
+      const firstCategory = Object.keys(fullMenu)[0];
+      if (firstCategory) renderCategory(firstCategory);
+    }
+
+    orderTypeSelect.addEventListener('change', function() {
+      const isDelivery = this.value === 'Delivery';
+      deliveryAddressContainer.style.display = isDelivery ? 'block' : 'none';
+      deliveryChargeDisplay.style.display = 'none';
+      locationStatus.style.display = 'none';
+      
+      if (isDelivery) {
+        startLocationTracking();
+      } else {
+        stopLocationTracking();
+        deliveryDistance = null;
+      }
+      
+      // Re-render current category to update disabled state
+      if (currentCategory) {
+        renderCategory(currentCategory, searchInput.value);
+      }
+      updateCart();
+    });
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function calculateDeliveryTime(distanceKm) {
+      if (!distanceKm) return "Unknown";
+      const preparationTime = 20; // 20 minutes food preparation
+      const travelTimePerKm = 8;  // 8 minutes per km travel
+      const travelTime = Math.round(distanceKm * travelTimePerKm);
+      const totalTime = preparationTime + travelTime;
+      
+      return `${totalTime} minutes (${preparationTime} min prep + ${travelTime} min travel)`;
+    }
+
+    function calculateDeliveryCharge(total, distance) {
+      if (total >= 500) return { charge: 0, message: "🎉 Free delivery (order above ₹500)" };
+      if (!distance || distance <= 4) return { charge: 0, message: "Free delivery (within 4km)" };
+      if (distance <= 6) return { charge: 20, message: `Delivery charge: ₹20 (${distance.toFixed(1)}km)` };
+      if (distance <= 8) return { charge: 30, message: `Delivery charge: ₹30 (${distance.toFixed(1)}km)` };
+      return { charge: null, message: "🚫 Delivery not available beyond 8km" };
+    }
+
+    function startLocationTracking() {
+      if (isLocationFetching) return;
+      
+      isLocationFetching = true;
+      locationStatus.style.display = 'block';
+      locationStatus.className = 'location-loading';
+      locationStatus.textContent = "Detecting your location...";
+      
+      if (!navigator.geolocation) {
+        locationStatus.className = 'location-error';
+        locationStatus.textContent = "Geolocation is not supported by your browser.";
+        isLocationFetching = false;
+        return;
+      }
+
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const userLat = position.coords.latitude;
+          const userLng = position.coords.longitude;
+          userLocation = { lat: userLat, lng: userLng };
+          
+          document.getElementById('deliveryLatitude').value = userLat;
+          document.getElementById('deliveryLongitude').value = userLng;
+          
+          deliveryDistance = calculateDistance(
+            userLat, 
+            userLng,
+            RESTAURANT_LOCATION.lat,
+            RESTAURANT_LOCATION.lng
+          );
+          
+          updateLocationDisplay(userLat, userLng, deliveryDistance);
+          locationStatus.className = 'location-success';
+          locationStatus.innerHTML = `Location tracking active`;
+          isLocationFetching = false;
+          updateCart();
+        },
+        (error) => {
+          locationStatus.className = 'location-error';
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              locationStatus.textContent = "Location access was denied. Please enable it.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              locationStatus.textContent = "Location information is unavailable.";
+              break;
+            case error.TIMEOUT:
+              locationStatus.textContent = "The request to get location timed out.";
+              break;
+            default:
+              locationStatus.textContent = "An unknown error occurred.";
+          }
+          isLocationFetching = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function updateLocationDisplay(lat, lng, distance) {
+      document.getElementById('locationText').textContent = `📍 Your location detected`;
+      document.getElementById('locationMapLink').innerHTML = 
+        `<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color: var(--primary-color);">
+           View on Google Maps
+         </a>`;
+      
+      const estimatedTime = calculateDeliveryTime(distance);
+      document.getElementById('deliveryEstimate').innerHTML = 
+        `📏 Distance: <strong>${distance.toFixed(1)}km</strong> | 
+         ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
+    }
+
+    function stopLocationTracking() {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
+    }
+
+    document.getElementById('refreshLocationBtn').addEventListener('click', function() {
+      stopLocationTracking();
+      startLocationTracking();
+    });
+
+    function renderCategory(category, searchTerm = '') {
+      container.innerHTML = "";
+      currentCategory = category;
+      
+      const section = document.createElement("div");
+      section.className = "category";
+      section.textContent = category;
+      container.appendChild(section);
+
+      const filteredItems = fullMenu[category].filter(item => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
+        return (
+          item.name.toLowerCase().includes(term) ||
+          (item.nameBn && item.nameBn.includes(term)) ||
+          item.desc.toLowerCase().includes(term)
+        );
+      });
+
+      if (filteredItems.length === 0) {
+        const noResults = document.createElement("div");
+        noResults.className = "no-results";
+        noResults.textContent = "No items found matching your search.";
+        container.appendChild(noResults);
+        return;
+      }
+
+      filteredItems.forEach((item) => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "item";
+        
+        // Add disabled class if combo and delivery
+        if (category === "Combos" && orderTypeSelect.value === "Delivery") {
+          itemDiv.classList.add("disabled-item");
+          itemDiv.title = "Combos not available for delivery";
+        }
+
+        const title = document.createElement("h3");
+        title.textContent = item.name;
+
+        const bn = document.createElement("small");
+        bn.textContent = item.nameBn || "";
+
+        const desc = document.createElement("p");
+        desc.className = "desc";
+        desc.textContent = item.desc || "";
+
+        const variantDiv = document.createElement("div");
+        variantDiv.className = "variants";
+        for (const [variant, price] of Object.entries(item.variants)) {
+          const label = document.createElement("label");
+          label.textContent = `${variant} ₹${price}`;
+          
+          // Disable click if combo and delivery
+          if (category === "Combos" && orderTypeSelect.value === "Delivery") {
+            label.style.opacity = "0.6";
+            label.style.cursor = "not-allowed";
+            label.title = "Combos not available for delivery";
+          } else {
+            label.onclick = () => addToOrder(item.name, variant, price);
+          }
+          
+          variantDiv.appendChild(label);
+        }
+
+        itemDiv.appendChild(title);
+        itemDiv.appendChild(bn);
+        itemDiv.appendChild(desc);
+        itemDiv.appendChild(variantDiv);
+        container.appendChild(itemDiv);
+      });
+    }
+
+    searchInput.addEventListener('input', (e) => {
+      if (currentCategory) {
+        renderCategory(currentCategory, e.target.value);
+      }
+    });
+
+    function addToOrder(name, variant, price) {
+      selectedItems.push({ name, variant, price });
+      updateCart();
+      
+      const itemAdded = document.createElement("div");
+      itemAdded.textContent = `Added ${name} (${variant}) to cart!`;
+      itemAdded.style.position = "fixed";
+      itemAdded.style.bottom = "20px";
+      itemAdded.style.right = "20px";
+      itemAdded.style.backgroundColor = "#4CAF50";
+      itemAdded.style.color = "white";
+      itemAdded.style.padding = "10px 20px";
+      itemAdded.style.borderRadius = "5px";
+      itemAdded.style.zIndex = "1000";
+      itemAdded.style.boxShadow = "0 2px 5px rgba(0,0,0,0.2)";
+      document.body.appendChild(itemAdded);
+      
+      setTimeout(() => {
+        itemAdded.style.transition = "opacity 0.5s";
+        itemAdded.style.opacity = "0";
+        setTimeout(() => itemAdded.remove(), 500);
+      }, 2000);
+    }
+
+    function updateCart() {
+      cartList.innerHTML = "";
+      const subtotal = selectedItems.reduce((sum, item) => sum + item.price, 0);
+      
+      let deliveryCharge = 0;
+      let deliveryMessage = "";
+      const orderType = orderTypeSelect.value;
+      
+      if (orderType === 'Delivery') {
+        const result = calculateDeliveryCharge(subtotal, deliveryDistance);
+        deliveryCharge = result.charge || 0;
+        deliveryMessage = result.message;
+        
+        if (deliveryCharge !== null) {
+          const estimatedTime = calculateDeliveryTime(deliveryDistance);
+          deliveryMessage += ` | ⏳ Est. Delivery: ${estimatedTime}`;
+          deliveryChargeDisplay.textContent = deliveryMessage;
+          deliveryChargeDisplay.style.display = 'block';
+        } else {
+          deliveryChargeDisplay.textContent = deliveryMessage;
+          deliveryChargeDisplay.style.color = 'var(--error-color)';
+          deliveryChargeDisplay.style.display = 'block';
+        }
+      }
+
+      const total = subtotal + (deliveryCharge || 0);
+      
+      selectedItems.forEach((item, index) => {
+        const li = document.createElement("li");
+        li.textContent = `${index + 1}. ${item.name} (${item.variant}) - ₹${item.price}`;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "Remove";
+        removeBtn.className = "remove-btn";
+        removeBtn.onclick = () => {
+          selectedItems.splice(index, 1);
+          updateCart();
+        };
+        li.appendChild(removeBtn);
+        cartList.appendChild(li);
+      });
+
+      let billText = `Subtotal: ₹${subtotal}`;
+      if (deliveryCharge > 0) {
+        billText += ` + Delivery: ₹${deliveryCharge}`;
+      } else if (orderType === 'Delivery' && deliveryCharge === 0) {
+        billText += ` + Delivery: Free`;
+      }
+      billText += ` = Total: ₹${total}`;
+      
+      if (orderType === 'Delivery' && deliveryCharge === null) {
+        billText += " (Delivery not available)";
+      }
+      
+      totalBill.innerHTML = billText;
+    }
+
+    function confirmOrder() {
+      const name = document.getElementById("customerName").value.trim();
+      const phone = document.getElementById("phoneNumber").value.trim();
+      const orderType = orderTypeSelect.value;
+      const subtotal = selectedItems.reduce((sum, item) => sum + item.price, 0);
+      
+      // Check if any combo items are in cart for delivery
+      if (orderType === "Delivery") {
+        const hasCombos = selectedItems.some(item => {
+          return Object.keys(fullMenu).some(category => {
+            return category === "Combos" && 
+                   fullMenu[category].some(combo => combo.name === item.name);
+          });
+        });
+        
+        if (hasCombos) {
+          alert("Combos are not available for delivery. Please remove combo items or choose pickup.");
+          return;
+        }
+      }
+
+      if (orderType === 'Delivery' && subtotal < MIN_DELIVERY_ORDER) {
+        alert(`Minimum order for delivery is ₹${MIN_DELIVERY_ORDER}. Please add more items or choose pickup.`);
+        return;
+      }
+
+      if (!name || !phone) {
+        alert("Please enter your name and phone number.");
+        return;
+      }
+
+      if (!/^\d{10}$/.test(phone)) {
+        alert("Please enter a valid 10-digit phone number.");
+        return;
+      }
+
+      let deliveryCharge = 0;
+      let deliveryMessage = "";
+      if (orderType === 'Delivery') {
+        const result = calculateDeliveryCharge(subtotal, deliveryDistance);
+        deliveryCharge = result.charge || 0;
+        deliveryMessage = result.message;
+        
+        if (deliveryCharge === null) {
+          alert("Delivery not available to your location. Please choose pickup.");
+          return;
+        }
+      }
+      const total = subtotal + deliveryCharge;
+
+      let confirmationHTML = `
+        <div class="order-summary-item"><strong>Customer:</strong> ${name}</div>
+        <div class="order-summary-item"><strong>Phone:</strong> ${phone}</div>
+        <div class="order-summary-item"><strong>Order Type:</strong> ${orderType}</div>`;
+      
+      if (orderType === 'Delivery') {
+        const estimatedTime = calculateDeliveryTime(deliveryDistance);
+        confirmationHTML += `
+          <div class="order-summary-item"><strong>Location:</strong> <a href="https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}" target="_blank">View on Map</a></div>
+          <div class="order-summary-item"><strong>Distance:</strong> ${deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>
+          <div class="order-summary-item"><strong>Estimated Delivery:</strong> ${estimatedTime}</div>`;
+      }
+      
+      confirmationHTML += `<div class="order-summary-item"><strong>Items:</strong></div>`;
+      
+      selectedItems.forEach((item, index) => {
+        confirmationHTML += `
+          <div class="order-summary-item">
+            ${index + 1}. ${item.name} (${item.variant}) - ₹${item.price}
+          </div>`;
+      });
+      
+      confirmationHTML += `
+        <div class="order-summary-item"><strong>Subtotal:</strong> ₹${subtotal}</div>`;
+      
+      if (deliveryCharge > 0) {
+        confirmationHTML += `
+          <div class="order-summary-item"><strong>Delivery Charge:</strong> ₹${deliveryCharge}</div>`;
+      } else if (orderType === 'Delivery') {
+        confirmationHTML += `
+          <div class="order-summary-item"><strong>Delivery Charge:</strong> Free</div>`;
+      }
+      
+      confirmationHTML += `
+        <div class="order-summary-item" style="font-weight:bold; color:var(--primary-color); border-bottom:none;">
+          <strong>Total Amount:</strong> ₹${total}
+        </div>`;
+      
+      document.getElementById("orderConfirmationDetails").innerHTML = confirmationHTML;
+      const modal = document.getElementById("orderConfirmationModal");
+      modal.style.display = "block";
+      
+      document.querySelector(".close-modal").onclick = function() {
+        modal.style.display = "none";
+      }
+      
+      document.getElementById("cancelOrderBtn").onclick = function() {
+        modal.style.display = "none";
+      }
+      
+      document.getElementById("confirmOrderBtn").onclick = function() {
+        modal.style.display = "none";
+        sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total);
+      }
+      
+      window.onclick = function(event) {
+        if (event.target == modal) {
+          modal.style.display = "none";
+        }
+      }
+    }
+
+    function generatePDFBill(orderDetails) {
+      const doc = new jsPDF();
+      
+      doc.setFontSize(20);
+      doc.setTextColor(40, 40, 40);
+      doc.text('Bake & Grill', 105, 20, { align: 'center' });
+      doc.setFontSize(12);
+      doc.text('Delicious food delivered to your doorstep', 105, 28, { align: 'center' });
+      
+      doc.setFontSize(16);
+      doc.setTextColor(214, 40, 40);
+      doc.text('ORDER RECEIPT', 105, 40, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`Order #: ${Math.floor(100000 + Math.random() * 900000)}`, 15, 50);
+      doc.text(`Date: ${new Date().toLocaleString()}`, 15, 58);
+      doc.text(`Customer: ${orderDetails.name}`, 15, 66);
+      doc.text(`Phone: ${orderDetails.phone}`, 15, 74);
+      doc.text(`Order Type: ${orderDetails.orderType}`, 15, 82);
+      
+      if (orderDetails.orderType === 'Delivery') {
+        doc.text(`Location: ${orderDetails.userLocation.lat}, ${orderDetails.userLocation.lng}`, 15, 90);
+        doc.text(`Distance: ${orderDetails.distance}`, 15, 98);
+        doc.text(`Est. Delivery: ${calculateDeliveryTime(orderDetails.distance)}`, 15, 106);
+      }
+      
+      doc.autoTable({
+        startY: 120,
+        head: [['#', 'Item', 'Variant', 'Price (₹)']],
+        body: orderDetails.items.map((item, index) => [
+          index + 1,
+          item.name,
+          item.variant,
+          item.price
+        ]),
+        theme: 'grid',
+        headStyles: {
+          fillColor: [214, 40, 40],
+          textColor: [255, 255, 255]
+        }
+      });
+      
+      const finalY = doc.lastAutoTable.finalY + 10;
+      doc.text(`Subtotal: ₹${orderDetails.subtotal}`, 140, finalY);
+      
+      if (orderDetails.deliveryCharge > 0) {
+        doc.text(`Delivery Charge: ₹${orderDetails.deliveryCharge}`, 140, finalY + 8);
+      } else if (orderDetails.orderType === 'Delivery') {
+        doc.text(`Delivery Charge: Free`, 140, finalY + 8);
+      }
+      
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Total Amount: ₹${orderDetails.total}`, 140, finalY + 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Thank you for your order!', 105, 280, { align: 'center' });
+      doc.text('For any queries, contact: +91 8240266267', 105, 285, { align: 'center' });
+      
+      doc.save(`BakeAndGrill_Order_${orderDetails.name}.pdf`);
+    }
+
+    function sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total) {
+      let orderDetails = "";
+      selectedItems.forEach((item, index) => {
+        orderDetails += `${index + 1}. ${item.name} (${item.variant}) - ₹${item.price}\n`;
+      });
+
+      orderDetails += `\nSubtotal: ₹${subtotal}`;
+      if (deliveryCharge > 0) {
+        orderDetails += `\nDelivery Charge: ₹${deliveryCharge}`;
+      } else if (orderType === 'Delivery') {
+        orderDetails += `\nDelivery Charge: Free`;
+      }
+      orderDetails += `\nTotal: ₹${total}`;
+
+      if (orderType === "Delivery" && userLocation) {
+        const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
+        const estimatedTime = calculateDeliveryTime(deliveryDistance);
+        const travelTime = Math.round(deliveryDistance * 8);
+        
+        orderDetails += `\n\n📍 Delivery Location:\n${mapsLink}`;
+        orderDetails += `\n📏 Distance: ${deliveryDistance.toFixed(1)}km`;
+        orderDetails += `\n⏳ Estimated Delivery: ${estimatedTime}`;
+        orderDetails += `\n   (20 min preparation + ${travelTime} min travel)`;
+      }
+
+      const message = `🍽 *New ${orderType} Order from Bake & Grill*\n\n👤 Name: ${name}\n📞 Phone: ${phone}\n\n📦 Order Details:\n${orderDetails}`;
+      const whatsappURL = `https://wa.me/918240266267?text=${encodeURIComponent(message)}`;
+      window.open(whatsappURL, '_blank');
+      
+      const pdfOrderDetails = {
+        name,
+        phone,
+        orderType,
+        userLocation,
+        distance: deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown',
+        items: selectedItems,
+        subtotal,
+        deliveryCharge,
+        total
+      };
+      
+      document.getElementById('downloadBillBtn').style.display = 'block';
+      document.getElementById('downloadBillBtn').onclick = function() {
+        generatePDFBill(pdfOrderDetails);
+      };
+      
+      selectedItems.length = 0;
+      updateCart();
+      document.getElementById("customerName").value = "";
+      document.getElementById("phoneNumber").value = "";
+    }
+  </script>
+</body>
+</html>
