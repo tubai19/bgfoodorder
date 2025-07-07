@@ -38,6 +38,97 @@
       line-height: 1.6;
     }
     
+    /* Hero Banner Styles */
+    .hero-banner {
+      background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1513104890138-7c749659a591?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80');
+      background-size: cover;
+      background-position: center;
+      padding: 5rem 1rem;
+      text-align: center;
+      color: white;
+      margin-bottom: 2rem;
+    }
+    
+    .hero-content {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .hero-content h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .hero-content p {
+      font-size: 1.25rem;
+      margin-bottom: 2rem;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+    
+    .cta-btn {
+      background: var(--primary-color);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 30px;
+      text-decoration: none;
+      font-weight: bold;
+      display: inline-block;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    
+    .cta-btn:hover {
+      background: #a4161a;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    
+    /* Category Navigation */
+    .category-nav {
+      display: flex;
+      justify-content: space-around;
+      padding: 1rem;
+      background: white;
+      margin: 1rem 0;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      flex-wrap: wrap;
+    }
+    
+    .category-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      flex: 1 1 22%;
+      min-width: 80px;
+      margin: 0.5rem;
+    }
+    
+    .category-icon {
+      background: #f5f5f5;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 0.5rem;
+      transition: all 0.3s ease;
+    }
+    
+    .category-btn:hover .category-icon {
+      background: var(--light-accent);
+      transform: scale(1.1);
+    }
+    
+    .category-btn span {
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: block;
+    }
+    
     .container {
       padding: 1rem;
       max-width: 960px;
@@ -56,6 +147,7 @@
       font-size: 2rem;
       color: var(--primary-color);
       margin-bottom: 0.5rem;
+      font-weight: 700;
     }
     
     .tagline {
@@ -113,34 +205,49 @@
     }
     
     .category {
-      font-size: 1.25rem;
+      font-size: 1.5rem;
       font-weight: bold;
-      margin: 1.5rem 0 0.75rem;
+      margin: 2rem 0 1rem;
       color: var(--primary-color);
       text-align: center;
       padding-bottom: 0.5rem;
       border-bottom: 2px dashed var(--primary-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
     .item {
       background: white;
-      padding: 1rem;
-      margin-bottom: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
       border-radius: 12px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
       position: relative;
+      overflow: hidden;
     }
     
-    .item:hover { 
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    .item:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    .item::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 5px;
+      height: 100%;
+      background: var(--primary-color);
     }
     
     .item h3 { 
       margin: 0 0 0.375rem; 
-      color: var(--dark-text);
-      font-size: 1.1rem;
+      color: var(--primary-color);
+      font-size: 1.2rem;
+      font-weight: 700;
     }
     
     .item small {
@@ -178,16 +285,25 @@
     }
     
     #cart {
-      background: #fff3f0;
-      padding: 1rem;
+      background: white;
+      padding: 1.5rem;
       border-radius: 10px;
-      margin-top: 1.5rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-top: 2rem;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      border-top: 5px solid var(--primary-color);
     }
     
     #cart h3 {
-      margin-bottom: 0.75rem;
+      margin-bottom: 1rem;
       color: var(--primary-color);
+      font-size: 1.5rem;
+      display: flex;
+      align-items: center;
+    }
+    
+    #cart h3::before {
+      content: "🛒";
+      margin-right: 0.5rem;
     }
     
     #cart ul {
@@ -197,7 +313,7 @@
     #cart li {
       font-size: 0.9375rem;
       margin-bottom: 0.5rem;
-      padding: 0.25rem 0;
+      padding: 0.5rem 0;
       border-bottom: 1px dashed #ddd;
       display: flex;
       justify-content: space-between;
@@ -219,11 +335,12 @@
     }
     
     .form-section {
-      background: #fff3f0;
+      background: white;
       padding: 1.5rem;
       border-radius: 10px;
       margin-top: 2rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      border-top: 5px solid var(--secondary-color);
     }
     
     .form-input {
@@ -271,6 +388,13 @@
       margin-top: 0;
       color: var(--primary-color);
       margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+    }
+    
+    .delivery-info h4::before {
+      content: "🚚";
+      margin-right: 0.5rem;
     }
     
     .delivery-info ul {
@@ -310,10 +434,11 @@
       font-size: 1.125rem;
       color: var(--primary-color);
       margin-bottom: 1rem;
-      padding: 0.5rem;
+      padding: 0.75rem;
       background: white;
       border-radius: 5px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border: 1px dashed var(--primary-color);
     }
     
     .modal {
@@ -516,6 +641,18 @@
         font-size: 15px;
       }
       
+      .hero-banner {
+        padding: 3rem 1rem;
+      }
+      
+      .hero-content h1 {
+        font-size: 2rem;
+      }
+      
+      .hero-content p {
+        font-size: 1rem;
+      }
+      
       #tabs button {
         min-width: 100px;
         padding: 0.5rem;
@@ -523,7 +660,7 @@
       }
       
       .item {
-        padding: 0.75rem;
+        padding: 1rem;
       }
       
       .item h3 {
@@ -548,6 +685,22 @@
         padding: 0.75rem;
       }
       
+      .hero-banner {
+        padding: 2rem 1rem;
+      }
+      
+      .hero-content h1 {
+        font-size: 1.5rem;
+      }
+      
+      .category-nav {
+        gap: 0.5rem;
+      }
+      
+      .category-btn {
+        flex: 1 1 45%;
+      }
+      
       .modal-content {
         width: 95%;
       }
@@ -564,13 +717,42 @@
     <div class="tagline">Delicious food delivered to your doorstep</div>
   </header>
 
+  <!-- Hero Banner Section -->
+  <section class="hero-banner">
+    <div class="hero-content">
+      <h1>🍕 Bake & Grill</h1>
+      <p>Delicious pizzas, burgers & more delivered to your doorstep</p>
+      <a href="#menuContainer" class="cta-btn">Order Now</a>
+    </div>
+  </section>
+
   <div class="container">
     <div id="searchContainer">
       <input type="text" id="searchInput" placeholder="🔍 Search for items (name or description)...">
     </div>
     
+    <!-- Quick Category Navigation -->
+    <div class="category-nav">
+      <button onclick="renderCategory('Veg Pizzas')" class="category-btn">
+        <div class="category-icon">🍕</div>
+        <span>Veg Pizzas</span>
+      </button>
+      <button onclick="renderCategory('Non-Veg Pizzas')" class="category-btn">
+        <div class="category-icon">🍗</div>
+        <span>Non-Veg</span>
+      </button>
+      <button onclick="renderCategory('Burgers')" class="category-btn">
+        <div class="category-icon">🍔</div>
+        <span>Burgers</span>
+      </button>
+      <button onclick="renderCategory('Sandwiches')" class="category-btn">
+        <div class="category-icon">🥪</div>
+        <span>Sandwiches</span>
+      </button>
+    </div>
+    
     <div class="delivery-info">
-      <h4>🚚 Delivery Information</h4>
+      <h4>Delivery Information</h4>
       <ul>
         <li>Minimum order for delivery: <strong>₹200</strong></li>
         <li>Delivery charges:
@@ -593,7 +775,7 @@
     <div id="menuContainer"></div>
     
     <div id="cart">
-      <h3>🛒 Your Cart</h3>
+      <h3>Your Cart</h3>
       <ul id="cartItems"></ul>
     </div>
   </div>
@@ -1255,6 +1437,18 @@
     let watchId = null;
     let isManualLocation = false;
 
+    // Category icons mapping
+    const categoryIcons = {
+      "Veg Pizzas": "🍕",
+      "Paneer Specials": "🧀",
+      "Non-Veg Pizzas": "🍗",
+      "Burgers": "🍔",
+      "Sandwiches": "🥪",
+      "Quick Bites": "🍟",
+      "Dips": "🥫",
+      "Combos": "🎁"
+    };
+
     document.addEventListener('DOMContentLoaded', function() {
       initializeTabs();
       if (orderTypeSelect.value === 'Delivery') {
@@ -1459,7 +1653,7 @@
       
       const section = document.createElement("div");
       section.className = "category";
-      section.textContent = category;
+      section.innerHTML = `<span style="font-size: 1.5rem; margin-right: 0.5rem;">${categoryIcons[category] || "🍽"}</span>${category}`;
       container.appendChild(section);
 
       const filteredItems = fullMenu[category].filter(item => {
