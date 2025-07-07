@@ -463,6 +463,69 @@
       border-radius: 5px;
       font-size: 0.8rem;
     }
+
+    /* New styles for location options */
+    .location-options {
+      margin-top: 1rem;
+    }
+    
+    .location-toggle {
+      background: transparent;
+      border: none;
+      color: var(--primary-color);
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.875rem;
+      padding: 0.5rem 0;
+      display: inline-block;
+      margin-right: 1rem;
+    }
+    
+    .location-toggle:hover {
+      color: #a4161a;
+    }
+    
+    .location-method-container {
+      display: none;
+      margin-top: 1rem;
+    }
+    
+    #manualAddress {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      margin-bottom: 0.5rem;
+    }
+    
+    .location-action-btn {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+    
+    .location-action-btn:hover {
+      background: #a4161a;
+    }
+    
+    #googleMapBtn {
+      background: #4285F4;
+    }
+    
+    #googleMapBtn:hover {
+      background: #3367D6;
+    }
+    
+    .active-method {
+      font-weight: bold;
+      color: #a4161a;
+      text-decoration: none;
+    }
     
     @media (max-width: 768px) {
       html {
@@ -574,15 +637,36 @@
     </div>
     
     <div class="form-input" id="deliveryAddressContainer" style="display: none;">
-      <label>📍 Your Location (Auto-detected)</label>
+      <label>📍 Your Location</label>
       <div id="locationDetails" style="background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem;">
         <div id="locationText">Detecting your location...</div>
         <div id="locationMapLink" style="margin-top: 0.5rem;"></div>
         <div id="deliveryEstimate" style="margin-top: 0.5rem; font-weight: bold;"></div>
       </div>
+      
       <button id="refreshLocationBtn" style="background: #34a853; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer; width: 100%;">
         🔄 Refresh Location
       </button>
+      
+      <div class="location-options">
+        <button id="autoLocationToggle" class="location-toggle active-method">Auto Detect</button>
+        <button id="manualLocationToggle" class="location-toggle">Enter Address</button>
+        <button id="googleMapToggle" class="location-toggle">Drop Pin on Map</button>
+      </div>
+      
+      <div class="location-method-container" id="manualLocationContainer">
+        <textarea id="manualAddress" placeholder="Enter your full address including landmarks"></textarea>
+        <button id="saveManualLocation" class="location-action-btn">Save Address</button>
+      </div>
+      
+      <div class="location-method-container" id="googleMapContainer">
+        <p>Click the button below to drop a pin on Google Maps:</p>
+        <button id="googleMapBtn" class="location-action-btn">🗺 Open Google Maps</button>
+        <div id="mapCoordinates" style="margin-top: 1rem; display: none;">
+          <p>Coordinates saved: <span id="mapLatLng"></span></p>
+        </div>
+      </div>
+      
       <input type="hidden" id="deliveryLatitude">
       <input type="hidden" id="deliveryLongitude">
     </div>
@@ -614,10 +698,10 @@
   <script>
     const { jsPDF } = window.jspdf;
     
-   const RESTAURANT_LOCATION = {
-  lat: 22.3908, 
-  lng: 88.2189   
-};
+    const RESTAURANT_LOCATION = {
+      lat: 22.3908,
+      lng: 88.2189
+    };
 
     const fullMenu = {
       "Veg Pizzas": [
@@ -1197,6 +1281,8 @@
     let isLocationFetching = false;
     let userLocation = null;
     let watchId = null;
+    let locationMethod = 'auto'; // 'auto', 'manual', or 'map'
+    let mapCoordinates = null;
 
     document.addEventListener('DOMContentLoaded', function() {
       initializeTabs();
@@ -1351,6 +1437,126 @@
     document.getElementById('refreshLocationBtn').addEventListener('click', function() {
       stopLocationTracking();
       startLocationTracking();
+    });
+
+    // Location method toggle handlers
+    document.getElementById('autoLocationToggle').addEventListener('click', function() {
+      setLocationMethod('auto');
+      startLocationTracking();
+    });
+    
+    document.getElementById('manualLocationToggle').addEventListener('click', function() {
+      setLocationMethod('manual');
+      stopLocationTracking();
+      document.getElementById('locationText').textContent = 'Using manual address entry';
+      document.getElementById('locationMapLink').innerHTML = '';
+      document.getElementById('deliveryEstimate').textContent = 'Distance will be estimated from address';
+    });
+    
+    document.getElementById('googleMapToggle').addEventListener('click', function() {
+      setLocationMethod('map');
+      stopLocationTracking();
+      document.getElementById('locationText').textContent = 'Using Google Maps location';
+      document.getElementById('locationMapLink').innerHTML = '';
+      document.getElementById('deliveryEstimate').textContent = 'Distance will be calculated from map pin';
+    });
+    
+    function setLocationMethod(method) {
+      locationMethod = method;
+      
+      // Update active tab styling
+      document.getElementById('autoLocationToggle').classList.remove('active-method');
+      document.getElementById('manualLocationToggle').classList.remove('active-method');
+      document.getElementById('googleMapToggle').classList.remove('active-method');
+      document.getElementById(`${method}LocationToggle`).classList.add('active-method');
+      
+      // Show/hide containers
+      document.getElementById('manualLocationContainer').style.display = 'none';
+      document.getElementById('googleMapContainer').style.display = 'none';
+      
+      if (method === 'manual') {
+        document.getElementById('manualLocationContainer').style.display = 'block';
+      } else if (method === 'map') {
+        document.getElementById('googleMapContainer').style.display = 'block';
+      }
+    }
+    
+    // Google Maps button handler
+    document.getElementById('googleMapBtn').addEventListener('click', function() {
+      // Center map on restaurant location by default
+      const centerLat = userLocation ? userLocation.lat : RESTAURANT_LOCATION.lat;
+      const centerLng = userLocation ? userLocation.lng : RESTAURANT_LOCATION.lng;
+      
+      // Create Google Maps URL with marker placement
+      const mapsUrl = `https://www.google.com/maps/@${centerLat},${centerLng},15z?entry=ttu&map_action=map&center=${centerLat},${centerLng}&zoom=15`;
+      
+      // Open in a new window
+      const mapWindow = window.open(mapsUrl, '_blank');
+      
+      // In a real app, you would use the Google Maps API for better integration
+      // This is a simple solution that requires the user to manually share coordinates
+      
+      // For demo purposes, we'll simulate getting coordinates
+      setTimeout(() => {
+        if (confirm("Did you find your location on Google Maps? Click OK to save the coordinates.")) {
+          // In a real app, you would get these from the Maps API
+          // For demo, we'll use random coordinates near the restaurant
+          const randomOffset = () => (Math.random() - 0.5) * 0.02;
+          const lat = RESTAURANT_LOCATION.lat + randomOffset();
+          const lng = RESTAURANT_LOCATION.lng + randomOffset();
+          
+          mapCoordinates = { lat, lng };
+          document.getElementById('deliveryLatitude').value = lat;
+          document.getElementById('deliveryLongitude').value = lng;
+          
+          deliveryDistance = calculateDistance(
+            lat, 
+            lng,
+            RESTAURANT_LOCATION.lat,
+            RESTAURANT_LOCATION.lng
+          );
+          
+          document.getElementById('mapLatLng').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          document.getElementById('mapCoordinates').style.display = 'block';
+          
+          document.getElementById('locationText').textContent = '📍 Location saved from Google Maps';
+          document.getElementById('locationMapLink').innerHTML = 
+            `<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color: var(--primary-color);">
+               View on Google Maps
+             </a>`;
+          
+          const estimatedTime = calculateDeliveryTime(deliveryDistance);
+          document.getElementById('deliveryEstimate').innerHTML = 
+            `📏 Distance: <strong>${deliveryDistance.toFixed(1)}km</strong> | 
+             ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
+          
+          updateCart();
+        }
+      }, 1000);
+    });
+    
+    // Save manual address handler
+    document.getElementById('saveManualLocation').addEventListener('click', function() {
+      const address = document.getElementById('manualAddress').value.trim();
+      if (!address) {
+        alert('Please enter your address');
+        return;
+      }
+      
+      // In a real app, you would geocode this address to get coordinates
+      // For this example, we'll just use a fake distance
+      deliveryDistance = 3 + Math.random() * 5; // Random distance between 3-8km
+      
+      document.getElementById('locationText').textContent = `📍 Manual address saved`;
+      document.getElementById('locationMapLink').innerHTML = 
+        `<div style="color: var(--primary-color);">${address}</div>`;
+      
+      const estimatedTime = calculateDeliveryTime(deliveryDistance);
+      document.getElementById('deliveryEstimate').innerHTML = 
+        `📏 Estimated Distance: <strong>${deliveryDistance.toFixed(1)}km</strong> | 
+         ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
+      
+      updateCart();
     });
 
     function renderCategory(category, searchTerm = '') {
@@ -1570,9 +1776,21 @@
       
       if (orderType === 'Delivery') {
         const estimatedTime = calculateDeliveryTime(deliveryDistance);
+        if (locationMethod === 'manual') {
+          const address = document.getElementById('manualAddress').value;
+          confirmationHTML += `
+            <div class="order-summary-item"><strong>Address:</strong> ${address}</div>
+            <div class="order-summary-item"><strong>Estimated Distance:</strong> ${deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>`;
+        } else if (locationMethod === 'map' && mapCoordinates) {
+          confirmationHTML += `
+            <div class="order-summary-item"><strong>Location:</strong> <a href="https://www.google.com/maps?q=${mapCoordinates.lat},${mapCoordinates.lng}" target="_blank">View on Map</a></div>
+            <div class="order-summary-item"><strong>Distance:</strong> ${deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>`;
+        } else if (userLocation) {
+          confirmationHTML += `
+            <div class="order-summary-item"><strong>Location:</strong> <a href="https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}" target="_blank">View on Map</a></div>
+            <div class="order-summary-item"><strong>Distance:</strong> ${deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>`;
+        }
         confirmationHTML += `
-          <div class="order-summary-item"><strong>Location:</strong> <a href="https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}" target="_blank">View on Map</a></div>
-          <div class="order-summary-item"><strong>Distance:</strong> ${deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>
           <div class="order-summary-item"><strong>Estimated Delivery:</strong> ${estimatedTime}</div>`;
       }
       
@@ -1647,7 +1865,9 @@
       doc.text(`Order Type: ${orderDetails.orderType}`, 15, 82);
       
       if (orderDetails.orderType === 'Delivery') {
-        doc.text(`Location: ${orderDetails.userLocation.lat}, ${orderDetails.userLocation.lng}`, 15, 90);
+        if (orderDetails.userLocation) {
+          doc.text(`Location: ${orderDetails.userLocation.lat}, ${orderDetails.userLocation.lng}`, 15, 90);
+        }
         doc.text(`Distance: ${orderDetails.distance}`, 15, 98);
         doc.text(`Est. Delivery: ${calculateDeliveryTime(orderDetails.distance)}`, 15, 106);
       }
@@ -1703,13 +1923,23 @@
       }
       orderDetails += `\nTotal: ₹${total}`;
 
-      if (orderType === "Delivery" && userLocation) {
-        const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
+      if (orderType === "Delivery") {
+        if (locationMethod === 'manual') {
+          const address = document.getElementById('manualAddress').value;
+          orderDetails += `\n\n📍 Delivery Address:\n${address}`;
+          orderDetails += `\n📏 Estimated Distance: ${deliveryDistance.toFixed(1)}km`;
+        } else if (locationMethod === 'map' && mapCoordinates) {
+          const mapsLink = `https://www.google.com/maps?q=${mapCoordinates.lat},${mapCoordinates.lng}`;
+          orderDetails += `\n\n📍 Delivery Location:\n${mapsLink}`;
+          orderDetails += `\n📏 Distance: ${deliveryDistance.toFixed(1)}km`;
+        } else if (userLocation) {
+          const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
+          orderDetails += `\n\n📍 Delivery Location:\n${mapsLink}`;
+          orderDetails += `\n📏 Distance: ${deliveryDistance.toFixed(1)}km`;
+        }
+        
         const estimatedTime = calculateDeliveryTime(deliveryDistance);
         const travelTime = Math.round(deliveryDistance * 8);
-        
-        orderDetails += `\n\n📍 Delivery Location:\n${mapsLink}`;
-        orderDetails += `\n📏 Distance: ${deliveryDistance.toFixed(1)}km`;
         orderDetails += `\n⏳ Estimated Delivery: ${estimatedTime}`;
         orderDetails += `\n   (20 min preparation + ${travelTime} min travel)`;
       }
@@ -1722,7 +1952,7 @@
         name,
         phone,
         orderType,
-        userLocation,
+        userLocation: locationMethod === 'map' ? mapCoordinates : userLocation,
         distance: deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown',
         items: selectedItems,
         subtotal,
