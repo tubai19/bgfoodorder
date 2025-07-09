@@ -355,12 +355,58 @@
     
     .form-input input,
     .form-input select,
+    .form-input textarea,
     .form-input button {
       padding: 0.75rem;
       width: 100%;
       border-radius: 6px;
       border: 1px solid #ccc;
       font-size: 1rem;
+    }
+    
+    /* Order Type Styles */
+    .order-type-options {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    
+    .order-type-option {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: #f5f5f5;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    
+    .order-type-option input {
+      display: none;
+    }
+    
+    .order-type-option span {
+      font-size: 0.9rem;
+      display: block;
+      margin-top: 0.25rem;
+    }
+    
+    .order-type-option:hover {
+      background: var(--light-accent);
+    }
+    
+    .order-type-option input:checked + span {
+      color: var(--primary-color);
+      font-weight: bold;
+    }
+    
+    .order-type-option input:checked {
+      background: var(--light-accent);
+      border-color: var(--primary-color);
     }
     
     .form-input button {
@@ -674,6 +720,10 @@
       .modal-content {
         margin: 20% auto;
       }
+      
+      .order-type-options {
+        flex-direction: column;
+      }
     }
     
     @media (max-width: 480px) {
@@ -794,12 +844,21 @@
     </div>
     
     <div class="form-input">
-      <label for="orderType">Order Type</label>
-      <select id="orderType">
-        <option value="Delivery" selected>Home Delivery</option>
-        <option value="Pickup">Pickup</option>
-        <option value="Table">Table Booking</option>
-      </select>
+      <label>Order Type</label>
+      <div class="order-type-options">
+        <label class="order-type-option">
+          <input type="radio" name="orderType" value="Delivery" checked>
+          <span>🏠 Home Delivery</span>
+        </label>
+        <label class="order-type-option">
+          <input type="radio" name="orderType" value="Pickup">
+          <span>🚶 Pickup</span>
+        </label>
+        <label class="order-type-option">
+          <input type="radio" name="orderType" value="DineIn">
+          <span>🍽️ Dine In</span>
+        </label>
+      </div>
     </div>
     
     <div class="form-input" id="deliveryAddressContainer" style="display: none;">
@@ -1434,7 +1493,6 @@
     const deliveryChargeDisplay = document.getElementById("deliveryChargeDisplay");
     const locationStatus = document.getElementById("locationStatus");
     const deliveryAddressContainer = document.getElementById("deliveryAddressContainer");
-    const orderTypeSelect = document.getElementById("orderType");
     let currentCategory = null;
     const MIN_DELIVERY_ORDER = 200;
     let deliveryDistance = null;
@@ -1457,7 +1515,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
       initializeTabs();
-      if (orderTypeSelect.value === 'Delivery') {
+      if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
         startLocationTracking();
       }
     });
@@ -1477,24 +1535,27 @@
       if (firstCategory) renderCategory(firstCategory);
     }
 
-    orderTypeSelect.addEventListener('change', function() {
-      const isDelivery = this.value === 'Delivery';
-      deliveryAddressContainer.style.display = isDelivery ? 'block' : 'none';
-      deliveryChargeDisplay.style.display = 'none';
-      locationStatus.style.display = 'none';
-      
-      if (isDelivery) {
-        startLocationTracking();
-      } else {
-        stopLocationTracking();
-        deliveryDistance = null;
-      }
-      
-      // Re-render current category to update disabled state
-      if (currentCategory) {
-        renderCategory(currentCategory, searchInput.value);
-      }
-      updateCart();
+    // Order type radio button change handler
+    document.querySelectorAll('input[name="orderType"]').forEach(radio => {
+      radio.addEventListener('change', function() {
+        const isDelivery = this.value === 'Delivery';
+        deliveryAddressContainer.style.display = isDelivery ? 'block' : 'none';
+        deliveryChargeDisplay.style.display = 'none';
+        locationStatus.style.display = 'none';
+        
+        if (isDelivery) {
+          startLocationTracking();
+        } else {
+          stopLocationTracking();
+          deliveryDistance = null;
+        }
+        
+        // Re-render current category to update disabled state
+        if (currentCategory) {
+          renderCategory(currentCategory, searchInput.value);
+        }
+        updateCart();
+      });
     });
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -1685,7 +1746,7 @@
         itemDiv.className = "item";
         
         // Add disabled class if combo and delivery
-        if (category === "Combos" && orderTypeSelect.value === "Delivery") {
+        if (category === "Combos" && document.querySelector('input[name="orderType"]:checked').value === "Delivery") {
           itemDiv.classList.add("disabled-item");
           itemDiv.title = "Combos not available for delivery";
         }
@@ -1707,7 +1768,7 @@
           label.textContent = `${variant} ₹${price}`;
           
           // Disable click if combo and delivery
-          if (category === "Combos" && orderTypeSelect.value === "Delivery") {
+          if (category === "Combos" && document.querySelector('input[name="orderType"]:checked').value === "Delivery") {
             label.style.opacity = "0.6";
             label.style.cursor = "not-allowed";
             label.title = "Combos not available for delivery";
@@ -1762,7 +1823,7 @@
       
       let deliveryCharge = 0;
       let deliveryMessage = "";
-      const orderType = orderTypeSelect.value;
+      const orderType = document.querySelector('input[name="orderType"]:checked').value;
       
       if (orderType === 'Delivery') {
         const result = calculateDeliveryCharge(subtotal, deliveryDistance);
@@ -1816,7 +1877,7 @@
     function confirmOrder() {
       const name = document.getElementById("customerName").value.trim();
       const phone = document.getElementById("phoneNumber").value.trim();
-      const orderType = orderTypeSelect.value;
+      const orderType = document.querySelector('input[name="orderType"]:checked').value;
       const subtotal = selectedItems.reduce((sum, item) => sum + item.price, 0);
       
       // Check if any combo items are in cart for delivery
