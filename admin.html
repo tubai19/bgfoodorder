@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bake & Grill - Admin Panel</title>
+</head>
+<body>
+  <h1>📋 Bake & Grill - Order Update Panel</h1>
+
+  <!-- Optional: Add phone login later here -->
+
+  <div id="orders"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCLTNqd_JiizF91O8qeDMzy5HXAEDEogWY",
+      authDomain: "bakeandgrillorder.firebaseapp.com",
+      projectId: "bakeandgrillorder",
+      storageBucket: "bakeandgrillorder.firebasestorage.app",
+      messagingSenderId: "51671422767",
+      appId: "1:51671422767:web:7898ed22e2b18cae0933da",
+      measurementId: "G-QYM9FKZ0SL"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function loadOrders() {
+      const snapshot = await getDocs(collection(db, "orders"));
+      let html = "";
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+
+        html += `
+          <div style="border:1px solid #ccc; margin:10px; padding:10px;">
+            <b>Name:</b> ${data.name}<br/>
+            <b>Phone:</b> ${data.phone}<br/>
+            <b>Type:</b> ${data.orderType}<br/>
+            <b>Total:</b> ₹${data.total}<br/>
+            <b>Status:</b> <span id="status-${id}">${data.status}</span><br/>
+            <select onchange="updateStatus('${id}', this.value)">
+              <option ${data.status === 'Pending' ? 'selected' : ''}>Pending</option>
+              <option ${data.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
+              <option ${data.status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
+              <option ${data.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+            </select>
+          </div>
+        `;
+      });
+
+      document.getElementById("orders").innerHTML = html;
+    }
+
+    window.updateStatus = async function(id, newStatus) {
+      const orderRef = doc(db, "orders", id);
+      await updateDoc(orderRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+      document.getElementById(`status-${id}`).innerText = newStatus;
+      alert("✅ Order status updated!");
+    }
+
+    loadOrders();
+  </script>
+</body>
+</html>
