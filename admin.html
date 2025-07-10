@@ -6,15 +6,26 @@
   <title>Bake & Grill - Admin Panel</title>
 </head>
 <body>
-  <h1>📋 Bake & Grill - Order Update Panel</h1>
+  <h1>📋 Bake & Grill - Admin Panel (Phone OTP)</h1>
 
-  <!-- Optional: Add phone login later here -->
+  <!-- Login Popup -->
+  <div id="loginPopup" style="padding:20px; border:1px solid #ccc; max-width:400px;">
+    <h3>Admin Login</h3>
+    <input id="adminPhone" type="tel" placeholder="+91XXXXXXXXXX" /><br><br>
+    <div id="recaptcha-container"></div><br>
+    <button onclick="sendOTP()">Send OTP</button><br><br>
 
-  <div id="orders"></div>
+    <input id="otpCode" placeholder="Enter OTP" /><br><br>
+    <button onclick="verifyOTP()">Verify OTP</button>
+  </div>
+
+  <!-- Orders Panel -->
+  <div id="orders" style="display:none; margin-top:20px;"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
     import { getFirestore, collection, getDocs, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+    import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCLTNqd_JiizF91O8qeDMzy5HXAEDEogWY",
@@ -28,6 +39,50 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // reCAPTCHA setup
+    window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+      'size': 'normal'
+    }, auth);
+
+    let confirmationResult = null;
+
+    window.sendOTP = function() {
+      const phone = document.getElementById("adminPhone").value.trim();
+      signInWithPhoneNumber(auth, phone, window.recaptchaVerifier)
+        .then((result) => {
+          confirmationResult = result;
+          alert("✅ OTP sent!");
+        })
+        .catch((error) => {
+          console.error(error);
+          alert("❌ Failed to send OTP");
+        });
+    }
+
+    window.verifyOTP = function() {
+      const code = document.getElementById("otpCode").value.trim();
+      confirmationResult.confirm(code)
+        .then((result) => {
+          const userPhone = result.user.phoneNumber;
+          console.log("✅ Logged in:", userPhone);
+
+          // ✅ Only allow your admin phone
+          if (userPhone !== "+91YOURADMINNUMBER") {
+            alert("❌ Not authorized!");
+            return;
+          }
+
+          document.getElementById("loginPopup").style.display = "none";
+          document.getElementById("orders").style.display = "block";
+          loadOrders();
+        })
+        .catch((error) => {
+          console.error(error);
+          alert("❌ Invalid OTP");
+        });
+    }
 
     async function loadOrders() {
       const snapshot = await getDocs(collection(db, "orders"));
@@ -64,10 +119,8 @@
         updatedAt: serverTimestamp()
       });
       document.getElementById(`status-${id}`).innerText = newStatus;
-      alert("✅ Order status updated!");
+      alert("✅ Status updated!");
     }
-
-    loadOrders();
   </script>
 </body>
 </html>
