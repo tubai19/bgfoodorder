@@ -681,6 +681,97 @@
     .location-method-toggle:hover {
       color: #a4161a;
     }
+
+    /* Auth styles */
+    #authButtons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      padding: 0.5rem;
+    }
+
+    #userInfo {
+      display: none;
+      align-items: center;
+      gap: 1rem;
+      justify-content: flex-end;
+      padding: 0.5rem;
+    }
+
+    #userGreeting {
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+
+    #userGreeting .welcome-text {
+      font-weight: normal;
+      color: var(--medium-text);
+    }
+
+    .auth-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    #loginBtn {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+    }
+
+    #signupBtn {
+      background: white;
+      color: var(--primary-color);
+      border: 1px solid var(--primary-color);
+    }
+
+    #logoutBtn {
+      background: #f5f5f5;
+      color: var(--error-color);
+      border: 1px solid #ddd;
+    }
+
+    .auth-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .auth-form input {
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+    }
+
+    .auth-submit-btn {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s ease;
+    }
+
+    .auth-submit-btn:hover {
+      background: #a4161a;
+    }
+
+    .auth-error {
+      color: var(--error-color);
+      font-size: 0.875rem;
+      margin-top: -0.5rem;
+    }
     
     @media (max-width: 768px) {
       html {
@@ -758,10 +849,24 @@
       .modal-buttons {
         flex-direction: column;
       }
+
+      #authButtons, #userInfo {
+        justify-content: center;
+      }
     }
   </style>
 </head>
 <body>
+  <div id="authButtons">
+    <button id="loginBtn" class="auth-btn">Login</button>
+    <button id="signupBtn" class="auth-btn">Sign Up</button>
+  </div>
+
+  <div id="userInfo">
+    <div id="userGreeting"></div>
+    <button id="logoutBtn" class="auth-btn">Logout</button>
+  </div>
+
   <header class="header">
     <div class="logo">Bake & Grill</div>
     <div class="tagline">Delicious food delivered to your doorstep</div>
@@ -891,6 +996,7 @@
     </div>
   </div>
 
+  <!-- Order Confirmation Modal -->
   <div id="orderConfirmationModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -908,14 +1014,64 @@
     </div>
   </div>
 
+  <!-- Login Modal -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Login</h2>
+        <span class="close-modal">&times;</span>
+      </div>
+      <form class="auth-form">
+        <div>
+          <label for="loginPhone">Phone Number</label>
+          <input type="tel" id="loginPhone" placeholder="Enter your 10-digit phone number" required>
+        </div>
+        <div>
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Enter your password" required>
+        </div>
+        <div id="loginError" class="auth-error"></div>
+        <button type="button" id="submitLogin" class="auth-submit-btn">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Signup Modal -->
+  <div id="signupModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Sign Up</h2>
+        <span class="close-modal">&times;</span>
+      </div>
+      <form class="auth-form">
+        <div>
+          <label for="signupName">Full Name</label>
+          <input type="text" id="signupName" placeholder="Enter your full name" required>
+        </div>
+        <div>
+          <label for="signupPhone">Phone Number</label>
+          <input type="tel" id="signupPhone" placeholder="Enter your 10-digit phone number" required>
+        </div>
+        <div>
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" placeholder="Create a password (min 6 characters)" required>
+        </div>
+        <div id="signupError" class="auth-error"></div>
+        <button type="button" id="submitSignup" class="auth-submit-btn">Sign Up</button>
+      </form>
+    </div>
+  </div>
+
   <script>
     const { jsPDF } = window.jspdf;
     
+    // Restaurant location
     const RESTAURANT_LOCATION = {
       lat: 22.3908,
       lng: 88.2189
     };
 
+    // Menu data
     const fullMenu = {
       "Veg Pizzas": [
         {
@@ -1484,6 +1640,7 @@
       ]
     };
 
+    // Application state
     const selectedItems = [];
     const tabsDiv = document.getElementById("tabs");
     const container = document.getElementById("menuContainer");
@@ -1513,12 +1670,187 @@
       "Combos": "🎁"
     };
 
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCLTNqd_JiizF91O8qeDMzy5HXAEDEogWY",
+      authDomain: "bakeandgrillorder.firebaseapp.com",
+      projectId: "bakeandgrillorder",
+      storageBucket: "bakeandgrillorder.firebasestorage.app",
+      messagingSenderId: "51671422767",
+      appId: "1:51671422767:web:7898ed22e2b18cae0933da",
+      measurementId: "G-QYM9FKZ0SL"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    const usersCollection = db.collection('users');
+
+    // Initialize application
     document.addEventListener('DOMContentLoaded', function() {
       initializeTabs();
       if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
         startLocationTracking();
       }
+      initAuth();
     });
+
+    // Authentication functions
+    function initAuth() {
+      // Auth state observer
+      auth.onAuthStateChanged(async (user) => {
+        if (user) {
+          // User is signed in
+          document.getElementById('authButtons').style.display = 'none';
+          document.getElementById('userInfo').style.display = 'flex';
+          
+          // Get user data from Firestore
+          try {
+            const userDoc = await usersCollection.doc(user.uid).get();
+            if (userDoc.exists) {
+              const userData = userDoc.data();
+              
+              // Show welcome message with user's name
+              document.getElementById('userGreeting').innerHTML = 
+                `<span class="welcome-text">Welcome,</span> ${userData.name}`;
+              
+              // Pre-fill order form
+              document.getElementById('customerName').value = userData.name;
+              document.getElementById('phoneNumber').value = userData.phone;
+            }
+          } catch (error) {
+            console.error("Error getting user document:", error);
+          }
+        } else {
+          // User is signed out
+          document.getElementById('authButtons').style.display = 'block';
+          document.getElementById('userInfo').style.display = 'none';
+          document.getElementById('userGreeting').textContent = '';
+          
+          // Clear order form
+          document.getElementById('customerName').value = '';
+          document.getElementById('phoneNumber').value = '';
+        }
+      });
+
+      // Auth button event listeners
+      document.getElementById('loginBtn').addEventListener('click', () => {
+        document.getElementById('loginModal').style.display = 'block';
+      });
+
+      document.getElementById('signupBtn').addEventListener('click', () => {
+        document.getElementById('signupModal').style.display = 'block';
+      });
+
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut();
+      });
+
+      // Login handler
+      document.getElementById('submitLogin').addEventListener('click', async () => {
+        const phone = document.getElementById('loginPhone').value;
+        const password = document.getElementById('loginPassword').value;
+        const errorElement = document.getElementById('loginError');
+
+        // Validation
+        if (!phone || !password) {
+          errorElement.textContent = 'Please enter both mobile number and password';
+          return;
+        }
+
+        if (!/^\d{10}$/.test(phone)) {
+          errorElement.textContent = 'Please enter a valid 10-digit mobile number';
+          return;
+        }
+
+        try {
+          // Find user by phone number
+          const querySnapshot = await usersCollection.where('phone', '==', phone).limit(1).get();
+          
+          if (querySnapshot.empty) {
+            errorElement.textContent = 'No account found with this mobile number';
+            return;
+          }
+
+          // Get user data
+          const userDoc = querySnapshot.docs[0];
+          const userData = userDoc.data();
+          
+          // Sign in with email/password
+          await auth.signInWithEmailAndPassword(userData.email, password);
+          
+          // Close modal and clear errors
+          document.getElementById('loginModal').style.display = 'none';
+          errorElement.textContent = '';
+        } catch (error) {
+          console.error("Login error:", error);
+          errorElement.textContent = error.message;
+        }
+      });
+
+      // Signup handler
+      document.getElementById('submitSignup').addEventListener('click', async () => {
+        const name = document.getElementById('signupName').value.trim();
+        const phone = document.getElementById('signupPhone').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        const errorElement = document.getElementById('signupError');
+
+        // Validation
+        if (!name || !phone || !password) {
+          errorElement.textContent = 'Please fill in all fields';
+          return;
+        }
+
+        if (!/^\d{10}$/.test(phone)) {
+          errorElement.textContent = 'Please enter a valid 10-digit mobile number';
+          return;
+        }
+
+        if (password.length < 6) {
+          errorElement.textContent = 'Password must be at least 6 characters';
+          return;
+        }
+
+        try {
+          // Check if phone number already exists
+          const phoneQuery = await usersCollection.where('phone', '==', phone).limit(1).get();
+          if (!phoneQuery.empty) {
+            errorElement.textContent = 'This mobile number is already registered';
+            return;
+          }
+
+          // Generate email from phone number
+          const email = `${phone}@bakeandgrill.com`;
+          
+          // Create user with email/password
+          const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+          
+          // Save additional user data to Firestore
+          await usersCollection.doc(userCredential.user.uid).set({
+            name: name,
+            email: email,
+            phone: phone,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+            orderCount: 0,
+            totalSpent: 0
+          });
+
+          // Close modal and clear errors
+          document.getElementById('signupModal').style.display = 'none';
+          errorElement.textContent = '';
+        } catch (error) {
+          console.error("Signup error:", error);
+          errorElement.textContent = error.message;
+        }
+      });
+
+      // Close modals
+      document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', function() {
+          this.closest('.modal').style.display = 'none';
+        });
+      });
+    }
 
     function initializeTabs() {
       for (const category in fullMenu) {
@@ -1874,7 +2206,7 @@
       totalBill.innerHTML = billText;
     }
 
-    function confirmOrder() {
+    async function confirmOrder() {
       const name = document.getElementById("customerName").value.trim();
       const phone = document.getElementById("phoneNumber").value.trim();
       const orderType = document.querySelector('input[name="orderType"]:checked').value;
@@ -1983,15 +2315,87 @@
         modal.style.display = "none";
       }
       
-      document.getElementById("confirmOrderBtn").onclick = function() {
+      document.getElementById("confirmOrderBtn").onclick = async function() {
         modal.style.display = "none";
-        sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total);
+        
+        // Prepare order data
+        const orderData = {
+          customerName: name,
+          phone: phone,
+          orderType: orderType,
+          items: selectedItems,
+          subtotal: subtotal,
+          deliveryCharge: deliveryCharge,
+          total: total,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Add user info if logged in
+        if (auth.currentUser) {
+          orderData.userId = auth.currentUser.uid;
+          orderData.userEmail = auth.currentUser.email;
+        }
+
+        // Add location info for delivery
+        if (orderType === 'Delivery') {
+          if (isManualLocation) {
+            orderData.deliveryAddress = document.getElementById('manualAddress').value;
+          } else if (userLocation) {
+            orderData.deliveryLocation = {
+              lat: userLocation.lat,
+              lng: userLocation.lng
+            };
+          }
+          orderData.deliveryDistance = deliveryDistance;
+        }
+
+        try {
+          // Save order to Firestore
+          await db.collection("orders").add(orderData);
+          
+          // Update user stats if logged in
+          if (auth.currentUser) {
+            await updateUserAfterOrder(auth.currentUser.uid, total);
+          }
+          
+          // Send WhatsApp notification
+          sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total);
+        } catch (error) {
+          console.error("Error saving order:", error);
+          alert("Failed to save order. Please try again.");
+        }
       }
       
       window.onclick = function(event) {
         if (event.target == modal) {
           modal.style.display = "none";
         }
+      }
+    }
+
+    async function updateUserAfterOrder(userId, orderAmount) {
+      try {
+        const userRef = usersCollection.doc(userId);
+        
+        await db.runTransaction(async (transaction) => {
+          const userDoc = await transaction.get(userRef);
+          if (!userDoc.exists) {
+            throw "User document does not exist!";
+          }
+          
+          const currentOrderCount = userDoc.data().orderCount || 0;
+          const currentTotalSpent = userDoc.data().totalSpent || 0;
+          
+          transaction.update(userRef, {
+            orderCount: currentOrderCount + 1,
+            totalSpent: currentTotalSpent + orderAmount,
+            lastOrder: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        });
+        
+        console.log("User data updated successfully");
+      } catch (error) {
+        console.error("Error updating user data:", error);
       }
     }
 
@@ -2119,5 +2523,10 @@
       document.getElementById("phoneNumber").value = "";
     }
   </script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
 </body>
 </html>
