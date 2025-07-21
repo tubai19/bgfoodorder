@@ -1,0 +1,87 @@
+@media (max-width: 768px) {
+  html {
+    font-size: 15px;
+  }
+  
+  .hero-banner {
+    padding: 3rem 1rem;
+  }
+  
+  .hero-content h1 {
+    font-size: 2rem;
+  }
+  
+  .hero-content p {
+    font-size: 1rem;
+  }
+  
+  #tabs button {
+    min-width: 100px;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .item {
+    padding: 1rem;
+  }
+  
+  .item h3 {
+    font-size: 1rem;
+  }
+  
+  .item small {
+    font-size: 0.8125rem;
+  }
+  
+  .modal-content {
+    margin: 20% auto;
+  }
+  
+  .order-type-options {
+    flex-direction: column;
+  }
+  
+  .location-prompt {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .location-prompt-btn {
+    margin: 0.5rem 0 0 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 14px;
+  }
+  
+  .container {
+    padding: 0.75rem;
+  }
+  
+  .hero-banner {
+    padding: 2rem 1rem;
+  }
+  
+  .hero-content h1 {
+    font-size: 1.5rem;
+  }
+  
+  .category-nav {
+    gap: 0.5rem;
+  }
+  
+  .category-btn {
+    flex: 1 1 45%;
+  }
+  
+  .modal-content {
+    width: 95%;
+  }
+  
+  .modal-buttons {
+    flex-direction: column;
+  }
+}
