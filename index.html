@@ -3,10 +3,327 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bake & Grill - Order Online</title>
+  <title>Bake & Grill - Order Online | Bakhrahat, Amatala, Muchisa</title>
+  <meta name="description" content="Delicious pizzas, burgers & more delivered to your doorstep in Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  
+  <!-- Google Schema Markup -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    "name": "Bake & Grill",
+    "description": "Delicious pizzas, burgers & more delivered to your doorstep in Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth",
+    "url": "https://www.bakeandgrillorder.shop",
+    "servesCuisine": ["Indian", "Italian", "Fast Food"],
+    "image": "https://www.bakeandgrillorder.shop/images/restaurant.jpg",
+    "priceRange": "$$",
+    "telephone": "+918240266267",
+    "email": "bakeandgrill@gmail.com",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Thakurpukur Bakhrahat Road",
+      "addressLocality": "Sanjua bakhrahat",
+      "addressRegion": "West Bengal",
+      "postalCode": "743377",
+      "addressCountry": "IN"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "22.3908",
+      "longitude": "88.2189"
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+      ],
+      "opens": "16:00",
+      "closes": "22:00"
+    },
+    "hasMap": "https://maps.google.com/?q=22.3908,88.2189",
+    "areaServed": {
+      "@type": "GeoShape",
+      "circle": "22.3908 88.2189 8000",
+      "description": "Serving Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth"
+    },
+    "containsPlace": {
+      "@type": "Place",
+      "name": "Sanjua Future Gems Academy",
+      "description": "Landmark near our restaurant"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      --primary: #e63946;
+      --secondary: #f1faee;
+      --accent: #a8dadc;
+      --dark: #1d3557;
+      --light: #f8f9fa;
+      --success: #2a9d8f;
+      --warning: #e9c46a;
+      --danger: #e76f51;
+      --contact: #3a86ff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: var(--light);
+    }
+    
+    .header {
+      background: var(--primary);
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .logo {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    
+    .tagline {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+    
+    .hero-banner {
+      background: linear-gradient(rgba(0,0,0,0.6), url('images/hero-bg.jpg') center/cover;
+      height: 60vh;
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      text-align: center;
+      padding: 2rem;
+    }
+    
+    .hero-content h1 {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .hero-content p {
+      font-size: 1.5rem;
+      margin-bottom: 2rem;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+    
+    .cta-btn {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 1.2rem;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .cta-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+      background: #d62828;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+    
+    .delivery-info h2 {
+      color: var(--primary);
+      margin-bottom: 1rem;
+      font-size: 1.8rem;
+    }
+    
+    .delivery-info h3 {
+      color: var(--dark);
+      margin: 1.5rem 0 1rem;
+      font-size: 1.4rem;
+    }
+    
+    .delivery-info p {
+      margin-bottom: 1rem;
+      line-height: 1.7;
+    }
+    
+    ul {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    li {
+      margin-bottom: 0.5rem;
+    }
+    
+    .contact-highlight {
+      color: var(--contact);
+      font-weight: bold;
+    }
+    
+    .contact-highlight a {
+      color: inherit;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    
+    .contact-highlight a:hover {
+      text-decoration: underline;
+    }
+    
+    .footer {
+      background: var(--dark);
+      color: white;
+      padding: 3rem 0 1.5rem;
+      text-align: center;
+    }
+    
+    .footer-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem;
+      text-align: left;
+    }
+    
+    .footer-section {
+      margin-bottom: 1.5rem;
+    }
+    
+    .footer-section h3 {
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+    }
+    
+    .footer-section p {
+      margin-bottom: 0.8rem;
+      opacity: 0.9;
+    }
+    
+    .copyright {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    
+    .fssai-badge {
+      display: inline-block;
+      background: var(--success);
+      color: white;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+    
+    /* Form styles */
+    .form-section {
+      background: white;
+      border-radius: 10px;
+      padding: 2rem;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      margin-top: 2rem;
+    }
+    
+    .form-input {
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-input label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+      color: var(--dark);
+    }
+    
+    .form-input input[type="text"],
+    .form-input input[type="tel"],
+    .form-input input[type="email"],
+    .form-input textarea {
+      width: 100%;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 1rem;
+    }
+    
+    .form-input textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    button:hover {
+      background: #d62828;
+      transform: translateY(-2px);
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .hero-content h1 {
+        font-size: 2.2rem;
+      }
+      
+      .hero-content p {
+        font-size: 1.2rem;
+      }
+      
+      .footer-container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- Header Section -->
@@ -20,14 +337,14 @@
     <div class="hero-content">
       <h1>🍕 Bake & Grill</h1>
       <p>Delicious pizzas, burgers & more delivered to your doorstep</p>
-      <a href="#menuContainer" class="cta-btn">Order Now</a>
+      <a href="#menuContainer" class="cta-btn">Order Now <i class="fas fa-arrow-right"></i></a>
     </div>
   </section>
 
   <!-- Main Content -->
   <div class="container">
     <!-- Search and menu sections -->
-    <div id="searchContainer">
+    <div id="searchContainer" class="card">
       <input type="text" id="searchInput" placeholder="🔍 Search for items (name or description)...">
     </div>
     
@@ -35,8 +352,18 @@
     <div id="tabs" class="category-nav"></div>
     
     <!-- Delivery Info -->
-    <div class="delivery-info">
-      <h4>Delivery Information</h4>
+    <div class="delivery-info card">
+      <h2><i class="fas fa-truck"></i> Service Areas</h2>
+      <p>We deliver to: Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth</p>
+      
+      <h3><i class="fas fa-map-marker-alt"></i> Restaurant Location</h3>
+      <p>
+        <strong>Address:</strong> Thakurpukur Bakhrahat Road, Sanjua bakhrahat<br>
+        <strong>Landmark:</strong> Near Sanjua Future Gems Academy / Sanjua Boimela Ground<br>
+        <strong>Pincode:</strong> 743377
+      </p>
+      
+      <h3><i class="fas fa-info-circle"></i> Delivery Information</h3>
       <ul>
         <li>Minimum order for delivery: <strong>₹200</strong></li>
         <li>Delivery charges:
@@ -51,7 +378,7 @@
         <li>Delivery time estimate: 20 minutes preparation + 8 minutes per km travel</li>
       </ul>
       <div id="locationStatus" class="location-loading" style="display:none;">
-        Calculating your distance from the restaurant...
+        Calculating your distance from our restaurant...
       </div>
     </div>
 
@@ -59,114 +386,150 @@
       Delivery not available to your location (beyond 8km). Please choose pickup or visit our restaurant.
     </div>
 
-    <div id="menuContainer"></div>
+    <div id="menuContainer" class="card"></div>
     
-    <div id="cart">
-      <h3>Your Cart</h3>
+    <div id="cart" class="card">
+      <h3><i class="fas fa-shopping-cart"></i> Your Cart</h3>
       <ul id="cartItems"></ul>
-    </div>
-  </div>
-
-  <!-- Order Form Section -->
-  <div class="container form-section">
-    <div id="liveTotal">💰 Total Bill: ₹0</div>
-    
-    <div class="form-input">
-      <label for="customerName">Your Name</label>
-      <input type="text" id="customerName" placeholder="Enter your name" required>
-    </div>
-    
-    <div class="form-input">
-      <label for="phoneNumber">Phone Number</label>
-      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required>
+      <div id="cartTotal" style="font-weight: bold; font-size: 1.2rem;">Total: ₹0</div>
     </div>
 
-    <button id="quickLocationBtn" class="quick-location-btn">
-      📍 <span>Share My Current Location</span>
-    </button>
-    <div id="quickLocationStatus" class="quick-location-status"></div>
-    
-    <div class="form-input">
-      <label>Order Type</label>
-      <div class="order-type-options">
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="Delivery" checked>
-          <span>🏠 Home Delivery</span>
-        </label>
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="Pickup">
-          <span>🚶 Pickup</span>
-        </label>
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="DineIn">
-          <span>🍽️ Dine In</span>
-        </label>
-      </div>
-    </div>
-    
-    <div class="form-input" id="deliveryAddressContainer" style="display: none;">
-      <label>📍 Your Location</label>
+    <!-- Order Form Section -->
+    <div class="form-section">
+      <div id="liveTotal" style="font-size: 1.3rem; font-weight: bold; text-align: center; margin-bottom: 1.5rem;">💰 Total Bill: ₹0</div>
       
-      <div id="locationPrompt" class="location-prompt" style="display: none;">
-        <div class="location-prompt-text">
-          <span class="location-prompt-icon">📍</span>
-          <span>To place a delivery order, please share your current location</span>
-        </div>
-        <button id="shareLocationBtn" class="location-prompt-btn">Share My Location</button>
+      <div class="form-input">
+        <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
+        <input type="text" id="customerName" placeholder="Enter your name" required>
       </div>
       
-      <div id="locationAccuracyWarning" class="location-accuracy-warning" style="display: none;">
-        Your location accuracy is low. For accurate delivery time and charges, please ensure high accuracy GPS is enabled.
+      <div class="form-input">
+        <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
+        <input type="tel" id="phoneNumber" placeholder="Enter phone number" required>
       </div>
-      
-      <div id="locationDetails" style="background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: none;">
-        <div id="locationText">Detecting your location...</div>
-        <div id="locationMapLink" style="margin-top: 0.5rem;"></div>
-        <div id="deliveryEstimate" style="margin-top: 0.5rem; font-weight: bold;"></div>
+
+      <div class="form-input">
+        <label for="email"><i class="fas fa-envelope"></i> Email (Optional)</label>
+        <input type="email" id="email" placeholder="Enter email for receipt">
       </div>
-      
-      <button id="refreshLocationBtn" style="background: #34a853; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer; width: 100%; display: none;">
-        🔄 Refresh Location
+
+      <button id="quickLocationBtn" class="quick-location-btn" style="width: 100%; margin-bottom: 1rem;">
+        <i class="fas fa-map-marker-alt"></i> Share My Current Location
       </button>
+      <div id="quickLocationStatus" class="quick-location-status"></div>
       
-      <button id="toggleManualLocation" class="location-method-toggle" style="display: none;">Or enter address manually</button>
-      
-      <div class="manual-location-container" id="manualLocationContainer">
-        <textarea id="manualAddress" placeholder="Enter your full address including landmarks"></textarea>
-        <button id="saveManualLocation" class="manual-location-btn">Save Manual Location</button>
+      <div class="form-input">
+        <label><i class="fas fa-utensils"></i> Order Type</label>
+        <div class="order-type-options" style="display: flex; gap: 1rem;">
+          <label class="order-type-option" style="flex: 1; background: #f5f5f5; padding: 1rem; border-radius: 5px; cursor: pointer;">
+            <input type="radio" name="orderType" value="Delivery" checked style="margin-right: 0.5rem;">
+            <span><i class="fas fa-home"></i> Home Delivery</span>
+          </label>
+          <label class="order-type-option" style="flex: 1; background: #f5f5f5; padding: 1rem; border-radius: 5px; cursor: pointer;">
+            <input type="radio" name="orderType" value="Pickup" style="margin-right: 0.5rem;">
+            <span><i class="fas fa-walking"></i> Pickup</span>
+          </label>
+          <label class="order-type-option" style="flex: 1; background: #f5f5f5; padding: 1rem; border-radius: 5px; cursor: pointer;">
+            <input type="radio" name="orderType" value="DineIn" style="margin-right: 0.5rem;">
+            <span><i class="fas fa-utensils"></i> Dine In</span>
+          </label>
+        </div>
       </div>
       
-      <input type="hidden" id="deliveryLatitude">
-      <input type="hidden" id="deliveryLongitude">
-    </div>
-    
-    <div id="deliveryChargeDisplay" style="text-align:center; margin:1rem 0; font-weight:bold;"></div>
-    
-    <div class="form-input">
-      <button onclick="confirmOrder()">Place Order</button>
+      <div class="form-input" id="deliveryAddressContainer" style="display: none;">
+        <label><i class="fas fa-map-pin"></i> Your Location</label>
+        
+        <div id="locationPrompt" class="location-prompt" style="background: #e3f2fd; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;">
+          <div class="location-prompt-text" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="location-prompt-icon"><i class="fas fa-map-marker-alt"></i></span>
+            <span>To place a delivery order, please share your current location</span>
+          </div>
+          <button id="shareLocationBtn" class="location-prompt-btn" style="width: 100%; background: #2196f3;">
+            <i class="fas fa-location-arrow"></i> Share My Location
+          </button>
+        </div>
+        
+        <div id="locationAccuracyWarning" class="location-accuracy-warning" style="display: none; background: #fff3e0; padding: 0.8rem; border-radius: 5px; margin-bottom: 1rem;">
+          <i class="fas fa-exclamation-triangle"></i> Your location accuracy is low. For accurate delivery time and charges, please ensure high accuracy GPS is enabled.
+        </div>
+        
+        <div id="locationDetails" style="display: none; background: white; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; border: 1px solid #eee;">
+          <div id="locationText" style="margin-bottom: 0.5rem;"><i class="fas fa-check-circle" style="color: #4caf50;"></i> Detecting your location...</div>
+          <div id="locationMapLink" style="margin-bottom: 0.5rem;"></div>
+          <div id="deliveryEstimate" style="font-weight: bold;"></div>
+        </div>
+        
+        <button id="refreshLocationBtn" style="width: 100%; margin-bottom: 1rem; display: none;">
+          <i class="fas fa-sync-alt"></i> Refresh Location
+        </button>
+        
+        <div class="manual-location-container" id="manualLocationContainer" style="margin-top: 1rem;">
+          <textarea id="manualAddress" placeholder="Enter your full address including landmarks" style="width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 0.5rem;"></textarea>
+          <button id="saveManualLocation" class="manual-location-btn" style="width: 100%; background: #4caf50;">
+            <i class="fas fa-save"></i> Save Manual Location
+          </button>
+        </div>
+        
+        <input type="hidden" id="deliveryLatitude">
+        <input type="hidden" id="deliveryLongitude">
+      </div>
+      
+      <div id="deliveryChargeDisplay" style="text-align: center; margin: 1rem 0; font-weight: bold;"></div>
+      
+      <div class="form-input">
+        <button onclick="confirmOrder()" style="width: 100%; padding: 1rem; font-size: 1.1rem; background: var(--success);">
+          <i class="fas fa-paper-plane"></i> Place Order
+        </button>
+      </div>
     </div>
   </div>
 
-  <!-- Order Confirmation Modal -->
-  <div id="orderConfirmationModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Confirm Your Order</h2>
-        <span class="close-modal">&times;</span>
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-section">
+        <h3><i class="fas fa-utensils"></i> Bake & Grill</h3>
+        <p>
+          Thakurpukur Bakhrahat Road, Sanjua bakhrahat<br>
+          Landmark: Sanjua Future Gems Academy / Sanjua Boimela Ground<br>
+          Pincode: 743377<br>
+          West Bengal
+        </p>
       </div>
-      <div class="order-summary" id="orderConfirmationDetails"></div>
-      <div class="modal-buttons">
-        <button class="modal-btn cancel-btn" id="cancelOrderBtn">Cancel</button>
-        <button class="modal-btn confirm-btn" id="confirmOrderBtn">Confirm & Send via WhatsApp</button>
+      <div class="footer-section">
+        <h3><i class="fas fa-phone"></i> Contact Us</h3>
+        <p>
+          Phone: <span class="contact-highlight"><a href="tel:+918240266267">+91 8240266267</a></span><br>
+          Email: <span class="contact-highlight"><a href="mailto:bakeandgrill@gmail.com">bakeandgrill@gmail.com</a></span>
+        </p>
       </div>
-      <button class="download-btn" id="downloadBillBtn" style="display:none;">Download Bill</button>
+      <div class="footer-section">
+        <h3><i class="fas fa-clock"></i> Hours</h3>
+        <p>Daily: 4:00 PM - 10:00 PM</p>
+      </div>
+      <div class="footer-section">
+        <h3><i class="fas fa-map-marked-alt"></i> Service Areas</h3>
+        <p>Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth</p>
+        <div class="fssai-badge">
+          <i class="fas fa-certificate"></i> FSSAI License: 10019064001810
+        </div>
+      </div>
     </div>
-  </div>
+    <div class="copyright">
+      &copy; <span id="copyright-year">2021</span> Bake & Grill. All rights reserved.
+    </div>
+  </footer>
 
   <!-- JavaScript Files -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
   <script src="firebase-config.js"></script>
+  <script>
+    // Set current year for copyright
+    document.getElementById('copyright-year').textContent = new Date().getFullYear();
+    
+    // Your other JavaScript code here
+  </script>
   <script src="script.js"></script>
 </body>
 </html>
