@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bake & Grill - Admin Login</title>
+  <style>
+    :root {
+      --primary-color: #d62828;
+      --secondary-color: #f77f00;
+      --light-bg: #fff8f0;
+      --light-accent: #ffe5d9;
+      --dark-text: #222;
+      --medium-text: #555;
+      --light-text: #777;
+      --success-color: #2e7d32;
+      --error-color: #c62828;
+      --warning-color: #ff8f00;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f5f5;
+      color: var(--dark-text);
+      line-height: 1.6;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-image: url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      margin: 20px;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .login-header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 25px;
+      text-align: center;
+    }
+    
+    .login-header h1 {
+      font-size: 1.8rem;
+      margin-bottom: 5px;
+    }
+    
+    .login-header p {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    .login-form {
+      padding: 25px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: var(--medium-text);
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary-color);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: #a4161a;
+    }
+    
+    .login-footer {
+      text-align: center;
+      padding: 15px;
+      border-top: 1px solid #eee;
+      font-size: 0.9rem;
+      color: var(--light-text);
+    }
+    
+    .login-footer a {
+      color: var(--primary-color);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .login-footer a:hover {
+      text-decoration: underline;
+    }
+    
+    .error-message {
+      color: var(--error-color);
+      font-size: 0.9rem;
+      margin-top: 5px;
+      display: none;
+    }
+    
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Notification */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 5px;
+      color: white;
+      z-index: 1001;
+      animation: slideIn 0.3s, fadeOut 0.5s 2.5s forwards;
+      display: none;
+    }
+    
+    .notification.success {
+      background-color: var(--success-color);
+    }
+    
+    .notification.error {
+      background-color: var(--error-color);
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    
+    /* Responsive */
+    @media (max-width: 480px) {
+      .login-container {
+        margin: 10px;
+      }
+      
+      .login-header {
+        padding: 20px;
+      }
+      
+      .login-form {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>Bake & Grill</h1>
+      <p>Admin Panel Login</p>
+    </div>
+    
+    <div class="login-form">
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" required>
+          <div class="error-message" id="email-error"></div>
+        </div>
+        
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" required>
+          <div class="error-message" id="password-error"></div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" id="loginBtn">
+          <span id="loginBtnText">Login</span>
+          <span id="loginSpinner" class="spinner" style="display: none;"></span>
+        </button>
+      </form>
+    </div>
+    
+    <div class="login-footer">
+      <p>Having trouble? <a href="#" id="resetPassword">Reset password</a></p>
+    </div>
+  </div>
+  
+  <div class="notification" id="notification"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+  
+  <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
+      authDomain: "bakeandgrill-44c25.firebaseapp.com",
+      projectId: "bakeandgrill-44c25",
+      storageBucket: "bakeandgrill-44c25.appspot.com",
+      messagingSenderId: "713279633359",
+      appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
+      measurementId: "G-SLG2R88J72"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    
+    // DOM elements
+    const loginForm = document.getElementById('loginForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginBtnText = document.getElementById('loginBtnText');
+    const loginSpinner = document.getElementById('loginSpinner');
+    const emailError = document.getElementById('email-error');
+    const passwordError = document.getElementById('password-error');
+    const resetPasswordLink = document.getElementById('resetPassword');
+    const notification = document.getElementById('notification');
+    
+    // Check if user is already logged in
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        // User is signed in, redirect to admin panel
+        window.location.href = 'admin3.html';
+      }
+    });
+    
+    // Login form submission
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = emailInput.value;
+      const password = passwordInput.value;
+      
+      // Reset error messages
+      emailError.style.display = 'none';
+      passwordError.style.display = 'none';
+      
+      // Validate inputs
+      let isValid = true;
+      
+      if (!email) {
+        emailError.textContent = 'Email is required';
+        emailError.style.display = 'block';
+        isValid = false;
+      } else if (!/\S+@\S+\.\S+/.test(email)) {
+        emailError.textContent = 'Email is invalid';
+        emailError.style.display = 'block';
+        isValid = false;
+      }
+      
+      if (!password) {
+        passwordError.textContent = 'Password is required';
+        passwordError.style.display = 'block';
+        isValid = false;
+      } else if (password.length < 6) {
+        passwordError.textContent = 'Password must be at least 6 characters';
+        passwordError.style.display = 'block';
+        isValid = false;
+      }
+      
+      if (!isValid) return;
+      
+      // Show loading state
+      loginBtn.disabled = true;
+      loginBtnText.textContent = 'Logging in...';
+      loginSpinner.style.display = 'inline-block';
+      
+      try {
+        // Sign in with email and password
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        
+        // Check if user is successfully logged in
+        if (userCredential.user) {
+          console.log('Login successful:', userCredential.user);
+          // Redirect to admin panel on success
+          window.location.href = 'admin3.html';
+        }
+      } catch (error) {
+        // Handle errors
+        loginBtn.disabled = false;
+        loginBtnText.textContent = 'Login';
+        loginSpinner.style.display = 'none';
+        
+        let errorMessage = 'Login failed. Please try again.';
+        
+        switch (error.code) {
+          case 'auth/user-not-found':
+            errorMessage = 'No user found with this email.';
+            emailError.textContent = errorMessage;
+            emailError.style.display = 'block';
+            break;
+          case 'auth/wrong-password':
+            errorMessage = 'Incorrect password.';
+            passwordError.textContent = errorMessage;
+            passwordError.style.display = 'block';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email format.';
+            emailError.textContent = errorMessage;
+            emailError.style.display = 'block';
+            break;
+          case 'auth/user-disabled':
+            errorMessage = 'This account has been disabled.';
+            showNotification('error', errorMessage);
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many failed attempts. Account temporarily locked.';
+            showNotification('error', errorMessage);
+            break;
+          default:
+            showNotification('error', errorMessage);
+            console.error('Login error:', error);
+        }
+      }
+    });
+    
+    // Password reset
+    resetPasswordLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      
+      const email = prompt('Please enter your email address to reset your password:');
+      if (!email) return;
+      
+      if (!/\S+@\S+\.\S+/.test(email)) {
+        showNotification('error', 'Please enter a valid email address.');
+        return;
+      }
+      
+      try {
+        await auth.sendPasswordResetEmail(email);
+        showNotification('success', 'Password reset email sent. Please check your inbox.');
+      } catch (error) {
+        console.error('Password reset error:', error);
+        showNotification('error', 'Failed to send reset email. Please try again.');
+      }
+    });
+    
+    // Show notification
+    function showNotification(type, message) {
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      notification.style.display = 'block';
+      
+      setTimeout(() => {
+        notification.style.display = 'none';
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
