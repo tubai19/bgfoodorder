@@ -717,6 +717,12 @@ function setupEventListeners() {
   // Mobile cart toggle
   mobileCartBtn.addEventListener('click', function() {
     cart.classList.toggle('active');
+
+ const cartTotal = document.createElement("div");
+ cartTotal.className = "cart-total";
+ cartTotal.textContent = `Total: ₹${total}`;
+ cartList.parentNode.appendChild(cartTotal);
+
  
  // If cart is being shown, update its contents
   if (cart.classList.contains('active')) {
