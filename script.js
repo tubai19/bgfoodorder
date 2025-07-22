@@ -1,3 +1,31 @@
+// Main application code 
+const { jsPDF } = window.jspdf;
+const RESTAURANT_LOCATION = { lat: 22.3908, lng: 88.2189 };
+const MAX_DELIVERY_DISTANCE = 8;
+const MIN_DELIVERY_ORDER = 200;
+
+const selectedItems = [];
+let currentCategory = null;
+let deliveryDistance = null;
+let isLocationFetching = false;
+let userLocation = null;
+let watchId = null;
+let isManualLocation = false;
+
+// Firebase initialization
+const firebaseConfig = {
+  apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
+  authDomain: "bakeandgrill-44c25.firebaseapp.com",
+  projectId: "bakeandgrill-44c25",
+  storageBucket: "bakeandgrill-44c25.appspot.com",
+  messagingSenderId: "713279633359",
+  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
+  measurementId: "G-SLG2R88J72"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 // Full menu data
 const fullMenu = {
   "Veg Pizzas": [
@@ -579,51 +607,119 @@ const categoryIcons = {
   "Combos": "🎁"
 };
 
-// Main application code 
-const { jsPDF } = window.jspdf;
-const RESTAURANT_LOCATION = { lat: 22.3908, lng: 88.2189 };
-const MAX_DELIVERY_DISTANCE = 8;
-const MIN_DELIVERY_ORDER = 200;
-
-const selectedItems = [];
-let currentCategory = null;
-let deliveryDistance = null;
-let isLocationFetching = false;
-let userLocation = null;
-let watchId = null;
-let isManualLocation = false;
-
-// Firebase initialization (unchanged)
-const firebaseConfig = {
-  apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
-  authDomain: "bakeandgrill-44c25.firebaseapp.com",
-  projectId: "bakeandgrill-44c25",
-  storageBucket: "bakeandgrill-44c25.appspot.com",
-  messagingSenderId: "713279633359",
-  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
-  measurementId: "G-SLG2R88J72"
+// Firebase functions
+const saveOrder = async (orderData) => {
+  try {
+    const docRef = await db.collection("orders").add(orderData);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error saving order: ", error);
+    throw error;
+  }
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const getOrder = async (orderId) => {
+  try {
+    const doc = await db.collection("orders").doc(orderId).get();
+    if (doc.exists) {
+      return doc.data();
+    } else {
+      throw new Error("Order not found");
+    }
+  } catch (error) {
+    console.error("Error getting order: ", error);
+    throw error;
+  }
+};
+
+const updateOrderStatus = async (orderId, status) => {
+  try {
+    await db.collection("orders").doc(orderId).update({ status });
+  } catch (error) {
+    console.error("Error updating order status: ", error);
+    throw error;
+  }
+};
 
 document.addEventListener('DOMContentLoaded', function() {
   initializeTabs();
   setupEventListeners();
+  setupNavigation();
+  
+  // Show menu by default
+  document.querySelector('.nav-btn[data-section="menu"]').click();
   
   if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
     showLocationPrompt();
   }
 });
 
-// Event listeners setup (unchanged except for quantity controls removal)
+function setupNavigation() {
+  const navButtons = document.querySelectorAll('.nav-btn');
+  
+  navButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const section = this.dataset.section;
+      
+      // Update active state
+      navButtons.forEach(btn => btn.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Show/hide sections
+      if (section === 'menu') {
+        document.getElementById('menuContainer').style.display = 'block';
+        document.getElementById('orderForm').style.display = 'none';
+        document.querySelector('.search-container').style.display = 'block';
+        document.querySelector('.category-nav').style.display = 'flex';
+      } else if (section === 'order') {
+        document.getElementById('menuContainer').style.display = 'none';
+        document.getElementById('orderForm').style.display = 'block';
+        document.querySelector('.search-container').style.display = 'none';
+        document.querySelector('.category-nav').style.display = 'none';
+        document.getElementById('orderForm').scrollIntoView({ behavior: 'smooth' });
+      } else if (section === 'info') {
+        showInfoSection();
+      }
+    });
+  });
+}
+
+function showInfoSection() {
+  const infoHTML = `
+    <div class="info-section">
+      <h3><i class="fas fa-info-circle"></i> About Bake & Grill</h3>
+      <p>Delicious pizzas, burgers & more delivered to your doorstep</p>
+      <p><strong>FSSAI License:</strong> 10019064001810</p>
+      
+      <h3><i class="fas fa-clock"></i> Opening Hours</h3>
+      <p>Monday - Sunday</p>
+      <p>11:00 AM - 11:00 PM</p>
+      
+      <h3><i class="fas fa-map-marker-alt"></i> Location</h3>
+      <p>Thakurpukur Bakhrahat Road, Sanjua bakhrahat, West Bengal 743377</p>
+      <a href="https://maps.google.com/?q=22.3908,88.2189" target="_blank" class="map-link">
+        <i class="fas fa-map"></i> View on Map
+      </a>
+      
+      <h3><i class="fas fa-phone"></i> Contact Us</h3>
+      <p><a href="tel:+918240266267">+91 8240266267</a></p>
+      <p><a href="mailto:bakeandgrill@gmail.com">bakeandgrill@gmail.com</a></p>
+    </div>
+  `;
+  
+  document.getElementById('menuContainer').innerHTML = infoHTML;
+  document.getElementById('menuContainer').style.display = 'block';
+  document.getElementById('orderForm').style.display = 'none';
+  document.querySelector('.search-container').style.display = 'none';
+  document.querySelector('.category-nav').style.display = 'none';
+}
+
 function setupEventListeners() {
   document.querySelectorAll('input[name="orderType"]').forEach(radio => {
     radio.addEventListener('change', function() {
       const isDelivery = this.value === 'Delivery';
       document.getElementById('deliveryAddressContainer').style.display = isDelivery ? 'block' : 'none';
       document.getElementById('deliveryChargeDisplay').style.display = 'none';
-      document.getElementById('locationStatus').style.display = 'none';
       document.getElementById('deliveryRestriction').style.display = 'none';
       
       if (isDelivery) {
@@ -640,10 +736,40 @@ function setupEventListeners() {
     });
   });
 
-  // ... (other event listeners unchanged)
+  document.getElementById('shareLocationBtn').addEventListener('click', startLocationTracking);
+  document.getElementById('refreshLocationBtn').addEventListener('click', startLocationTracking);
+  document.getElementById('quickLocationBtn').addEventListener('click', getQuickLocation);
+  
+  document.getElementById('toggleManualLocation').addEventListener('click', function() {
+    isManualLocation = true;
+    document.getElementById('manualLocationContainer').style.display = 'block';
+    document.getElementById('locationDetails').style.display = 'none';
+    document.getElementById('refreshLocationBtn').style.display = 'none';
+    document.getElementById('locationPrompt').style.display = 'none';
+    document.getElementById('locationAccuracyWarning').style.display = 'none';
+  });
+  
+  document.getElementById('saveManualLocation').addEventListener('click', function() {
+    const address = document.getElementById('manualAddress').value.trim();
+    if (!address) {
+      alert("Please enter your full address");
+      return;
+    }
+    
+    userLocation = { address };
+    document.getElementById('locationText').textContent = `📍 Manual Address Saved`;
+    document.getElementById('locationDetails').style.display = 'block';
+    document.getElementById('locationMapLink').innerHTML = '';
+    document.getElementById('deliveryEstimate').textContent = 'Distance calculation not available for manual address';
+    
+    // Estimate distance (this is a placeholder - in a real app you'd geocode the address)
+    deliveryDistance = 5; // Default to 5km for manual addresses
+    updateCart();
+    checkDeliveryRestriction();
+  });
 
-  document.getElementById('mobileCartBtn').addEventListener('click', function() {
-    document.getElementById('cart').classList.toggle('active');
+  document.getElementById('cartBtn').addEventListener('click', function() {
+    document.querySelector('.nav-btn[data-section="order"]').click();
   });
 
   document.getElementById('placeOrderBtn').addEventListener('click', confirmOrder);
@@ -655,7 +781,6 @@ function setupEventListeners() {
   });
 }
 
-// Initialize tabs (unchanged)
 function initializeTabs() {
   const tabsDiv = document.getElementById("tabs");
   for (const category in fullMenu) {
@@ -682,7 +807,6 @@ function initializeTabs() {
   }
 }
 
-// Updated renderCategory function with simplified controls
 function renderCategory(category, searchTerm = '') {
   const container = document.getElementById("menuContainer");
   container.innerHTML = "";
@@ -700,7 +824,6 @@ function renderCategory(category, searchTerm = '') {
       item.name.toLowerCase().includes(term) ||
       (item.nameBn && item.nameBn.includes(term)) ||
       (item.desc && item.desc.toLowerCase().includes(term))
-    );
   });
 
   if (filteredItems.length === 0) {
@@ -809,7 +932,6 @@ function renderCategory(category, searchTerm = '') {
   });
 }
 
-// Add to order function (unchanged)
 function addToOrder(name, variant, price, quantity = 1) {
   const existingItemIndex = selectedItems.findIndex(
     item => item.name === name && item.variant === variant
@@ -829,7 +951,6 @@ function addToOrder(name, variant, price, quantity = 1) {
   updateCart();
 }
 
-// Updated updateCart function with quantity controls
 function updateCart() {
   const cartList = document.getElementById("cartItems");
   cartList.innerHTML = "";
