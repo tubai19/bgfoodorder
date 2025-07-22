@@ -717,6 +717,11 @@ function setupEventListeners() {
   // Mobile cart toggle
   mobileCartBtn.addEventListener('click', function() {
     cart.classList.toggle('active');
+ 
+ // If cart is being shown, update its contents
+  if (cart.classList.contains('active')) {
+    updateCart();
+   }
   });
 
   // Place order button
