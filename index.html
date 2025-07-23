@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bake & Grill - Order Online</title>
+  <meta name="description" content="Order delicious pizzas, burgers & more from Bake & Grill. Fast delivery to Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="https://www.bakeandgrillorder.shop/favicon.ico" type="image/x-icon">
+  
+  <!-- Schema.org markup for Google -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      "name": "Bake & Grill",
+      "description": "Delicious pizzas, burgers & more delivered to your doorstep",
+      "url": "https://www.bakeandgrillorder.shop",
+      "servesCuisine": ["Indian", "Italian", "Fast Food"],
+      "image": "https://www.bakeandgrillorder.shop/images/restaurant.jpg",
+      "priceRange": "$$",
+      "telephone": "+918240266267",
+      "email": "bakeandgrill@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Thakurpukur Bakhrahat Road",
+        "addressLocality": "Sanjua bakhrahat",
+        "addressRegion": "West Bengal",
+        "postalCode": "743377",
+        "addressCountry": "IN"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "22.3908",
+        "longitude": "88.2189"
+      },
+      "openingHoursSpecification": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "opens": "16:00",
+        "closes": "22:00"
+      },
+      "hasMap": "https://maps.google.com/?q=22.3908,88.2189"
+    }
+  </script>
+</head>
+<body>
+  <!-- Header Section -->
+  <header class="header">
+    <div class="logo">Bake & Grill</div>
+    <div class="tagline">Delicious food delivered to your doorstep</div>
+    <div class="fssai-badge">FSSAI Licensed: 10019064001810</div>
+  </header>
+
+  <!-- Hero Banner Section -->
+  <section class="hero-banner">
+    <div class="hero-content">
+      <h1>🍕 Bake & Grill</h1>
+      <p>Delicious pizzas, burgers & more delivered to your doorstep</p>
+      <a href="#menuContainer" class="cta-btn">Order Now</a>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <div class="container">
+    <!-- Search and menu sections -->
+    <div id="searchContainer">
+      <i class="fas fa-search"></i>
+      <input type="text" id="searchInput" placeholder="Search for items..." aria-label="Search menu items">
+    </div>
+    
+    <!-- Category Navigation -->
+    <div id="tabs" class="category-nav"></div>
+    
+    <!-- Delivery Info -->
+    <div class="delivery-info">
+      <h4><i class="fas fa-info-circle"></i> Delivery Information</h4>
+      <ul>
+        <li>Minimum order for delivery: <strong>₹200</strong></li>
+        <li>Delivery charges:
+          <ul>
+            <li>Free for orders under 4km</li>
+            <li>₹20 for 4-6km</li>
+            <li>₹30 for 6-8km</li>
+            <li>Free for orders above ₹500</li>
+          </ul>
+        </li>
+        <li>Delivery only available within 8km radius</li>
+        <li>Delivery time estimate: 20 minutes preparation + 8 minutes per km travel</li>
+      </ul>
+      <div id="locationStatus" class="location-loading" style="display:none;">
+        Calculating your distance from the restaurant...
+      </div>
+    </div>
+
+    <div id="deliveryRestriction" class="delivery-restriction" style="display:none;">
+      <i class="fas fa-exclamation-triangle"></i> Delivery not available to your location (beyond 8km). Please choose pickup or visit our restaurant.
+    </div>
+
+    <!-- Menu Container -->
+    <div id="menuContainer"></div>
+    
+    <!-- Cart (visible on desktop) -->
+    <div id="cart">
+      <h3>Your Cart <span class="cart-count">(0)</span></h3>
+      <ul id="cartItems">
+        <!-- Cart items will be added here -->
+      </ul>
+      <div id="cartTotal" class="cart-total">Total: ₹0</div>
+    </div>
+  </div>
+
+  <!-- Order Form Section -->
+  <div class="container form-section">
+    <div id="liveTotal">💰 Total Bill: ₹0</div>
+    
+    <div class="form-input">
+      <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
+      <input type="text" id="customerName" placeholder="Enter your name" required>
+    </div>
+    
+    <div class="form-input">
+      <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
+      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required pattern="[0-9]{10}">
+    </div>
+
+    <button id="quickLocationBtn" class="quick-location-btn" aria-label="Share my current location">
+      <i class="fas fa-map-marker-alt"></i> Share My Current Location
+    </button>
+    <div id="quickLocationStatus" class="quick-location-status"></div>
+    
+    <div class="form-input">
+      <label><i class="fas fa-truck"></i> Order Type</label>
+      <div class="order-type-options">
+        <label class="order-type-option">
+          <input type="radio" name="orderType" value="Delivery" checked>
+          <span><i class="fas fa-home"></i> Home Delivery</span>
+        </label>
+        <label class="order-type-option">
+          <input type="radio" name="orderType" value="Pickup">
+          <span><i class="fas fa-walking"></i> Pickup</span>
+        </label>
+        <label class="order-type-option">
+          <input type="radio" name="orderType" value="DineIn">
+          <span><i class="fas fa-utensils"></i> Dine In</span>
+        </label>
+      </div>
+    </div>
+    
+    <div class="form-input" id="deliveryAddressContainer" style="display: none;">
+      <label><i class="fas fa-map-marked-alt"></i> Your Location</label>
+      
+      <div id="locationPrompt" class="location-prompt" style="display: none;">
+        <div class="location-prompt-text">
+          <i class="fas fa-map-marker-alt"></i>
+          <span>To place a delivery order, please share your current location</span>
+        </div>
+        <button id="shareLocationBtn" class="location-prompt-btn">Share My Location</button>
+      </div>
+      
+      <div id="locationAccuracyWarning" class="location-accuracy-warning" style="display: none;">
+        <i class="fas fa-exclamation-triangle"></i> Your location accuracy is low. For accurate delivery time and charges, please ensure high accuracy GPS is enabled.
+      </div>
+      
+      <div id="locationDetails" style="background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: none;">
+        <div id="locationText">Detecting your location...</div>
+        <div id="locationMapLink" style="margin-top: 0.5rem;"></div>
+        <div id="deliveryEstimate" style="margin-top: 0.5rem; font-weight: bold;"></div>
+      </div>
+      
+      <button id="refreshLocationBtn" style="background: #34a853; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer; width: 100%; display: none;">
+        <i class="fas fa-sync-alt"></i> Refresh Location
+      </button>
+      
+      <button id="toggleManualLocation" class="location-method-toggle" style="display: none;">Or enter address manually</button>
+      
+      <div class="manual-location-container" id="manualLocationContainer">
+        <textarea id="manualAddress" placeholder="Enter your full address including landmarks"></textarea>
+        <button id="saveManualLocation" class="manual-location-btn"><i class="fas fa-save"></i> Save Manual Location</button>
+      </div>
+      
+      <input type="hidden" id="deliveryLatitude">
+      <input type="hidden" id="deliveryLongitude">
+    </div>
+    
+    <div id="deliveryChargeDisplay" style="text-align:center; margin:1rem 0; font-weight:bold;"></div>
+    
+    <div class="form-input">
+      <button id="placeOrderBtn"><i class="fas fa-paper-plane"></i> Place Order</button>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div id="orderConfirmationModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Confirm Your Order</h2>
+        <span class="close-modal" aria-label="Close modal">&times;</span>
+      </div>
+      <div class="order-summary" id="orderConfirmationDetails"></div>
+      <div class="modal-buttons">
+        <button class="modal-btn cancel-btn" id="cancelOrderBtn"><i class="fas fa-times"></i> Cancel</button>
+        <button class="modal-btn confirm-btn" id="confirmOrderBtn"><i class="fab fa-whatsapp"></i> Confirm & Send via WhatsApp</button>
+      </div>
+      <button class="download-btn" id="downloadBillBtn" style="display:none;"><i class="fas fa-file-pdf"></i> Download Bill</button>
+    </div>
+  </div>
+
+  <!-- Footer Section -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-section">
+          <h3>About Bake & Grill</h3>
+          <p>Delicious pizzas, burgers & more delivered to your doorstep</p>
+          <p>FSSAI License: 10019064001810</p>
+        </div>
+        <div class="footer-section">
+          <h3>Contact Us</h3>
+          <p><i class="fas fa-phone"></i> <a href="tel:+918240266267">+91 8240266267</a></p>
+          <p><i class="fas fa-envelope"></i> <a href="mailto:bakeandgrill@gmail.com">bakeandgrill@gmail.com</a></p>
+        </div>
+        <div class="footer-section">
+          <h3>Location</h3>
+          <p><i class="fas fa-map-marker-alt"></i> Thakurpukur Bakhrahat Road, Sanjua bakhrahat, West Bengal 743377</p>
+          <p><a href="https://maps.google.com/?q=22.3908,88.2189" target="_blank" rel="noopener noreferrer"><i class="fas fa-map"></i> View on Map</a></p>
+        </div>
+        <div class="footer-section">
+          <h3>Opening Hours</h3>
+          <p><i class="far fa-clock"></i> Monday - Sunday</p>
+          <p>4:00 PM - 10:00 PM</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 Bake & Grill. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Mobile Menu Button -->
+  <button class="mobile-menu-btn" id="mobileCartBtn" aria-label="View cart">
+    <i class="fas fa-shopping-cart"></i>
+    <span class="cart-badge">0</span>
+  </button>
+
+  <!-- Notification -->
+  <div class="notification" id="notification">
+    <i class="fas fa-check-circle"></i>
+    <span id="notificationText">Item added to cart!</span>
+  </div>
+
+  <!-- Firebase and other scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
