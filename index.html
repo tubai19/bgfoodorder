@@ -4,20 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bake & Grill - Order Online</title>
-  <meta name="description" content="Order delicious pizzas, burgers & more from Bake & Grill. Fast delivery to Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
   <link rel="stylesheet" href="styles.css">
-  <link rel="icon" href="https://www.bakeandgrillorder.shop/favicon.ico" type="image/x-icon">
-  
-  <!-- Schema.org markup for Google -->
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Restaurant",
       "name": "Bake & Grill",
-      "description": "Delicious pizzas, burgers & more delivered to your doorstep",
+      "description": "Delicious pizzas, burgers & more delivered to your doorstep in Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth",
       "url": "https://www.bakeandgrillorder.shop",
       "servesCuisine": ["Indian", "Italian", "Fast Food"],
       "image": "https://www.bakeandgrillorder.shop/images/restaurant.jpg",
@@ -48,10 +44,103 @@
           "Saturday",
           "Sunday"
         ],
-        "opens": "16:00",
-        "closes": "22:00"
+        "opens": "11:00",
+        "closes": "23:00"
       },
-      "hasMap": "https://maps.google.com/?q=22.3908,88.2189"
+      "hasMap": "https://maps.google.com/?q=22.3908,88.2189",
+      "areaServed": {
+        "@type": "GeoShape",
+        "circle": "22.3908 88.2189 8000",
+        "description": "Serving Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth"
+      },
+      "hasMenu": {
+        "@type": "Menu",
+        "name": "Bake & Grill Menu",
+        "description": "Our full menu of pizzas, burgers, sandwiches and more",
+        "hasMenuSection": [
+          {
+            "@type": "MenuSection",
+            "name": "Veg Pizzas",
+            "description": "Delicious vegetarian pizzas",
+            "hasMenuItem": [
+              {
+                "@type": "MenuItem",
+                "name": "Farmhouse Special",
+                "description": "Onion, capsicum, tomato, green chili, spicy sauce",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "179",
+                  "priceCurrency": "INR"
+                }
+              },
+              {
+                "@type": "MenuItem",
+                "name": "Spicy Veggie Blast",
+                "description": "Onion, capsicum, tomato, green chili, spicy sauce",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "159",
+                  "priceCurrency": "INR"
+                }
+              }
+            ]
+          },
+          {
+            "@type": "MenuSection",
+            "name": "Non-Veg Pizzas",
+            "description": "Tasty non-vegetarian pizzas",
+            "hasMenuItem": [
+              {
+                "@type": "MenuItem",
+                "name": "Chicken Keema Pizza",
+                "description": "Spicy chicken keema, onion, green chili",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "169",
+                  "priceCurrency": "INR"
+                }
+              },
+              {
+                "@type": "MenuItem",
+                "name": "BBQ Chicken Pizza",
+                "description": "Barbecue chicken, capsicum, onion",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "169",
+                  "priceCurrency": "INR"
+                }
+              }
+            ]
+          },
+          {
+            "@type": "MenuSection",
+            "name": "Burgers",
+            "description": "Juicy burgers with various fillings",
+            "hasMenuItem": [
+              {
+                "@type": "MenuItem",
+                "name": "Veg Burger",
+                "description": "Classic veg patty with fresh veggies",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "40",
+                  "priceCurrency": "INR"
+                }
+              },
+              {
+                "@type": "MenuItem",
+                "name": "Cheese Chicken Burger",
+                "description": "Chicken burger with cheese slice",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "99",
+                  "priceCurrency": "INR"
+                }
+              }
+            ]
+          }
+        ]
+      }
     }
   </script>
 </head>
@@ -77,7 +166,7 @@
     <!-- Search and menu sections -->
     <div id="searchContainer">
       <i class="fas fa-search"></i>
-      <input type="text" id="searchInput" placeholder="Search for items..." aria-label="Search menu items">
+      <input type="text" id="searchInput" placeholder="Search for items...">
     </div>
     
     <!-- Category Navigation -->
@@ -132,10 +221,10 @@
     
     <div class="form-input">
       <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
-      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required pattern="[0-9]{10}">
+      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required>
     </div>
 
-    <button id="quickLocationBtn" class="quick-location-btn" aria-label="Share my current location">
+    <button id="quickLocationBtn" class="quick-location-btn">
       <i class="fas fa-map-marker-alt"></i> Share My Current Location
     </button>
     <div id="quickLocationStatus" class="quick-location-status"></div>
@@ -206,7 +295,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>Confirm Your Order</h2>
-        <span class="close-modal" aria-label="Close modal">&times;</span>
+        <span class="close-modal">&times;</span>
       </div>
       <div class="order-summary" id="orderConfirmationDetails"></div>
       <div class="modal-buttons">
@@ -223,7 +312,7 @@
       <div class="footer-grid">
         <div class="footer-section">
           <h3>About Bake & Grill</h3>
-          <p>Delicious pizzas, burgers & more delivered to your doorstep</p>
+          <p>Delicious pizzas, burgers & more delivered to your doorstep in Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth</p>
           <p>FSSAI License: 10019064001810</p>
         </div>
         <div class="footer-section">
@@ -234,12 +323,12 @@
         <div class="footer-section">
           <h3>Location</h3>
           <p><i class="fas fa-map-marker-alt"></i> Thakurpukur Bakhrahat Road, Sanjua bakhrahat, West Bengal 743377</p>
-          <p><a href="https://maps.google.com/?q=22.3908,88.2189" target="_blank" rel="noopener noreferrer"><i class="fas fa-map"></i> View on Map</a></p>
+          <p><a href="https://maps.google.com/?q=22.3908,88.2189" target="_blank"><i class="fas fa-map"></i> View on Map</a></p>
         </div>
         <div class="footer-section">
           <h3>Opening Hours</h3>
           <p><i class="far fa-clock"></i> Monday - Sunday</p>
-          <p>4:00 PM - 10:00 PM</p>
+          <p> 4:00 PM - 10:00 PM</p>
         </div>
       </div>
       <div class="footer-bottom">
@@ -249,7 +338,7 @@
   </footer>
 
   <!-- Mobile Menu Button -->
-  <button class="mobile-menu-btn" id="mobileCartBtn" aria-label="View cart">
+  <button class="mobile-menu-btn" id="mobileCartBtn">
     <i class="fas fa-shopping-cart"></i>
     <span class="cart-badge">0</span>
   </button>
@@ -260,10 +349,7 @@
     <span id="notificationText">Item added to cart!</span>
   </div>
 
-  <!-- Firebase and other scripts -->
-  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
-  <script src="firebase-config.js"></script>
+  <!-- JavaScript -->
   <script src="script.js"></script>
 </body>
 </html>

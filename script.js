@@ -1068,14 +1068,14 @@ function renderCategory(category, searchTerm = '') {
     const minusBtn = document.createElement("button");
     minusBtn.className = "quantity-btn minus";
     minusBtn.innerHTML = "-";
-    minusBtn.addEventListener('click', () => {
+    minusBtn.onclick = () => {
       const quantitySpan = minusBtn.nextElementSibling;
       let quantity = parseInt(quantitySpan.textContent);
       if (quantity > 0) {
         quantity--;
         quantitySpan.textContent = quantity;
       }
-    });
+    };
     
     const quantitySpan = document.createElement("span");
     quantitySpan.className = "quantity";
@@ -1084,12 +1084,12 @@ function renderCategory(category, searchTerm = '') {
     const plusBtn = document.createElement("button");
     plusBtn.className = "quantity-btn plus";
     plusBtn.innerHTML = "+";
-    plusBtn.addEventListener('click', () => {
+    plusBtn.onclick = () => {
       const quantitySpan = plusBtn.previousElementSibling;
       let quantity = parseInt(quantitySpan.textContent);
       quantity++;
       quantitySpan.textContent = quantity;
-    });
+    };
     
     quantityDiv.appendChild(minusBtn);
     quantityDiv.appendChild(quantitySpan);
@@ -1098,7 +1098,7 @@ function renderCategory(category, searchTerm = '') {
     const addBtn = document.createElement("button");
     addBtn.className = "add-to-cart";
     addBtn.innerHTML = "Add";
-    addBtn.addEventListener('click', () => {
+    addBtn.onclick = () => {
       const quantity = parseInt(quantitySpan.textContent);
       if (quantity > 0) {
         const selectedVariant = variantDiv.querySelector('input[name^="variant-"]:checked');
@@ -1108,7 +1108,7 @@ function renderCategory(category, searchTerm = '') {
         addToOrder(item.name, variantName, variantPrice, quantity);
         quantitySpan.textContent = "0";
       }
-    });
+    };
     
     controlsDiv.appendChild(quantityDiv);
     controlsDiv.appendChild(addBtn);
@@ -1215,11 +1215,11 @@ function updateCart() {
     const removeBtn = document.createElement("button");
     removeBtn.className = "cart-item-remove";
     removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
-    removeBtn.addEventListener('click', () => {
+    removeBtn.onclick = () => {
       selectedItems.splice(index, 1);
       updateCart();
       showNotification("Item removed from cart");
-    });
+    };
     
     controlsDiv.appendChild(removeBtn);
     li.appendChild(nameSpan);
@@ -1248,6 +1248,7 @@ function updateCart() {
     el.textContent = itemCount;
   });
 }
+
 function calculateDeliveryTime(distanceKm) {
   if (!distanceKm) return "Unknown";
   const preparationTime = 20; // 20 minutes food preparation
