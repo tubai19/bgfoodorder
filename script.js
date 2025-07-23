@@ -647,10 +647,16 @@ document.addEventListener('DOMContentLoaded', function() {
   setupNavigation();
   
   // Show menu by default
-  document.querySelector('.nav-btn[data-section="menu"]').click();
+  document.querySelector('.nav-btn[data-section="menu"]').classList.add('active');
+  document.getElementById('menuContainer').style.display = 'block';
+  document.getElementById('orderForm').style.display = 'none';
+  document.querySelector('.search-container').style.display = 'block';
+  document.querySelector('.category-nav').style.display = 'flex';
   
-  if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
-    showLocationPrompt();
+  // Render the first category
+  const firstCategory = Object.keys(fullMenu)[0];
+  if (firstCategory) {
+    renderCategory(firstCategory);
   }
 });
 
