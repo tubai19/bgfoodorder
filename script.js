@@ -642,22 +642,30 @@ const updateOrderStatus = async (orderId, status) => {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  
+  // Initialize UI components
   initializeTabs();
   setupEventListeners();
   setupNavigation();
-  
-  // Show menu by default
-  document.querySelector('.nav-btn[data-section="menu"]').classList.add('active');
+
+  // Force show the menu section
   document.getElementById('menuContainer').style.display = 'block';
   document.getElementById('orderForm').style.display = 'none';
   document.querySelector('.search-container').style.display = 'block';
   document.querySelector('.category-nav').style.display = 'flex';
-  
-  // Render the first category
-  const firstCategory = Object.keys(fullMenu)[0];
-  if (firstCategory) {
-    renderCategory(firstCategory);
+
+  // Activate the first tab
+  const firstTab = document.querySelector('#tabs button');
+  if (firstTab) {
+    firstTab.classList.add('active');
+    renderCategory(firstTab.dataset.category);
   }
+
+  // Debug check
+  console.log('Full menu data:', fullMenu);
+  console.log('First category:', Object.keys(fullMenu)[0]);
 });
 
 function setupNavigation() {
