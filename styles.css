@@ -774,4 +774,27 @@ body {
   .modal-btn {
     width: 100%;
   }
+
+  #menuContainer {
+  display: block !important;
+  opacity: 1 !important;
+
+  }
+
+  .error {
+  color: #e63946;
+  padding: 20px;
+  text-align: center;
+  font-weight: bold;
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  margin: 20px;
+ }
+
+ .no-results {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+ }
+
 }
