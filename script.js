@@ -830,7 +830,7 @@ function renderCategory(category, searchTerm = '') {
       item.name.toLowerCase().includes(term) ||
       (item.nameBn && item.nameBn.includes(term)) ||
       (item.desc && item.desc.toLowerCase().includes(term))
-
+   }
 
   if (filteredItems.length === 0) {
     const noResults = document.createElement("div");
