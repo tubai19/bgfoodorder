@@ -70,6 +70,8 @@ let currentAction = null;
 let actionData = null;
 let menuData = {};
 let settingsData = {};
+let cachedToken = null;
+let tokenExpiry = 0;
 
 // Initialize the admin interface
 document.addEventListener('DOMContentLoaded', function() {
@@ -674,6 +676,100 @@ async function saveMenuItem() {
   }
 }
 
+async function getAccessToken() {
+  if (cachedToken && Date.now() < tokenExpiry) {
+    return cachedToken;
+  }
+
+  try {
+    // This should be replaced with your actual service account credentials
+    // For client-side, you should use Firebase Functions to handle this securely
+    const response = await fetch('https://your-firebase-function-url/generateFCMToken');
+    const data = await response.json();
+    
+    if (data.token) {
+      cachedToken = data.token;
+      tokenExpiry = Date.now() + (data.expires_in * 1000) - 300000; // 5 minute buffer
+      return cachedToken;
+    }
+    
+    throw new Error('Failed to get access token');
+  } catch (error) {
+    console.error('Error generating access token:', error);
+    throw error;
+  }
+}
+
+async function sendStatusNotification(phoneNumber, orderId, status) {
+  if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '') {
+    console.error('Invalid phone number for notification:', phoneNumber);
+    return;
+  }
+
+  try {
+    const trimmedPhone = phoneNumber.trim();
+    const tokensSnapshot = await db.collection('fcmTokens')
+      .where('phone', '==', trimmedPhone)
+      .get();
+
+    if (tokensSnapshot.empty) {
+      console.log('No FCM tokens found for phone:', trimmedPhone);
+      return;
+    }
+
+    const tokens = tokensSnapshot.docs.map(doc => doc.id);
+    if (tokens.length === 0) {
+      console.log('No valid FCM tokens to send to');
+      return;
+    }
+
+    const statusMessages = {
+      pending: "Your order is being processed",
+      preparing: "We're preparing your order now",
+      delivering: "Your order is on its way!",
+      completed: "Your order has been delivered",
+      cancelled: "Your order has been cancelled"
+    };
+
+    const message = {
+      notification: {
+        title: `Order #${orderId.substring(0, 8)} Update`,
+        body: statusMessages[status] || "Your order status has changed"
+      },
+      data: {
+        orderId,
+        status,
+        timestamp: new Date().toISOString(),
+        click_action: "FLUTTER_NOTIFICATION_CLICK"
+      },
+      tokens
+    };
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      throw new Error('Failed to get FCM access token');
+    }
+
+    const response = await fetch('https://fcm.googleapis.com/v1/projects/bakeandgrill-44c25/messages:send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({ message })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`FCM error: ${JSON.stringify(errorData)}`);
+    }
+
+    console.log('Notification sent successfully to', tokens.length, 'devices');
+  } catch (error) {
+    console.error('Notification send error:', error);
+  }
+}
+
 async function updateOrderStatus(data) {
   console.log("Attempting to update status:", data);
   
@@ -683,7 +779,7 @@ async function updateOrderStatus(data) {
   }
 
   try {
-    const orderRef = db.collection('orders').doc(data.orderId);
+    const orderRef = db.collection("orders").doc(data.orderId);
     const orderDoc = await orderRef.get();
     
     if (!orderDoc.exists) {
@@ -708,7 +804,7 @@ async function updateOrderStatus(data) {
       throw new Error(`Cannot change from ${currentStatus} to ${data.status}`);
     }
     
-    // Create status history entry with client timestamp
+    // Create status history entry
     const newStatusEntry = {
       status: data.status,
       timestamp: new Date(),
@@ -751,87 +847,6 @@ async function updateOrderStatus(data) {
       orderCard.classList.remove('updating');
     }
   }
-}
-
-async function sendStatusNotification(phoneNumber, orderId, status) {
-  // Validate phone number
-  if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '') {
-    console.error('Invalid phone number for notification:', phoneNumber);
-    return;
-  }
-
-  try {
-    const trimmedPhone = phoneNumber.trim();
-    
-    // Get all tokens for this phone number
-    const tokensSnapshot = await db.collection('fcmTokens')
-      .where('phone', '==', trimmedPhone)
-      .get();
-
-    if (tokensSnapshot.empty) {
-      console.log('No FCM tokens found for phone:', trimmedPhone);
-      return;
-    }
-
-    const tokens = tokensSnapshot.docs.map(doc => doc.id);
-    if (tokens.length === 0) {
-      console.log('No valid FCM tokens to send to');
-      return;
-    }
-
-    const statusMessages = {
-      pending: "Your order is being processed",
-      preparing: "We're preparing your order now",
-      delivering: "Your order is on its way!",
-      completed: "Your order has been delivered",
-      cancelled: "Your order has been cancelled"
-    };
-
-    const message = {
-      notification: {
-        title: `Order #${orderId.substring(0, 8)} Update`,
-        body: statusMessages[status] || "Your order status has changed"
-      },
-      data: {
-        orderId,
-        status,
-        timestamp: new Date().toISOString(),
-        click_action: "FLUTTER_NOTIFICATION_CLICK"
-      },
-      tokens
-    };
-
-    // Get access token (you'll need to implement this properly)
-    const accessToken = await getAccessToken();
-    if (!accessToken) {
-      throw new Error('Failed to get FCM access token');
-    }
-
-    // Send via HTTP v1 API
-    const response = await fetch('https://fcm.googleapis.com/v1/projects/bakeandgrill-44c25/messages:send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({ messages: [message] })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`FCM error: ${JSON.stringify(errorData)}`);
-    }
-
-    console.log('Notification sent successfully to', tokens.length, 'devices');
-  } catch (error) {
-    console.error('Notification send error:', error);
-  }
-}
-
-async function getAccessToken() {
-  // Implement proper token generation logic here
-  // This typically involves using a service account
-  return 'YOUR_ACCESS_TOKEN';
 }
 
 async function deleteCategory(data) {
