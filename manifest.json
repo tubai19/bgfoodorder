@@ -1,0 +1,124 @@
+{
+  "name": "Bake & Grill",
+  "short_name": "Bake&Grill",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e63946",
+  "description": "Order delicious food from Bake & Grill",
+  "icons": [
+    {
+      "src": "/images/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/screenshots/screenshot1.webp",
+      "sizes": "1080x1920",
+      "type": "image/webp",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/images/screenshots/screenshot2.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide"
+    }
+  ],
+  "gcm_sender_id": "103953800507",
+  "gcm_user_visible_only": true,
+  "permissions": [
+    "notifications",
+    "gcm"
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.bakeandgrill.app",
+      "id": "com.bakeandgrill.app"
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+bakeandgrill",
+      "url": "/order?id=%s"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "name",
+      "text": "description",
+      "url": "link"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "New Order",
+      "short_name": "Order",
+      "url": "/new-order",
+      "icons": [
+        {
+          "src": "/images/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "My Orders",
+      "short_name": "Orders",
+      "url": "/orders",
+      "icons": [
+        {
+          "src": "/images/icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}

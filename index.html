@@ -2,15 +2,12 @@
 <html lang="en">
 <head>
   <!-- Google Tag Manager -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-KW9KB9P6');</script>
-<!-- End Google Tag Manager -->
-  <!-- Favicon -->
-<link rel="icon" href="images/favicon.ico" type="image/x-icon">
-<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-KW9KB9P6');</script>
+  <!-- End Google Tag Manager -->
   
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,6 +15,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
   <link rel="stylesheet" href="styles.css">
   <script type="application/ld+json">
     {
@@ -319,6 +319,24 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <button class="modal-btn confirm-btn" id="confirmOrderBtn"><i class="fab fa-whatsapp"></i> Confirm & Send via WhatsApp</button>
       </div>
       <button class="download-btn" id="downloadBillBtn" style="display:none;"><i class="fas fa-file-pdf"></i> Download Bill</button>
+      <button class="download-btn" id="saveOrderBtn" style="display:none; background-color: #4CAF50;"><i class="fas fa-save"></i> Save Order Locally</button>
+    </div>
+  </div>
+
+  <!-- Order History Modal -->
+  <div id="orderHistoryModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Your Order History</h2>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div id="orderHistoryList" class="order-history-list">
+        <!-- Order history will be loaded here -->
+      </div>
+      <div class="modal-buttons">
+        <button class="modal-btn cancel-btn" id="closeHistoryBtn"><i class="fas fa-times"></i> Close</button>
+        <button class="modal-btn" id="clearHistoryBtn" style="background-color: #f44336;"><i class="fas fa-trash"></i> Clear History</button>
+      </div>
     </div>
   </div>
 
@@ -339,7 +357,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <div class="footer-section">
           <h3>Location</h3>
           <p><i class="fas fa-map-marker-alt"></i> Thakurpukur Bakhrahat Road, Sanjua bakhrahat, West Bengal 743377</p>
-          <p><a href="https://maps.google.com/?q=22.39083850, 88.21888940" target="_blank"><i class="fas fa-map"></i> View on Map</a></p>
+          <p><a href="https://maps.google.com/?q=22.39083850,88.21888940" target="_blank"><i class="fas fa-map"></i> View on Map</a></p>
         </div>
         <div class="footer-section">
           <h3>Opening Hours</h3>
@@ -349,6 +367,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
       <div class="footer-bottom">
         <p>&copy; 2025 Bake & Grill. All rights reserved.</p>
+        <button id="viewOrderHistoryBtn" class="order-history-btn"><i class="fas fa-history"></i> View Order History</button>
       </div>
     </div>
   </footer>
