@@ -690,7 +690,8 @@ async function updateOrderStatus(data) {
       throw new Error('Order not found');
     }
     
-    const currentStatus = orderDoc.data().status.toLowerCase();
+    const orderData = orderDoc.data();
+    const currentStatus = orderData.status.toLowerCase();
     console.log("Current status:", currentStatus);
     
     // Define valid status transitions
@@ -734,8 +735,12 @@ async function updateOrderStatus(data) {
       statusHistory: firebase.firestore.FieldValue.arrayUnion(newStatusEntry)
     });
     
-    // Send notification to customer
-    await sendStatusNotification(orderDoc.data().phone, data.orderId, data.status);
+    // Send notification to customer if phone exists
+    if (orderData.phone) {
+      await sendStatusNotification(orderData.phone, data.orderId, data.status);
+    } else {
+      console.log('No phone number found for order, skipping notification');
+    }
     
     showError(`Order status updated to ${data.status}`);
   } catch (error) {
@@ -748,20 +753,30 @@ async function updateOrderStatus(data) {
   }
 }
 
-// Send status notification
+// Send status notification with improved error handling
 async function sendStatusNotification(phoneNumber, orderId, status) {
+  if (!phoneNumber || typeof phoneNumber !== 'string') {
+    console.error('Invalid phone number for notification:', phoneNumber);
+    return;
+  }
+
   try {
     // Get all tokens for this phone number
     const tokensSnapshot = await db.collection('fcmTokens')
-      .where('phone', '==', phoneNumber)
+      .where('phone', '==', phoneNumber.trim())
       .get();
 
     if (tokensSnapshot.empty) {
-      console.log('No tokens found for:', phoneNumber);
+      console.log('No FCM tokens found for phone:', phoneNumber);
       return;
     }
 
     const tokens = tokensSnapshot.docs.map(doc => doc.id);
+    if (tokens.length === 0) {
+      console.log('No valid FCM tokens to send to');
+      return;
+    }
+
     const statusMessages = {
       pending: "Your order is being processed",
       preparing: "We're preparing your order now",
@@ -784,21 +799,28 @@ async function sendStatusNotification(phoneNumber, orderId, status) {
       tokens
     };
 
+    // Get access token (you'll need to implement this properly)
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      throw new Error('Failed to get FCM access token');
+    }
+
     // Send via HTTP v1 API
     const response = await fetch('https://fcm.googleapis.com/v1/projects/bakeandgrill-44c25/messages:send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await getAccessToken()}`
+        'Authorization': `Bearer ${accessToken}`
       },
       body: JSON.stringify({ messages: [message] })
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(`FCM error: ${JSON.stringify(errorData)}`);
     }
 
-    console.log('Notification sent successfully');
+    console.log('Notification sent successfully to', tokens.length, 'devices');
   } catch (error) {
     console.error('Notification send error:', error);
   }
