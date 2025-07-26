@@ -20,8 +20,6 @@ try {
   console.error("Unable to initialize Firebase Messaging", err);
 }
 
-let isTokenRegistered = false;
-
 // Full menu data
 const fullMenu = {
   "Veg Pizzas": [
@@ -645,110 +643,148 @@ let userLocation = null;
 let watchId = null;
 let isManualLocation = false;
 
-/* ======================
-   NOTIFICATION SYSTEM
-   ====================== */
+// ======================
+// NOTIFICATION SYSTEM
+// ======================
 
-async function initializeNotifications() {
+// Firebase Messaging variables
+const vapidKey = 'BKTsteSYE7yggmmbvQnPzDt0wFuHADZxcJpR8hu_bGOE8RpyBx4AamyQ2TIyItS6uvwZ79EzBp1rWOpuT4KHHDY';
+let isTokenRegistered = false;
+
+// Initialize Firebase Messaging
+function initializeFirebaseMessaging() {
   try {
-    if (!('Notification' in window)) {
-      console.log('This browser does not support notifications');
-      return;
+    if (firebase.messaging.isSupported()) {
+      messaging = firebase.messaging();
+      console.log("Firebase Messaging initialized");
+      return true;
     }
-
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      await registerServiceWorker();
-      await registerToken();
-      setupMessageHandlers();
-    } else {
-      console.log('Notification permission denied');
-    }
+    console.warn("Firebase Messaging not supported");
+    return false;
   } catch (error) {
-    console.error('Notification initialization failed:', error);
+    console.error("Messaging init error:", error);
+    return false;
   }
 }
 
+// Register Service Worker
 async function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      console.log('Service Worker registered with scope:', registration.scope);
-      
-      setInterval(() => {
-        registration.update().then(() => {
-          console.log('Service Worker updated');
-        });
-      }, 60 * 60 * 1000);
-      
-      return registration;
-    } catch (error) {
-      console.error('Service Worker registration failed:', error);
-      throw error;
-    }
+  try {
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('SW registered:', registration.scope);
+    
+    // Check for updates hourly
+    setInterval(() => registration.update(), 3600000);
+    
+    return registration;
+  } catch (error) {
+    console.error('SW registration failed:', error);
+    throw error;
   }
-  throw new Error('Service workers not supported');
 }
 
+// Register FCM Token
 async function registerToken() {
-  if (isTokenRegistered) return;
+  if (!messaging || isTokenRegistered) return;
   
   try {
     const currentToken = await messaging.getToken({ 
-      vapidKey: 'BKTsteSYE7yggmmbvQnPzDt0wFuHADZxcJpR8hu_bGOE8RpyBx4AamyQ2TIyItS6uvwZ79EzBp1rWOpuT4KHHDY',
+      vapidKey,
       serviceWorkerRegistration: await navigator.serviceWorker.ready
     });
 
     if (currentToken) {
+      console.log('FCM token:', currentToken);
       await saveTokenToFirestore(currentToken);
       isTokenRegistered = true;
-      console.log('FCM token registered');
     } else {
-      console.log('No registration token available');
+      console.log('No FCM token available');
+      requestNotificationPermission();
     }
   } catch (error) {
-    console.error('Error getting token:', error);
-    throw error;
+    console.error('Token error:', error);
+    handleTokenError(error);
   }
 }
 
+// Save token to Firestore
 async function saveTokenToFirestore(token) {
-  const phone = document.getElementById('phoneNumber')?.value;
-  if (!phone) {
-    console.log('Phone number not available for token registration');
-    return;
-  }
-
   try {
+    const phone = document.getElementById('phoneNumber')?.value || 'pending';
     await db.collection('fcmTokens').doc(token).set({
-      token: token,
-      phone: phone,
+      token,
+      phone,
       userAgent: navigator.userAgent,
       lastActive: firebase.firestore.FieldValue.serverTimestamp(),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    console.log('Token saved for:', phone);
   } catch (error) {
-    console.error('Error saving token:', error);
-    throw error;
+    console.error('Save token error:', error);
   }
 }
 
+// Handle token errors
+function handleTokenError(error) {
+  if (error.code === 'messaging/permission-blocked') {
+    console.log('Notifications blocked');
+  } else if (error.code === 'messaging/permission-default') {
+    requestNotificationPermission();
+  }
+}
+
+// Setup message handlers
 function setupMessageHandlers() {
+  if (!messaging) return;
+
+  // Foreground messages
   messaging.onMessage((payload) => {
-    console.log('Foreground message received:', payload);
+    console.log('Foreground message:', payload);
     showCustomNotification(payload);
   });
 
-  messaging.onTokenRefresh(async () => {
-    console.log('Token refreshed');
-    await registerToken();
+  // Token refresh
+  messaging.onTokenRefresh(() => {
+    console.log('Token refreshing...');
+    isTokenRegistered = false;
+    registerToken();
   });
 }
 
-function showCustomNotification(payload) {
-  const notificationContainer = document.getElementById('notification-container') || 
-    createNotificationContainer();
+// Request notification permission
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    console.log('Notifications not supported');
+    return;
+  }
 
+  Notification.requestPermission().then(permission => {
+    console.log('Permission:', permission);
+    if (permission === 'granted') initializeNotifications();
+  });
+}
+
+// Initialize notifications
+async function initializeNotifications() {
+  try {
+    if (!initializeFirebaseMessaging()) return;
+    
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      console.log('Notifications enabled');
+      await registerServiceWorker();
+      await registerToken();
+      setupMessageHandlers();
+    }
+  } catch (error) {
+    console.error('Notification init failed:', error);
+  }
+}
+
+// Show custom notification
+function showCustomNotification(payload) {
+  const container = document.getElementById('notification-container') || createNotificationContainer();
+  
   const notification = document.createElement('div');
   notification.className = `notification ${payload.data?.status || 'default'}`;
   
@@ -758,31 +794,28 @@ function showCustomNotification(payload) {
     </div>
     <div class="notification-content">
       <h4>${escapeHtml(payload.notification?.title || 'Order Update')}</h4>
-      <p>${escapeHtml(payload.notification?.body || 'Your order status has changed')}</p>
-      ${payload.data?.timestamp ? `<small>${formatTime(payload.data.timestamp)}</small>` : ''}
+      <p>${escapeHtml(payload.notification?.body || 'Status updated')}</p>
+      <small>${formatTime(payload.data?.timestamp || new Date())}</small>
     </div>
-    <button class="notification-close" aria-label="Close notification">
-      &times;
-    </button>
+    <button class="notification-close">&times;</button>
   `;
 
-  notificationContainer.prepend(notification);
+  container.prepend(notification);
   setTimeout(() => notification.classList.add('show'), 10);
 
+  // Setup close button
   notification.querySelector('.notification-close').addEventListener('click', () => {
     notification.classList.remove('show');
     setTimeout(() => notification.remove(), 300);
   });
 
-  const autoDismiss = setTimeout(() => {
+  // Auto-dismiss
+  const dismissTimer = setTimeout(() => {
     notification.classList.remove('show');
     setTimeout(() => notification.remove(), 300);
   }, 8000);
 
-  notification.addEventListener('mouseenter', () => {
-    clearTimeout(autoDismiss);
-  });
-
+  notification.addEventListener('mouseenter', () => clearTimeout(dismissTimer));
   notification.addEventListener('mouseleave', () => {
     setTimeout(() => {
       notification.classList.remove('show');
@@ -791,13 +824,7 @@ function showCustomNotification(payload) {
   });
 }
 
-function createNotificationContainer() {
-  const container = document.createElement('div');
-  container.id = 'notification-container';
-  document.body.appendChild(container);
-  return container;
-}
-
+// Helper functions for notifications
 function getStatusIcon(status) {
   const icons = {
     pending: 'fa-clock',
@@ -827,9 +854,16 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
-/* ======================
-   MAIN APPLICATION
-   ====================== */
+function createNotificationContainer() {
+  const container = document.createElement('div');
+  container.id = 'notification-container';
+  document.body.appendChild(container);
+  return container;
+}
+
+// ======================
+// MAIN APPLICATION
+// ======================
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -844,6 +878,14 @@ document.addEventListener('DOMContentLoaded', function() {
   document.body.addEventListener('click', () => {
     initializeNotifications().catch(console.error);
   }, { once: true });
+  
+  // Update token when phone number changes
+  document.getElementById('phoneNumber')?.addEventListener('change', async () => {
+    if (messaging && isTokenRegistered) {
+      const token = await messaging.getToken();
+      if (token) await saveTokenToFirestore(token);
+    }
+  });
 });
 
 // Initialize category tabs

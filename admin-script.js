@@ -734,6 +734,9 @@ async function updateOrderStatus(data) {
       statusHistory: firebase.firestore.FieldValue.arrayUnion(newStatusEntry)
     });
     
+    // Send notification to customer
+    await sendStatusNotification(orderDoc.data().phone, data.orderId, data.status);
+    
     showError(`Order status updated to ${data.status}`);
   } catch (error) {
     console.error("Error updating order status:", error);
@@ -743,6 +746,69 @@ async function updateOrderStatus(data) {
       orderCard.classList.remove('updating');
     }
   }
+}
+
+// Send status notification
+async function sendStatusNotification(phoneNumber, orderId, status) {
+  try {
+    // Get all tokens for this phone number
+    const tokensSnapshot = await db.collection('fcmTokens')
+      .where('phone', '==', phoneNumber)
+      .get();
+
+    if (tokensSnapshot.empty) {
+      console.log('No tokens found for:', phoneNumber);
+      return;
+    }
+
+    const tokens = tokensSnapshot.docs.map(doc => doc.id);
+    const statusMessages = {
+      pending: "Your order is being processed",
+      preparing: "We're preparing your order now",
+      delivering: "Your order is on its way!",
+      completed: "Your order has been delivered",
+      cancelled: "Your order has been cancelled"
+    };
+
+    const message = {
+      notification: {
+        title: `Order #${orderId.substring(0, 8)} Update`,
+        body: statusMessages[status] || "Your order status has changed"
+      },
+      data: {
+        orderId,
+        status,
+        timestamp: new Date().toISOString(),
+        click_action: "FLUTTER_NOTIFICATION_CLICK"
+      },
+      tokens
+    };
+
+    // Send via HTTP v1 API
+    const response = await fetch('https://fcm.googleapis.com/v1/projects/bakeandgrill-44c25/messages:send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken()}`
+      },
+      body: JSON.stringify({ messages: [message] })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    console.log('Notification sent successfully');
+  } catch (error) {
+    console.error('Notification send error:', error);
+  }
+}
+
+// Get access token for FCM
+async function getAccessToken() {
+  // Implement your token generation logic here
+  // This typically involves using a service account
+  return 'YOUR_ACCESS_TOKEN';
 }
 
 async function deleteCategory(data) {
