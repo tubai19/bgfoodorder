@@ -334,7 +334,7 @@ function renderOrderCard(order) {
     <div class="order-body">
       <div class="customer-info">
         <span><i class="fas fa-user"></i> ${order.customerName}</span>
-        <span><i class="fas fa-phone"></i> ${order.phone}</span>
+        <span><i class="fas fa-phone"></i> ${order.phone || 'N/A'}</span>
         <span><i class="fas fa-${order.orderType === 'Delivery' ? 'truck' : 'walking'}"></i> ${order.orderType} ${order.deliveryDistance ? `(${order.deliveryDistance}km)` : ''}</span>
       </div>
       <div class="order-items">
@@ -735,11 +735,11 @@ async function updateOrderStatus(data) {
       statusHistory: firebase.firestore.FieldValue.arrayUnion(newStatusEntry)
     });
     
-    // Send notification to customer if phone exists
-    if (orderData.phone) {
+    // Send notification to customer if phone exists and is valid
+    if (orderData.phone && typeof orderData.phone === 'string' && orderData.phone.trim() !== '') {
       await sendStatusNotification(orderData.phone, data.orderId, data.status);
     } else {
-      console.log('No phone number found for order, skipping notification');
+      console.log('No valid phone number found for order, skipping notification');
     }
     
     showError(`Order status updated to ${data.status}`);
@@ -753,21 +753,23 @@ async function updateOrderStatus(data) {
   }
 }
 
-// Send status notification with improved error handling
 async function sendStatusNotification(phoneNumber, orderId, status) {
-  if (!phoneNumber || typeof phoneNumber !== 'string') {
+  // Validate phone number
+  if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '') {
     console.error('Invalid phone number for notification:', phoneNumber);
     return;
   }
 
   try {
+    const trimmedPhone = phoneNumber.trim();
+    
     // Get all tokens for this phone number
     const tokensSnapshot = await db.collection('fcmTokens')
-      .where('phone', '==', phoneNumber.trim())
+      .where('phone', '==', trimmedPhone)
       .get();
 
     if (tokensSnapshot.empty) {
-      console.log('No FCM tokens found for phone:', phoneNumber);
+      console.log('No FCM tokens found for phone:', trimmedPhone);
       return;
     }
 
@@ -826,9 +828,8 @@ async function sendStatusNotification(phoneNumber, orderId, status) {
   }
 }
 
-// Get access token for FCM
 async function getAccessToken() {
-  // Implement your token generation logic here
+  // Implement proper token generation logic here
   // This typically involves using a service account
   return 'YOUR_ACCESS_TOKEN';
 }
