@@ -360,9 +360,6 @@ img {
   border-radius: var(--border-radius);
   box-shadow: var(--shadow);
   margin-bottom: 20px;
-  position: sticky;
-  bottom: 0;
-  z-index: 90;
 }
 
 #cart h3 {
@@ -430,6 +427,44 @@ img {
   text-align: right;
   padding-top: 10px;
   border-top: 1px solid #eee;
+}
+
+.cart-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.clear-cart-btn {
+  flex: 1;
+  background-color: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.clear-cart-btn:hover {
+  background-color: #c62828;
+}
+
+.checkout-btn {
+  flex: 1;
+  background-color: var(--success-color);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.checkout-btn:hover {
+  background-color: #21867a;
 }
 
 /* Order Form */
@@ -1008,6 +1043,95 @@ img {
   display: none;
 }
 
+/* Install Prompt */
+.install-prompt {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  background: white;
+  border-radius: var(--border-radius);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  z-index: 1000;
+  padding: 15px;
+  display: none;
+  animation: slideUp 0.3s ease-out;
+}
+
+.install-prompt-content {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.install-prompt-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+}
+
+.install-prompt-text {
+  flex: 1;
+}
+
+.install-prompt-text h3 {
+  margin: 0 0 5px 0;
+  font-size: 1rem;
+  color: var(--dark-color);
+}
+
+.install-prompt-text p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.install-prompt-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: var(--border-radius);
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.install-prompt-dismiss {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 0 0 10px;
+}
+
+/* Offline Status */
+.offline-status {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--warning-color);
+  color: #333;
+  padding: 10px;
+  text-align: center;
+  font-weight: bold;
+  z-index: 999;
+}
+
+/* Animation for install prompt */
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* Responsive Styles */
 @media (max-width: 768px) {
   .hero-banner {
@@ -1158,5 +1282,24 @@ img {
   .variant-option input:checked + label {
     background-color: var(--primary-color);
     color: white;
+  }
+
+  /* Dark mode for new elements */
+  .install-prompt {
+    background-color: #333;
+    color: #eee;
+  }
+  
+  .install-prompt-text h3 {
+    color: #eee;
+  }
+  
+  .install-prompt-text p {
+    color: #bbb;
+  }
+  
+  .offline-status {
+    background-color: #e9c46a;
+    color: #333;
   }
 }

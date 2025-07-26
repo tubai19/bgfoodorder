@@ -11,6 +11,13 @@
   
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#e63946">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bake & Grill">
+  <link rel="apple-touch-icon" href="/images/icons/icon-192x192.png">
+  <link rel="manifest" href="/manifest.json">
+  
   <title>Bake & Grill - Order Online</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -19,6 +26,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
   <link rel="stylesheet" href="styles.css">
+  
+  <!-- Schema.org markup for Google -->
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -223,6 +232,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <!-- Cart items will be added here -->
       </ul>
       <div id="cartTotal" class="cart-total">Total: ₹0</div>
+      <div class="cart-actions">
+        <button id="clearCartBtn" class="clear-cart-btn"><i class="fas fa-trash"></i> Clear Cart</button>
+        <button id="checkoutBtn" class="checkout-btn"><i class="fas fa-shopping-bag"></i> Checkout</button>
+      </div>
     </div>
   </div>
 
@@ -338,6 +351,24 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <button class="modal-btn" id="clearHistoryBtn" style="background-color: #f44336;"><i class="fas fa-trash"></i> Clear History</button>
       </div>
     </div>
+  </div>
+
+  <!-- Install App Prompt -->
+  <div id="installPrompt" class="install-prompt" style="display: none;">
+    <div class="install-prompt-content">
+      <img src="/images/icons/icon-192x192.png" alt="Bake & Grill" class="install-prompt-icon">
+      <div class="install-prompt-text">
+        <h3>Install Bake & Grill</h3>
+        <p>Get the best experience by installing our app on your home screen!</p>
+      </div>
+      <button id="installAppBtn" class="install-prompt-btn">Install</button>
+      <button id="dismissInstallBtn" class="install-prompt-dismiss">&times;</button>
+    </div>
+  </div>
+
+  <!-- Offline Status Indicator -->
+  <div id="offlineStatus" class="offline-status" style="display: none;">
+    <i class="fas fa-wifi-slash"></i> You are currently offline. Some features may be limited.
   </div>
 
   <!-- Footer Section -->
