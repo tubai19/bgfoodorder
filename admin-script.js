@@ -701,13 +701,17 @@ async function getAccessToken() {
 }
 
 async function sendStatusNotification(phoneNumber, orderId, status) {
-  if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '') {
+  // Validate phone number more strictly
+  if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '' || 
+      !/^[\d+][\d\s-]+$/.test(phoneNumber)) {
     console.error('Invalid phone number for notification:', phoneNumber);
     return;
   }
 
+  const trimmedPhone = phoneNumber.trim();
+  console.log('Attempting to send notification to phone:', trimmedPhone);
+
   try {
-    const trimmedPhone = phoneNumber.trim();
     const tokensSnapshot = await db.collection('fcmTokens')
       .where('phone', '==', trimmedPhone)
       .get();
@@ -832,7 +836,7 @@ async function updateOrderStatus(data) {
     });
     
     // Send notification to customer if phone exists and is valid
-    if (orderData.phone && typeof orderData.phone === 'string' && orderData.phone.trim() !== '') {
+    if (orderData.phone && isValidPhoneNumber(orderData.phone)) {
       await sendStatusNotification(orderData.phone, data.orderId, data.status);
     } else {
       console.log('No valid phone number found for order, skipping notification');
@@ -847,6 +851,11 @@ async function updateOrderStatus(data) {
       orderCard.classList.remove('updating');
     }
   }
+}
+
+function isValidPhoneNumber(phone) {
+  return phone && typeof phone === 'string' && phone.trim() !== '' && 
+         /^[\d+][\d\s-]+$/.test(phone);
 }
 
 async function deleteCategory(data) {
