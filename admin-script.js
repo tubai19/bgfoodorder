@@ -1,4 +1,4 @@
-// Firebase configuration (client-side only)
+// Firebase configuration - Load from environment variables in production
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
   authDomain: "bakeandgrill-44c25.firebaseapp.com",
@@ -13,76 +13,103 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const functions = firebase.functions();
+const messaging = firebase.messaging.isSupported() ? firebase.messaging() : null;
 
-// Admin configuration
-const ADMIN_EMAIL = "suvradeep.pal93@gmail.com";
+// Admin configuration - Should be configured in Firebase in production
+const ADMIN_EMAILS = [
+  "suvradeep.pal93@gmail.com",
+  // Add additional admin emails as needed
+];
 
 // DOM Elements
-const loginScreen = document.getElementById('loginScreen');
-const adminDashboard = document.getElementById('adminDashboard');
-const loginForm = document.getElementById('loginForm');
-const loginError = document.getElementById('loginError');
-const logoutBtn = document.getElementById('logoutBtn');
-const currentTime = document.getElementById('currentTime');
-const navItems = document.querySelectorAll('.sidebar li');
-const contentSections = document.querySelectorAll('.content-section');
-const orderFilter = document.getElementById('orderFilter');
-const orderSearch = document.getElementById('orderSearch');
-const ordersListContainer = document.getElementById('ordersListContainer');
-const addCategoryBtn = document.getElementById('addCategoryBtn');
-const menuCategoriesContainer = document.getElementById('menuCategoriesContainer');
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const elements = {
+  // Auth elements
+  loginScreen: document.getElementById('loginScreen'),
+  adminDashboard: document.getElementById('adminDashboard'),
+  loginForm: document.getElementById('loginForm'),
+  loginError: document.getElementById('loginError'),
+  logoutBtn: document.getElementById('logoutBtn'),
+  
+  // Navigation elements
+  currentTime: document.getElementById('currentTime'),
+  navItems: document.querySelectorAll('.sidebar li'),
+  contentSections: document.querySelectorAll('.content-section'),
+  
+  // Order management
+  orderFilter: document.getElementById('orderFilter'),
+  orderSearch: document.getElementById('orderSearch'),
+  ordersListContainer: document.getElementById('ordersListContainer'),
+  
+  // Menu management
+  addCategoryBtn: document.getElementById('addCategoryBtn'),
+  menuCategoriesContainer: document.getElementById('menuCategoriesContainer'),
+  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+  
+  // Modals
+  modals: {
+    addCategory: document.getElementById('addCategoryModal'),
+    menuItem: document.getElementById('menuItemModal'),
+    confirmation: document.getElementById('confirmationModal')
+  },
+  
+  // Form elements
+  inputs: {
+    categoryName: document.getElementById('categoryName'),
+    categoryIcon: document.getElementById('categoryIcon'),
+    itemName: document.getElementById('itemName'),
+    itemNameBn: document.getElementById('itemNameBn'),
+    itemDesc: document.getElementById('itemDesc'),
+    variantsContainer: document.getElementById('variantsContainer'),
+    currentCategoryId: document.getElementById('currentCategoryId'),
+    currentItemId: document.getElementById('currentItemId'),
+    
+    // Settings
+    restaurantName: document.getElementById('restaurantName'),
+    contactNumber: document.getElementById('contactNumber'),
+    deliveryRadius: document.getElementById('deliveryRadius'),
+    minDeliveryOrder: document.getElementById('minDeliveryOrder'),
+    charge04km: document.getElementById('charge04km'),
+    charge46km: document.getElementById('charge46km'),
+    charge68km: document.getElementById('charge68km'),
+    freeDeliveryAbove: document.getElementById('freeDeliveryAbove')
+  },
+  
+  // Buttons
+  buttons: {
+    addVariant: document.getElementById('addVariantBtn'),
+    saveMenuItem: document.getElementById('saveMenuItemBtn'),
+    confirmAddCategory: document.getElementById('confirmAddCategoryBtn'),
+    confirmAction: document.getElementById('confirmActionBtn')
+  },
+  
+  // Confirmation modal
+  confirmationTitle: document.getElementById('confirmationTitle'),
+  confirmationMessage: document.getElementById('confirmationMessage')
+};
 
-// Modal elements
-const addCategoryModal = document.getElementById('addCategoryModal');
-const menuItemModal = document.getElementById('menuItemModal');
-const confirmationModal = document.getElementById('confirmationModal');
-const closeModalButtons = document.querySelectorAll('.close-modal, .cancel-btn');
-
-// Form elements
-const categoryNameInput = document.getElementById('categoryName');
-const categoryIconInput = document.getElementById('categoryIcon');
-const itemNameInput = document.getElementById('itemName');
-const itemNameBnInput = document.getElementById('itemNameBn');
-const itemDescInput = document.getElementById('itemDesc');
-const variantsContainer = document.getElementById('variantsContainer');
-const addVariantBtn = document.getElementById('addVariantBtn');
-const saveMenuItemBtn = document.getElementById('saveMenuItemBtn');
-const currentCategoryIdInput = document.getElementById('currentCategoryId');
-const currentItemIdInput = document.getElementById('currentItemId');
-const confirmAddCategoryBtn = document.getElementById('confirmAddCategoryBtn');
-const confirmActionBtn = document.getElementById('confirmActionBtn');
-const confirmationTitle = document.getElementById('confirmationTitle');
-const confirmationMessage = document.getElementById('confirmationMessage');
-
-// Settings form elements
-const restaurantNameInput = document.getElementById('restaurantName');
-const contactNumberInput = document.getElementById('contactNumber');
-const deliveryRadiusInput = document.getElementById('deliveryRadius');
-const minDeliveryOrderInput = document.getElementById('minDeliveryOrder');
-const charge04kmInput = document.getElementById('charge04km');
-const charge46kmInput = document.getElementById('charge46km');
-const charge68kmInput = document.getElementById('charge68km');
-const freeDeliveryAboveInput = document.getElementById('freeDeliveryAbove');
-
-// Global variables
-let currentAction = null;
-let actionData = null;
-let menuData = {};
-let settingsData = {};
-let cachedToken = null;
-let tokenExpiry = 0;
+// Global state
+const state = {
+  currentAction: null,
+  actionData: null,
+  menuData: {},
+  settingsData: {},
+  fcmToken: null,
+  tokenExpiry: 0
+};
 
 // Initialize the admin interface
 document.addEventListener('DOMContentLoaded', function() {
-  // Check auth state
+  // Check auth state with email verification
   auth.onAuthStateChanged(user => {
-    if (user && user.email === ADMIN_EMAIL) {
+    if (user && ADMIN_EMAILS.includes(user.email)) {
       showAdminDashboard();
       setupRealtimeListeners();
       loadSettings();
+      requestNotificationPermission();
     } else {
       showLoginScreen();
+      if (user) auth.signOut(); // Log out if not admin
     }
   });
 
@@ -91,53 +118,53 @@ document.addEventListener('DOMContentLoaded', function() {
   setupEventListeners();
 });
 
+// Event Listeners
 function setupEventListeners() {
   // Login form submission
-  loginForm.addEventListener('submit', handleLogin);
+  elements.loginForm.addEventListener('submit', handleLogin);
 
   // Logout button
-  logoutBtn.addEventListener('click', handleLogout);
+  elements.logoutBtn.addEventListener('click', handleLogout);
 
   // Navigation menu
-  navItems.forEach(item => {
+  elements.navItems.forEach(item => {
     item.addEventListener('click', () => {
       const section = item.dataset.section;
       showSection(section);
-      navItems.forEach(navItem => navItem.classList.remove('active'));
+      elements.navItems.forEach(navItem => navItem.classList.remove('active'));
       item.classList.add('active');
     });
   });
 
   // Order filter
-  orderFilter.addEventListener('change', filterOrders);
-  orderSearch.addEventListener('input', filterOrders);
+  elements.orderFilter.addEventListener('change', filterOrders);
+  elements.orderSearch.addEventListener('input', filterOrders);
 
   // Menu management
-  addCategoryBtn.addEventListener('click', () => showModal(addCategoryModal));
-  confirmAddCategoryBtn.addEventListener('click', addNewCategory);
-  addVariantBtn.addEventListener('click', addVariantRow);
-  saveMenuItemBtn.addEventListener('click', saveMenuItem);
+  elements.addCategoryBtn.addEventListener('click', () => showModal(elements.modals.addCategory));
+  elements.buttons.confirmAddCategory.addEventListener('click', addNewCategory);
+  elements.buttons.addVariant.addEventListener('click', addVariantRow);
+  elements.buttons.saveMenuItem.addEventListener('click', saveMenuItem);
 
   // Settings
-  saveSettingsBtn.addEventListener('click', saveSettings);
+  elements.saveSettingsBtn.addEventListener('click', saveSettings);
 
   // Modal controls
-  closeModalButtons.forEach(button => {
+  document.querySelectorAll('.close-modal, .cancel-btn').forEach(button => {
     button.addEventListener('click', () => {
-      hideModal(addCategoryModal);
-      hideModal(menuItemModal);
-      hideModal(confirmationModal);
+      Object.values(elements.modals).forEach(modal => hideModal(modal));
     });
   });
 
   // Click outside modal to close
   window.addEventListener('click', (e) => {
     if (e.target.classList.contains('modal')) {
-      hideModal(addCategoryModal);
-      hideModal(menuItemModal);
-      hideModal(confirmationModal);
+      Object.values(elements.modals).forEach(modal => hideModal(modal));
     }
   });
+
+  // Confirmation action
+  elements.buttons.confirmAction.addEventListener('click', confirmAction);
 }
 
 // Authentication functions
@@ -150,7 +177,7 @@ async function handleLogin(e) {
     const userCredential = await auth.signInWithEmailAndPassword(email, password);
     const user = userCredential.user;
     
-    if (user.email === ADMIN_EMAIL) {
+    if (ADMIN_EMAILS.includes(user.email)) {
       showAdminDashboard();
       setupRealtimeListeners();
       loadSettings();
@@ -175,32 +202,36 @@ async function handleLogout() {
 }
 
 function getErrorMessage(errorCode) {
-  switch(errorCode) {
-    case 'auth/invalid-email': return 'Invalid email address';
-    case 'auth/user-disabled': return 'Account disabled';
-    case 'auth/user-not-found': return 'Account not found';
-    case 'auth/wrong-password': return 'Incorrect password';
-    case 'auth/too-many-requests': return 'Too many attempts. Try again later';
-    default: return 'Login failed. Please try again';
-  }
+  const errorMessages = {
+    'auth/invalid-email': 'Invalid email address',
+    'auth/user-disabled': 'Account disabled',
+    'auth/user-not-found': 'Account not found',
+    'auth/wrong-password': 'Incorrect password',
+    'auth/too-many-requests': 'Too many attempts. Try again later',
+    'auth/network-request-failed': 'Network error. Please check your connection',
+    'default': 'Login failed. Please try again'
+  };
+  
+  return errorMessages[errorCode] || errorMessages.default;
 }
 
 // UI Functions
 function showLoginScreen() {
-  loginScreen.style.display = 'flex';
-  adminDashboard.style.display = 'none';
+  elements.loginScreen.style.display = 'flex';
+  elements.adminDashboard.style.display = 'none';
   document.getElementById('adminEmail').value = '';
   document.getElementById('adminPassword').value = '';
-  loginError.textContent = '';
+  elements.loginError.textContent = '';
 }
 
 function showAdminDashboard() {
-  loginScreen.style.display = 'none';
-  adminDashboard.style.display = 'block';
+  elements.loginScreen.style.display = 'none';
+  elements.adminDashboard.style.display = 'block';
+  showSection('orders'); // Default to orders section
 }
 
 function showSection(sectionId) {
-  contentSections.forEach(section => {
+  elements.contentSections.forEach(section => {
     section.style.display = 'none';
   });
   document.getElementById(`${sectionId}Section`).style.display = 'block';
@@ -208,7 +239,7 @@ function showSection(sectionId) {
 
 function updateCurrentTime() {
   const now = new Date();
-  currentTime.textContent = now.toLocaleString('en-IN', {
+  elements.currentTime.textContent = now.toLocaleString('en-IN', {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -219,8 +250,8 @@ function updateCurrentTime() {
 }
 
 function showError(message) {
-  loginError.textContent = message;
-  setTimeout(() => loginError.textContent = '', 5000);
+  elements.loginError.textContent = message;
+  setTimeout(() => elements.loginError.textContent = '', 5000);
 }
 
 function showModal(modal) {
@@ -232,11 +263,11 @@ function hideModal(modal) {
 }
 
 function showConfirmation(title, message, action, data = null) {
-  currentAction = action;
-  actionData = data;
-  confirmationTitle.textContent = title;
-  confirmationMessage.textContent = message;
-  showModal(confirmationModal);
+  state.currentAction = action;
+  state.actionData = data;
+  elements.confirmationTitle.textContent = title;
+  elements.confirmationMessage.textContent = message;
+  showModal(elements.modals.confirmation);
 }
 
 // Setup real-time Firestore listeners
@@ -246,10 +277,10 @@ function setupRealtimeListeners() {
     .orderBy('timestamp', 'desc')
     .limit(50)
     .onSnapshot(snapshot => {
-      ordersListContainer.innerHTML = '';
+      elements.ordersListContainer.innerHTML = '';
       
       if (snapshot.empty) {
-        ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
+        elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
         return;
       }
       
@@ -260,28 +291,28 @@ function setupRealtimeListeners() {
       });
     }, error => {
       console.error("Orders listener error:", error);
-      ordersListContainer.innerHTML = '<div class="error">Failed to load orders</div>';
+      elements.ordersListContainer.innerHTML = '<div class="error">Failed to load orders</div>';
     });
 
   // Real-time menu listener
   db.collection('menuCategories').onSnapshot(snapshot => {
-    menuData = {};
-    menuCategoriesContainer.innerHTML = '';
+    state.menuData = {};
+    elements.menuCategoriesContainer.innerHTML = '';
     
     if (snapshot.empty) {
-      menuCategoriesContainer.innerHTML = '<div class="no-categories">No menu categories found</div>';
+      elements.menuCategoriesContainer.innerHTML = '<div class="no-categories">No menu categories found</div>';
       return;
     }
     
     snapshot.forEach(doc => {
       const category = doc.data();
       category.id = doc.id;
-      menuData[category.id] = category;
+      state.menuData[category.id] = category;
       renderCategoryCard(category);
     });
   }, error => {
     console.error("Menu listener error:", error);
-    menuCategoriesContainer.innerHTML = '<div class="error">Failed to load menu</div>';
+    elements.menuCategoriesContainer.innerHTML = '<div class="error">Failed to load menu</div>';
   });
 }
 
@@ -291,11 +322,11 @@ async function loadSettings() {
     const doc = await db.collection('settings').doc('restaurantSettings').get();
     
     if (doc.exists) {
-      settingsData = doc.data();
-      updateSettingsForm(settingsData);
+      state.settingsData = doc.data();
+      updateSettingsForm(state.settingsData);
     } else {
       // Initialize default settings
-      settingsData = {
+      state.settingsData = {
         restaurantName: "Bake & Grill",
         contactNumber: "+918240266267",
         deliveryRadius: 8,
@@ -303,13 +334,167 @@ async function loadSettings() {
         charge04km: 0,
         charge46km: 20,
         charge68km: 30,
-        freeDeliveryAbove: 500
+        freeDeliveryAbove: 500,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
-      await db.collection('settings').doc('restaurantSettings').set(settingsData);
-      updateSettingsForm(settingsData);
+      await db.collection('settings').doc('restaurantSettings').set(state.settingsData);
+      updateSettingsForm(state.settingsData);
     }
   } catch (error) {
     console.error("Error loading settings:", error);
+    showError('Failed to load settings');
+  }
+}
+
+// Notification functions
+async function requestNotificationPermission() {
+  if (!messaging) return;
+  
+  try {
+    await Notification.requestPermission();
+    state.fcmToken = await messaging.getToken();
+    
+    if (state.fcmToken) {
+      console.log("FCM Token:", state.fcmToken);
+      // You might want to store this token in Firestore for the admin user
+    }
+  } catch (error) {
+    console.error("Notification permission error:", error);
+  }
+}
+
+async function sendStatusNotification(phoneNumber, orderId, status) {
+  if (!isValidPhoneNumber(phoneNumber)) {
+    console.error(`Invalid phone number format for order ${orderId}: ${phoneNumber}`);
+    return false;
+  }
+
+  try {
+    // First get the token for this phone number
+    const tokenDoc = await db.collection('fcmTokens').doc(phoneNumber.trim()).get();
+    
+    if (!tokenDoc.exists) {
+      console.warn(`No FCM token found for phone: ${phoneNumber}`);
+      return false;
+    }
+    
+    const tokenData = tokenDoc.data();
+    const token = tokenData.token;
+    
+    if (!token) {
+      console.warn(`Empty FCM token for phone: ${phoneNumber}`);
+      return false;
+    }
+
+    // Status messages
+    const statusMessages = {
+      pending: 'Your order is pending confirmation',
+      preparing: 'Your order is being prepared',
+      delivering: 'Your order is out for delivery',
+      completed: 'Your order has been delivered',
+      cancelled: 'Your order has been cancelled'
+    };
+
+    // Send notification via Firebase Functions
+    const sendNotification = functions.httpsCallable('sendOrderStatusNotification');
+    const result = await sendNotification({
+      token,
+      orderId,
+      status,
+      phoneNumber: phoneNumber.trim(),
+      message: statusMessages[status] || 'Your order status has been updated'
+    });
+
+    console.log("Notification sent successfully:", result);
+    return true;
+  } catch (error) {
+    console.error('Notification send error:', error);
+    showError(`Failed to send notification: ${error.message}`);
+    return false;
+  }
+}
+
+// Phone number validation
+function isValidPhoneNumber(phone) {
+  if (!phone || typeof phone !== 'string') return false;
+  const trimmedPhone = phone.trim();
+  return /^\+?[\d\s-]{10,15}$/.test(trimmedPhone);
+}
+
+// Order status management
+async function updateOrderStatus(data) {
+  const orderCard = document.querySelector(`.order-card[data-order-id="${data.orderId}"]`);
+  if (orderCard) {
+    orderCard.classList.add('updating');
+  }
+
+  try {
+    const orderRef = db.collection("orders").doc(data.orderId);
+    const orderDoc = await orderRef.get();
+    
+    if (!orderDoc.exists) {
+      throw new Error('Order not found');
+    }
+    
+    const orderData = orderDoc.data();
+    const currentStatus = orderData.status.toLowerCase();
+    
+    // Define valid status transitions
+    const validTransitions = {
+      pending: ['preparing', 'cancelled'],
+      preparing: ['delivering', 'completed', 'cancelled'],
+      delivering: ['completed'],
+      completed: [],
+      cancelled: []
+    };
+    
+    // Check if the transition is valid
+    if (validTransitions[currentStatus] && !validTransitions[currentStatus].includes(data.status)) {
+      throw new Error(`Cannot change from ${currentStatus} to ${data.status}`);
+    }
+
+    // Prepare update data
+    const updateData = {
+      status: data.status,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // Special case: if cancelling, add cancellation reason
+    if (data.status === 'cancelled') {
+      const reason = prompt('Please enter cancellation reason:');
+      if (reason) {
+        updateData.cancellationReason = reason;
+      }
+    }
+    
+    // Perform updates
+    await orderRef.update(updateData);
+    await orderRef.update({
+      statusHistory: firebase.firestore.FieldValue.arrayUnion({
+        status: data.status,
+        timestamp: new Date(),
+        changedBy: auth.currentUser.email
+      })
+    });
+    
+    // Attempt notification if phone exists
+    if (orderData.phoneNumber) {
+      const notificationSent = await sendStatusNotification(orderData.phoneNumber, data.orderId, data.status);
+      if (!notificationSent) {
+        console.warn(`Notification failed for order ${data.orderId}`);
+      }
+    } else {
+      console.warn(`Order ${data.orderId} has no phone number - status updated but no notification sent`);
+    }
+    
+    showError(`Order status updated to ${data.status}`);
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    showError(error.message || 'Failed to update order status');
+  } finally {
+    if (orderCard) {
+      orderCard.classList.remove('updating');
+    }
   }
 }
 
@@ -323,7 +508,7 @@ function renderOrderCard(order) {
   const statusInfo = getStatusInfo(order.status);
   
   // Format timestamp
-  const orderDate = new Date(order.timestamp);
+  const orderDate = order.timestamp.toDate();
   const dateString = formatOrderDate(orderDate);
   
   // Create order card HTML
@@ -336,7 +521,7 @@ function renderOrderCard(order) {
     <div class="order-body">
       <div class="customer-info">
         <span><i class="fas fa-user"></i> ${order.customerName}</span>
-        <span><i class="fas fa-phone"></i> ${order.phone || 'N/A'}</span>
+        <span><i class="fas fa-phone"></i> ${order.phoneNumber || 'N/A'}</span>
         <span><i class="fas fa-${order.orderType === 'Delivery' ? 'truck' : 'walking'}"></i> ${order.orderType} ${order.deliveryDistance ? `(${order.deliveryDistance}km)` : ''}</span>
       </div>
       <div class="order-items">
@@ -379,7 +564,7 @@ function renderOrderCard(order) {
     });
   });
   
-  ordersListContainer.appendChild(orderCard);
+  elements.ordersListContainer.appendChild(orderCard);
 }
 
 function renderCategoryCard(category) {
@@ -424,7 +609,7 @@ function renderCategoryCard(category) {
     });
   });
   
-  menuCategoriesContainer.appendChild(categoryCard);
+  elements.menuCategoriesContainer.appendChild(categoryCard);
   loadCategoryItems(category.id);
 }
 
@@ -503,16 +688,16 @@ function renderMenuItem(item, container) {
 
 // Modal Functions
 function showAddMenuItemModal(categoryId) {
-  currentCategoryIdInput.value = categoryId;
-  currentItemIdInput.value = '';
-  itemNameInput.value = '';
-  itemNameBnInput.value = '';
-  itemDescInput.value = '';
-  variantsContainer.innerHTML = '';
+  elements.inputs.currentCategoryId.value = categoryId;
+  elements.inputs.currentItemId.value = '';
+  elements.inputs.itemName.value = '';
+  elements.inputs.itemNameBn.value = '';
+  elements.inputs.itemDesc.value = '';
+  elements.inputs.variantsContainer.innerHTML = '';
   addVariantRow(); // Add one empty variant by default
   
   document.getElementById('menuItemModalTitle').textContent = 'Add Menu Item';
-  showModal(menuItemModal);
+  showModal(elements.modals.menuItem);
 }
 
 function showEditMenuItemModal(itemId) {
@@ -520,12 +705,12 @@ function showEditMenuItemModal(itemId) {
     .then(doc => {
       if (doc.exists) {
         const item = doc.data();
-        currentCategoryIdInput.value = item.categoryId;
-        currentItemIdInput.value = doc.id;
-        itemNameInput.value = item.name;
-        itemNameBnInput.value = item.nameBn || '';
-        itemDescInput.value = item.desc || '';
-        variantsContainer.innerHTML = '';
+        elements.inputs.currentCategoryId.value = item.categoryId;
+        elements.inputs.currentItemId.value = doc.id;
+        elements.inputs.itemName.value = item.name;
+        elements.inputs.itemNameBn.value = item.nameBn || '';
+        elements.inputs.itemDesc.value = item.desc || '';
+        elements.inputs.variantsContainer.innerHTML = '';
         
         // Add variants
         if (item.variants) {
@@ -537,7 +722,7 @@ function showEditMenuItemModal(itemId) {
         }
         
         document.getElementById('menuItemModalTitle').textContent = 'Edit Menu Item';
-        showModal(menuItemModal);
+        showModal(elements.modals.menuItem);
       }
     })
     .catch(error => {
@@ -547,18 +732,18 @@ function showEditMenuItemModal(itemId) {
 }
 
 function showEditCategoryModal(categoryId) {
-  const category = menuData[categoryId];
+  const category = state.menuData[categoryId];
   if (!category) return;
   
-  categoryNameInput.value = category.name;
-  categoryIconInput.value = category.icon || '';
+  elements.inputs.categoryName.value = category.name;
+  elements.inputs.categoryIcon.value = category.icon || '';
   
-  currentAction = 'editCategory';
-  actionData = { categoryId };
+  state.currentAction = 'editCategory';
+  state.actionData = { categoryId };
   
   document.querySelector('#addCategoryModal h3').textContent = 'Edit Category';
   document.getElementById('confirmAddCategoryBtn').textContent = 'Update Category';
-  showModal(addCategoryModal);
+  showModal(elements.modals.addCategory);
 }
 
 function addVariantRow(name = '', price = '') {
@@ -573,18 +758,18 @@ function addVariantRow(name = '', price = '') {
   
   const removeBtn = variantRow.querySelector('.remove-variant-btn');
   removeBtn.addEventListener('click', () => {
-    if (variantsContainer.children.length > 1) {
+    if (elements.inputs.variantsContainer.children.length > 1) {
       variantRow.remove();
     }
   });
   
-  variantsContainer.appendChild(variantRow);
+  elements.inputs.variantsContainer.appendChild(variantRow);
 }
 
 // Data Manipulation Functions
 async function addNewCategory() {
-  const name = categoryNameInput.value.trim();
-  const icon = categoryIconInput.value.trim();
+  const name = elements.inputs.categoryName.value.trim();
+  const icon = elements.inputs.categoryIcon.value.trim();
   
   if (!name) {
     showError('Category name is required');
@@ -592,11 +777,12 @@ async function addNewCategory() {
   }
   
   try {
-    if (currentAction === 'editCategory') {
+    if (state.currentAction === 'editCategory') {
       // Update existing category
-      await db.collection('menuCategories').doc(actionData.categoryId).update({
+      await db.collection('menuCategories').doc(state.actionData.categoryId).update({
         name,
-        icon
+        icon,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       showError('Category updated successfully');
     } else {
@@ -609,7 +795,7 @@ async function addNewCategory() {
       showError('Category added successfully');
     }
     
-    hideModal(addCategoryModal);
+    hideModal(elements.modals.addCategory);
     loadMenu();
   } catch (error) {
     console.error("Error saving category:", error);
@@ -618,10 +804,10 @@ async function addNewCategory() {
 }
 
 async function saveMenuItem() {
-  const name = itemNameInput.value.trim();
-  const nameBn = itemNameBnInput.value.trim();
-  const desc = itemDescInput.value.trim();
-  const categoryId = currentCategoryIdInput.value;
+  const name = elements.inputs.itemName.value.trim();
+  const nameBn = elements.inputs.itemNameBn.value.trim();
+  const desc = elements.inputs.itemDesc.value.trim();
+  const categoryId = elements.inputs.currentCategoryId.value;
   
   if (!name || !categoryId) {
     showError('Item name and category are required');
@@ -630,7 +816,7 @@ async function saveMenuItem() {
   
   // Collect variants
   const variants = {};
-  const variantRows = variantsContainer.querySelectorAll('.variant-row');
+  const variantRows = elements.inputs.variantsContainer.querySelectorAll('.variant-row');
   
   variantRows.forEach(row => {
     const name = row.querySelector('.variant-name').value.trim();
@@ -657,9 +843,9 @@ async function saveMenuItem() {
     if (nameBn) itemData.nameBn = nameBn;
     if (desc) itemData.desc = desc;
     
-    if (currentItemIdInput.value) {
+    if (elements.inputs.currentItemId.value) {
       // Update existing item
-      await db.collection('menuItems').doc(currentItemIdInput.value).update(itemData);
+      await db.collection('menuItems').doc(elements.inputs.currentItemId.value).update(itemData);
       showError('Menu item updated successfully');
     } else {
       // Add new item
@@ -668,194 +854,12 @@ async function saveMenuItem() {
       showError('Menu item added successfully');
     }
     
-    hideModal(menuItemModal);
+    hideModal(elements.modals.menuItem);
     loadMenu();
   } catch (error) {
     console.error("Error saving menu item:", error);
     showError('Failed to save menu item');
   }
-}
-
-async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiry) {
-    return cachedToken;
-  }
-
-  try {
-    // This should be replaced with your actual service account credentials
-    // For client-side, you should use Firebase Functions to handle this securely
-    const response = await fetch('https://your-firebase-function-url/generateFCMToken');
-    const data = await response.json();
-    
-    if (data.token) {
-      cachedToken = data.token;
-      tokenExpiry = Date.now() + (data.expires_in * 1000) - 300000; // 5 minute buffer
-      return cachedToken;
-    }
-    
-    throw new Error('Failed to get access token');
-  } catch (error) {
-    console.error('Error generating access token:', error);
-    throw error;
-  }
-}
-
-async function sendStatusNotification(phoneNumber, orderId, status) {
-  // Validate phone number more strictly
-  if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.trim() === '' || 
-      !/^[\d+][\d\s-]+$/.test(phoneNumber)) {
-    console.error('Invalid phone number for notification:', phoneNumber);
-    return;
-  }
-
-  const trimmedPhone = phoneNumber.trim();
-  console.log('Attempting to send notification to phone:', trimmedPhone);
-
-  try {
-    const tokensSnapshot = await db.collection('fcmTokens')
-      .where('phone', '==', trimmedPhone)
-      .get();
-
-    if (tokensSnapshot.empty) {
-      console.log('No FCM tokens found for phone:', trimmedPhone);
-      return;
-    }
-
-    const tokens = tokensSnapshot.docs.map(doc => doc.id);
-    if (tokens.length === 0) {
-      console.log('No valid FCM tokens to send to');
-      return;
-    }
-
-    const statusMessages = {
-      pending: "Your order is being processed",
-      preparing: "We're preparing your order now",
-      delivering: "Your order is on its way!",
-      completed: "Your order has been delivered",
-      cancelled: "Your order has been cancelled"
-    };
-
-    const message = {
-      notification: {
-        title: `Order #${orderId.substring(0, 8)} Update`,
-        body: statusMessages[status] || "Your order status has changed"
-      },
-      data: {
-        orderId,
-        status,
-        timestamp: new Date().toISOString(),
-        click_action: "FLUTTER_NOTIFICATION_CLICK"
-      },
-      tokens
-    };
-
-    const accessToken = await getAccessToken();
-    if (!accessToken) {
-      throw new Error('Failed to get FCM access token');
-    }
-
-    const response = await fetch('https://fcm.googleapis.com/v1/projects/bakeandgrill-44c25/messages:send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify({ message })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`FCM error: ${JSON.stringify(errorData)}`);
-    }
-
-    console.log('Notification sent successfully to', tokens.length, 'devices');
-  } catch (error) {
-    console.error('Notification send error:', error);
-  }
-}
-
-async function updateOrderStatus(data) {
-  console.log("Attempting to update status:", data);
-  
-  const orderCard = document.querySelector(`.order-card[data-order-id="${data.orderId}"]`);
-  if (orderCard) {
-    orderCard.classList.add('updating');
-  }
-
-  try {
-    const orderRef = db.collection("orders").doc(data.orderId);
-    const orderDoc = await orderRef.get();
-    
-    if (!orderDoc.exists) {
-      throw new Error('Order not found');
-    }
-    
-    const orderData = orderDoc.data();
-    const currentStatus = orderData.status.toLowerCase();
-    console.log("Current status:", currentStatus);
-    
-    // Define valid status transitions
-    const validTransitions = {
-      pending: ['preparing', 'cancelled'],
-      preparing: ['delivering', 'completed', 'cancelled'],
-      delivering: ['completed'],
-      completed: [],
-      cancelled: []
-    };
-    
-    // Check if the transition is valid
-    if (validTransitions[currentStatus] && !validTransitions[currentStatus].includes(data.status)) {
-      throw new Error(`Cannot change from ${currentStatus} to ${data.status}`);
-    }
-    
-    // Create status history entry
-    const newStatusEntry = {
-      status: data.status,
-      timestamp: new Date(),
-      changedBy: auth.currentUser.email
-    };
-
-    // Prepare update data
-    const updateData = {
-      status: data.status,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    
-    // Special case: if cancelling, add cancellation reason
-    if (data.status === 'cancelled') {
-      const reason = prompt('Please enter cancellation reason:');
-      if (reason) {
-        updateData.cancellationReason = reason;
-      }
-    }
-    
-    // Perform updates
-    await orderRef.update(updateData);
-    await orderRef.update({
-      statusHistory: firebase.firestore.FieldValue.arrayUnion(newStatusEntry)
-    });
-    
-    // Send notification to customer if phone exists and is valid
-    if (orderData.phone && isValidPhoneNumber(orderData.phone)) {
-      await sendStatusNotification(orderData.phone, data.orderId, data.status);
-    } else {
-      console.log('No valid phone number found for order, skipping notification');
-    }
-    
-    showError(`Order status updated to ${data.status}`);
-  } catch (error) {
-    console.error("Error updating order status:", error);
-    showError(error.message || 'Failed to update order status');
-  } finally {
-    if (orderCard) {
-      orderCard.classList.remove('updating');
-    }
-  }
-}
-
-function isValidPhoneNumber(phone) {
-  return phone && typeof phone === 'string' && phone.trim() !== '' && 
-         /^[\d+][\d\s-]+$/.test(phone);
 }
 
 async function deleteCategory(data) {
@@ -895,16 +899,22 @@ async function deleteMenuItem(data) {
 
 async function saveSettings() {
   const settings = {
-    restaurantName: restaurantNameInput.value.trim(),
-    contactNumber: contactNumberInput.value.trim(),
-    deliveryRadius: Number(deliveryRadiusInput.value),
-    minDeliveryOrder: Number(minDeliveryOrderInput.value),
-    charge04km: Number(charge04kmInput.value),
-    charge46km: Number(charge46kmInput.value),
-    charge68km: Number(charge68kmInput.value),
-    freeDeliveryAbove: Number(freeDeliveryAboveInput.value),
+    restaurantName: elements.inputs.restaurantName.value.trim(),
+    contactNumber: elements.inputs.contactNumber.value.trim(),
+    deliveryRadius: Number(elements.inputs.deliveryRadius.value),
+    minDeliveryOrder: Number(elements.inputs.minDeliveryOrder.value),
+    charge04km: Number(elements.inputs.charge04km.value),
+    charge46km: Number(elements.inputs.charge46km.value),
+    charge68km: Number(elements.inputs.charge68km.value),
+    freeDeliveryAbove: Number(elements.inputs.freeDeliveryAbove.value),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
+  
+  // Validate phone number
+  if (!isValidPhoneNumber(settings.contactNumber)) {
+    showError('Please enter a valid phone number');
+    return;
+  }
   
   try {
     await db.collection('settings').doc('restaurantSettings').set(settings, { merge: true });
@@ -917,10 +927,10 @@ async function saveSettings() {
 
 // Helper Functions
 function filterOrders() {
-  const statusFilter = orderFilter.value;
-  const searchTerm = orderSearch.value.toLowerCase();
+  const statusFilter = elements.orderFilter.value;
+  const searchTerm = elements.orderSearch.value.toLowerCase();
   
-  const orderCards = ordersListContainer.querySelectorAll('.order-card');
+  const orderCards = elements.ordersListContainer.querySelectorAll('.order-card');
   let visibleCount = 0;
   
   orderCards.forEach(card => {
@@ -942,30 +952,32 @@ function filterOrders() {
   });
   
   if (visibleCount === 0) {
-    ordersListContainer.innerHTML = '<div class="no-orders">No orders match your criteria</div>';
+    elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders match your criteria</div>';
   }
 }
 
 function updateSettingsForm(settings) {
-  restaurantNameInput.value = settings.restaurantName || '';
-  contactNumberInput.value = settings.contactNumber || '';
-  deliveryRadiusInput.value = settings.deliveryRadius || 8;
-  minDeliveryOrderInput.value = settings.minDeliveryOrder || 200;
-  charge04kmInput.value = settings.charge04km || 0;
-  charge46kmInput.value = settings.charge46km || 20;
-  charge68kmInput.value = settings.charge68km || 30;
-  freeDeliveryAboveInput.value = settings.freeDeliveryAbove || 500;
+  elements.inputs.restaurantName.value = settings.restaurantName || '';
+  elements.inputs.contactNumber.value = settings.contactNumber || '';
+  elements.inputs.deliveryRadius.value = settings.deliveryRadius || 8;
+  elements.inputs.minDeliveryOrder.value = settings.minDeliveryOrder || 200;
+  elements.inputs.charge04km.value = settings.charge04km || 0;
+  elements.inputs.charge46km.value = settings.charge46km || 20;
+  elements.inputs.charge68km.value = settings.charge68km || 30;
+  elements.inputs.freeDeliveryAbove.value = settings.freeDeliveryAbove || 500;
 }
 
 function getStatusInfo(status) {
-  switch(status) {
-    case 'pending': return { class: 'pending', text: 'Pending' };
-    case 'preparing': return { class: 'preparing', text: 'Preparing' };
-    case 'delivering': return { class: 'delivering', text: 'Out for Delivery' };
-    case 'completed': return { class: 'completed', text: 'Completed' };
-    case 'cancelled': return { class: 'cancelled', text: 'Cancelled' };
-    default: return { class: '', text: status };
-  }
+  const statusInfo = {
+    pending: { class: 'pending', text: 'Pending' },
+    preparing: { class: 'preparing', text: 'Preparing' },
+    delivering: { class: 'delivering', text: 'Out for Delivery' },
+    completed: { class: 'completed', text: 'Completed' },
+    cancelled: { class: 'cancelled', text: 'Cancelled' },
+    default: { class: '', text: status }
+  };
+  
+  return statusInfo[status] || statusInfo.default;
 }
 
 function formatOrderDate(date) {
@@ -996,22 +1008,37 @@ function loadMenu() {
 }
 
 // Confirm action handler
-confirmActionBtn.addEventListener('click', () => {
-  console.log("Confirming action:", currentAction, actionData);
-  hideModal(confirmationModal);
+async function confirmAction() {
+  if (!state.currentAction || !state.actionData) return;
   
-  switch(currentAction) {
-    case 'updateOrderStatus':
-      updateOrderStatus(actionData);
-      break;
-    case 'deleteCategory':
-      deleteCategory(actionData);
-      break;
-    case 'deleteMenuItem':
-      deleteMenuItem(actionData);
-      break;
+  hideModal(elements.modals.confirmation);
+  
+  try {
+    // Verify user is still authenticated and is admin
+    const user = auth.currentUser;
+    if (!user || !ADMIN_EMAILS.includes(user.email)) {
+      showError('Session expired or permission denied. Please login again.');
+      return;
+    }
+
+    switch(state.currentAction) {
+      case 'updateOrderStatus':
+        await updateOrderStatus(state.actionData);
+        break;
+      case 'deleteCategory':
+        await deleteCategory(state.actionData);
+        break;
+      case 'deleteMenuItem':
+        await deleteMenuItem(state.actionData);
+        break;
+      default:
+        throw new Error('Unknown action');
+    }
+  } catch (error) {
+    console.error("Action failed:", error);
+    showError(`Action failed: ${error.message}`);
+  } finally {
+    state.currentAction = null;
+    state.actionData = null;
   }
-  
-  currentAction = null;
-  actionData = null;
-});
+}

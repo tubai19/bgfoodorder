@@ -1904,17 +1904,3 @@ function sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, tot
   document.getElementById("customerName").value = "";
   document.getElementById("phoneNumber").value = "";
 }
-
-// Add CSS styles
-const style = document.createElement('style');
-style.textContent = `
-  html {
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  body {
-    overscroll-behavior-y: contain;
-  }
-`;
-document.head.appendChild(style);
