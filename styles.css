@@ -883,153 +883,31 @@ img {
   font-weight: bold;
 }
 
-/* Notification System */
-#notification-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-width: 350px;
-  width: 100%;
-  pointer-events: none;
-}
-
+/* Notification */
 .notification {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  padding: 16px;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--success-color);
+  color: white;
+  padding: 10px 20px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  z-index: 1000;
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  transform: translateX(120%);
-  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  align-items: center;
+  gap: 10px;
   opacity: 0;
-  border-left: 4px solid var(--primary-color);
-  pointer-events: auto;
+  transition: opacity 0.3s ease;
 }
 
 .notification.show {
-  transform: translateX(0);
   opacity: 1;
 }
 
-.notification-icon {
-  font-size: 1.4rem;
-  color: var(--primary-color);
-  margin-top: 2px;
-  flex-shrink: 0;
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-content h4 {
-  margin: 0 0 6px 0;
-  font-size: 1rem;
-  color: var(--dark-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.notification-content p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #555;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.notification-content small {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: #888;
-}
-
-.notification-close {
-  background: none;
-  border: none;
+.notification i {
   font-size: 1.2rem;
-  color: #aaa;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 8px;
-  transition: color 0.2s;
-  flex-shrink: 0;
-}
-
-.notification-close:hover {
-  color: var(--danger-color);
-}
-
-/* Status-specific styles */
-.notification.pending {
-  border-left-color: var(--warning-color);
-}
-.notification.pending .notification-icon {
-  color: var(--warning-color);
-}
-
-.notification.preparing {
-  border-left-color: var(--accent-color);
-}
-.notification.preparing .notification-icon {
-  color: var(--accent-color);
-}
-
-.notification.delivering {
-  border-left-color: #4cc9f0;
-}
-.notification.delivering .notification-icon {
-  color: #4cc9f0;
-}
-
-.notification.completed {
-  border-left-color: var(--success-color);
-}
-.notification.completed .notification-icon {
-  color: var(--success-color);
-}
-
-.notification.cancelled {
-  border-left-color: var(--danger-color);
-}
-.notification.cancelled .notification-icon {
-  color: var(--danger-color);
-}
-
-/* Animation for notification count */
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
-.notification-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background-color: var(--danger-color);
-  color: white;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: bold;
-  animation: pulse 1s infinite;
 }
 
 /* Delivery Restriction */
@@ -1043,92 +921,154 @@ img {
   display: none;
 }
 
-/* Install Prompt */
-.install-prompt {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  right: 20px;
-  background: white;
-  border-radius: var(--border-radius);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-  z-index: 1000;
-  padding: 15px;
-  display: none;
-  animation: slideUp 0.3s ease-out;
+/* Improved touch targets */
+button, input[type="radio"] + label, input[type="checkbox"] + label {
+  min-height: 44px;
 }
 
-.install-prompt-content {
-  display: flex;
-  align-items: center;
-  gap: 15px;
+/* Better form inputs */
+input, textarea, select {
+  font-size: 16px !important; /* Prevent zooming on focus in iOS */
 }
 
-.install-prompt-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
-}
-
-.install-prompt-text {
-  flex: 1;
-}
-
-.install-prompt-text h3 {
-  margin: 0 0 5px 0;
-  font-size: 1rem;
-  color: var(--dark-color);
-}
-
-.install-prompt-text p {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.install-prompt-btn {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: var(--border-radius);
-  font-weight: bold;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.install-prompt-dismiss {
-  background: none;
-  border: none;
-  color: #999;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0 0 0 10px;
-}
-
-/* Offline Status */
-.offline-status {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: var(--warning-color);
-  color: #333;
-  padding: 10px;
-  text-align: center;
-  font-weight: bold;
-  z-index: 999;
-}
-
-/* Animation for install prompt */
-@keyframes slideUp {
-  from {
-    transform: translateY(100px);
-    opacity: 0;
+/* Enhanced mobile menu */
+@media (max-width: 768px) {
+  .header {
+    position: relative;
+    padding: 10px 0;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
+  
+  .hero-banner {
+    height: 200px;
+    margin-top: 0;
+  }
+  
+  .hero-content h1 {
+    font-size: 1.5rem;
+  }
+  
+  .hero-content p {
+    font-size: 0.9rem;
+  }
+  
+  .category-nav {
+    padding: 10px 5px;
+  }
+  
+  .category-nav button {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+  
+  /* Improved cart for mobile */
+  #cart {
+    width: 90%;
+    max-height: 70vh;
+    bottom: 80px;
+    right: 5%;
+    left: 5%;
+  }
+  
+  .mobile-menu-btn {
+    width: 56px;
+    height: 56px;
+    font-size: 1.3rem;
+  }
+  
+  /* Better form layout */
+  .form-input {
+    margin-bottom: 12px;
+  }
+  
+  /* Stack order type options */
+  .order-type-options {
+    flex-direction: column;
+  }
+  
+  .order-type-option {
+    width: 100%;
+  }
+}
+
+/* Smaller devices */
+@media (max-width: 480px) {
+  .menu-items {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .menu-item {
+    padding: 12px;
+  }
+  
+  .variant-option label {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+  
+  /* Better modal for small screens */
+  .modal-content {
+    width: 98%;
+    margin: 10px auto;
+  }
+  
+  .modal-buttons {
+    flex-direction: column;
+  }
+  
+  .modal-btn {
+    width: 100%;
+  }
+  
+  /* Footer adjustments */
+  .footer-section {
+    margin-bottom: 20px;
+  }
+  
+  .footer-bottom {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+/* Very small devices */
+@media (max-width: 360px) {
+  .hero-banner {
+    height: 180px;
+  }
+  
+  .hero-content h1 {
+    font-size: 1.3rem;
+  }
+  
+  .cta-btn {
+    padding: 8px 15px;
+  }
+  
+  .menu-item-name {
+    font-size: 1rem;
+  }
+  
+  .menu-item-desc {
+    font-size: 0.8rem;
+  }
+}
+
+/* Landscape orientation fixes */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hero-banner {
+    height: 150px;
+  }
+  
+  #cart {
+    max-height: 50vh;
+  }
+}
+
+/* Prevent zoom on input focus in mobile Safari */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px;
   }
 }
 
@@ -1168,17 +1108,6 @@ img {
   
   #cart.active {
     display: block;
-  }
-  
-  #notification-container {
-    top: 10px;
-    right: 10px;
-    left: 10px;
-    max-width: none;
-  }
-  
-  .notification {
-    width: calc(100% - 20px);
   }
   
   .footer-grid {
@@ -1230,23 +1159,6 @@ img {
     color: #eee;
   }
   
-  .notification {
-    background: #2d2d2d;
-    border-left-color: #444;
-  }
-  
-  .notification-content h4 {
-    color: #eee;
-  }
-  
-  .notification-content p {
-    color: #bbb;
-  }
-  
-  .notification-close {
-    color: #777;
-  }
-  
   .menu-item,
   .delivery-info,
   .form-section,
@@ -1282,24 +1194,5 @@ img {
   .variant-option input:checked + label {
     background-color: var(--primary-color);
     color: white;
-  }
-
-  /* Dark mode for new elements */
-  .install-prompt {
-    background-color: #333;
-    color: #eee;
-  }
-  
-  .install-prompt-text h3 {
-    color: #eee;
-  }
-  
-  .install-prompt-text p {
-    color: #bbb;
-  }
-  
-  .offline-status {
-    background-color: #e9c46a;
-    color: #333;
   }
 }

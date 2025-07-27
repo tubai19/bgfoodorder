@@ -636,10 +636,6 @@ const placeOrderBtn = document.getElementById("placeOrderBtn");
 const viewOrderHistoryBtn = document.getElementById("viewOrderHistoryBtn");
 const clearCartBtn = document.getElementById("clearCartBtn");
 const checkoutBtn = document.getElementById("checkoutBtn");
-const installPrompt = document.getElementById("installPrompt");
-const installAppBtn = document.getElementById("installAppBtn");
-const dismissInstallBtn = document.getElementById("dismissInstallBtn");
-const offlineStatus = document.getElementById("offlineStatus");
 
 // Application state
 let currentCategory = null;
@@ -648,106 +644,6 @@ let isLocationFetching = false;
 let userLocation = null;
 let watchId = null;
 let isManualLocation = false;
-let deferredPrompt = null;
-
-// ======================
-// PWA INSTALL PROMPT
-// ======================
-
-function showInstallPrompt() {
-  // Only show if not running in standalone mode
-  if (!window.matchMedia('(display-mode: standalone)').matches) {
-    installPrompt.style.display = 'block';
-  }
-}
-
-function hideInstallPrompt() {
-  installPrompt.style.display = 'none';
-}
-
-// Listen for beforeinstallprompt event
-window.addEventListener('beforeinstallprompt', (e) => {
-  // Prevent the mini-infobar from appearing on mobile
-  e.preventDefault();
-  // Stash the event so it can be triggered later
-  deferredPrompt = e;
-  // Show our install button
-  showInstallPrompt();
-});
-
-// Install button click handler
-installAppBtn.addEventListener('click', async () => {
-  if (deferredPrompt) {
-    // Show the install prompt
-    deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    // Optionally, send analytics event with outcome of user choice
-    console.log(`User response to the install prompt: ${outcome}`);
-    // We no longer need the prompt
-    deferredPrompt = null;
-    // Hide our install button
-    hideInstallPrompt();
-  }
-});
-
-// Dismiss button handler
-dismissInstallBtn.addEventListener('click', () => {
-  hideInstallPrompt();
-  // Optionally, store in localStorage that user dismissed the prompt
-  localStorage.setItem('installPromptDismissed', 'true');
-});
-
-// Check if app is running in standalone mode
-function isRunningStandalone() {
-  return window.matchMedia('(display-mode: standalone)').matches || 
-         window.navigator.standalone ||
-         document.referrer.includes('android-app://');
-}
-
-// ======================
-// OFFLINE DETECTION
-// ======================
-
-function updateOnlineStatus() {
-  if (navigator.onLine) {
-    offlineStatus.style.display = 'none';
-  } else {
-    offlineStatus.style.display = 'block';
-    showNotification('You are now offline. Some features may be limited.');
-  }
-}
-
-// Listen for online/offline status changes
-window.addEventListener('online', updateOnlineStatus);
-window.addEventListener('offline', updateOnlineStatus);
-
-// ======================
-// SERVICE WORKER REGISTRATION
-// ======================
-
-async function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      console.log('Service Worker registered with scope:', registration.scope);
-      
-      // Check for updates periodically
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showNotification('A new version is available. Please refresh to update.');
-          }
-        });
-      });
-      
-      return registration;
-    } catch (error) {
-      console.error('Service Worker registration failed:', error);
-    }
-  }
-}
 
 // ======================
 // NOTIFICATION SYSTEM
@@ -770,6 +666,22 @@ function initializeFirebaseMessaging() {
   } catch (error) {
     console.error("Messaging init error:", error);
     return false;
+  }
+}
+
+// Register Service Worker
+async function registerServiceWorker() {
+  try {
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('SW registered:', registration.scope);
+    
+    // Check for updates hourly
+    setInterval(() => registration.update(), 3600000);
+    
+    return registration;
+  } catch (error) {
+    console.error('SW registration failed:', error);
+    throw error;
   }
 }
 
@@ -956,14 +868,7 @@ function createNotificationContainer() {
 // ======================
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', async function() {
-  // Check online status
-  updateOnlineStatus();
-  
-  // Register service worker
-  await registerServiceWorker();
-  
-  // Initialize UI
+document.addEventListener('DOMContentLoaded', function() {
   initializeTabs();
   setupEventListeners();
   
@@ -983,11 +888,6 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (token) await saveTokenToFirestore(token);
     }
   });
-  
-  // Check if we should show install prompt
-  if (!localStorage.getItem('installPromptDismissed') && !isRunningStandalone()) {
-    setTimeout(showInstallPrompt, 10000); // Show after 10 seconds
-  }
 });
 
 // Initialize category tabs
@@ -2004,3 +1904,17 @@ function sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, tot
   document.getElementById("customerName").value = "";
   document.getElementById("phoneNumber").value = "";
 }
+
+// Add CSS styles
+const style = document.createElement('style');
+style.textContent = `
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body {
+    overscroll-behavior-y: contain;
+  }
+`;
+document.head.appendChild(style);
