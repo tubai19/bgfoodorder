@@ -21,6 +21,96 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #fafafa;
+      color: #222;
+      font-size: 17px;
+    }
+    .container, .form-section {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem 2rem;
+      box-sizing: border-box;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .header, .footer, .hero-banner, .delivery-info, #cart, .footer-bottom {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .header { padding: 1rem 0 0.5rem 0; text-align: center; }
+    .logo { font-size: 2rem; font-weight: bold; color: #e63946; }
+    .tagline { font-size: 1.1rem; color: #444; margin: 0.5rem 0;}
+    .fssai-badge { color: #888; font-size: 0.9rem; }
+    .hero-banner { background: #ffe5e9; text-align: center; padding: 2rem 1rem 1.5rem 1rem; }
+    .hero-content h1 { margin: 0; font-size: 2.5rem; color: #e63946;}
+    .hero-content p { color: #444; margin: 1rem 0;}
+    .cta-btn { background: #e63946; color: #fff; border: none; padding: 0.9rem 2rem; border-radius: 25px; font-weight: bold; font-size: 1.1rem; cursor: pointer; text-decoration: none; }
+    .category-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.5rem 0; }
+    .category-nav > * { flex: 1 1 40%; min-width: 120px; }
+    #searchContainer { display: flex; align-items: center; background: #f1f1f1; border-radius: 6px; padding: 0.5rem; margin-bottom: 1rem;}
+    #searchContainer input { flex: 1; border: none; background: transparent; font-size: 1.1rem; padding: 0.5rem 0.75rem;}
+    #searchContainer i { color: #888; font-size: 1.2rem; }
+    .delivery-info { background: #f8f9fa; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;}
+    .delivery-info ul { padding-left: 1.3rem;}
+    #deliveryRestriction { color: #b71c1c; font-weight: bold; background: #ffe5e5; border: 1px solid #e63946; border-radius: 6px; padding: 0.9rem; margin: 1rem 0;}
+    #menuContainer { margin-bottom: 2rem; }
+    #cart { background: #fff3e6; border-radius: 10px; padding: 1rem; margin: 2rem 0 2rem 0; box-shadow: 0 2px 8px rgba(230,57,70,0.08);}
+    .cart-actions { display: flex; gap: 0.8rem; }
+    .cart-actions button { flex:1 1 45%; }
+    .cart-total { font-weight: bold; margin: 1rem 0; }
+    .form-section { margin-bottom: 2rem;}
+    .form-input { margin-bottom: 1.2rem;}
+    .form-input label { font-weight: 600;}
+    .form-input input, .form-input textarea { width: 100%; padding: 0.7rem; border: 1px solid #ccc; border-radius: 5px; margin-top: 0.3rem; font-size: 1rem;}
+    .order-type-options { display: flex; gap: 1rem; }
+    .order-type-option input { margin-right: 5px; }
+    #placeOrderBtn { background: #e63946; color: #fff; border: none; padding: 1rem; border-radius: 6px; font-size: 1.15rem; width: 100%; font-weight: bold; }
+    /* Footer */
+    .footer { background: #222; color: #fff; padding: 2rem 0 1rem 0; margin-top: 2rem;}
+    .footer-grid { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: space-between; }
+    .footer-section { flex: 1 1 180px; min-width: 160px; }
+    .footer-section h3 { color: #e63946;}
+    .footer a { color: #fff; text-decoration: underline;}
+    .footer-bottom { text-align: center; color: #aaa; margin-top: 1.5rem;}
+    .order-history-btn { background: #e63946; color: #fff; border: none; padding: 0.7rem 1.5rem; border-radius: 25px; margin-top: 0.6rem; cursor: pointer;}
+    /* Mobile Floating Cart Button */
+    .mobile-menu-btn { display: none; position: fixed; right: 18px; bottom: 24px; z-index: 900; background: #e63946; color: #fff; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 2rem; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.18);}
+    .cart-badge { position: absolute; top: 8px; right: 8px; background: #34a853; color: #fff; border-radius: 50%; padding: 3px 8px; font-size: 1rem; }
+    /* Notification */
+    .notification { display: none; position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #34a853; color: #fff; padding: 0.8rem 1.5rem; border-radius: 25px; font-size: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.12); z-index: 10000;}
+    @media (max-width: 800px) {
+      .container, .form-section { padding: 1rem 0.7rem; }
+      .footer-grid { gap: 1.2rem;}
+    }
+    @media (max-width: 600px) {
+      html, body { font-size: 16px; }
+      .container, .form-section { padding: 0.3rem 0.2rem; border-radius: 0; box-shadow: none;}
+      .header { padding: 0.7rem 0 0.3rem 0;}
+      .logo { font-size: 1.4rem;}
+      .tagline, .fssai-badge { font-size: 0.95rem;}
+      .hero-banner { padding: 1.1rem 0.2rem 0.8rem 0.2rem;}
+      .hero-content h1 { font-size: 1.45rem;}
+      .category-nav { gap: 0.25rem; }
+      #searchContainer { padding: 0.3rem;}
+      .delivery-info { padding: 0.7rem; font-size: 0.95rem;}
+      #cart { margin: 1rem 0;}
+      .footer { padding: 1.5rem 0 0.5rem 0;}
+      .footer-grid { flex-direction: column; gap: 0.6rem;}
+      .footer-section { margin-bottom: 0.9rem;}
+      .mobile-menu-btn { display: flex;}
+      #cart { position: fixed; left: 0; right: 0; bottom: 0; width: 100vw; margin: 0; border-radius: 18px 18px 0 0; max-height: 60vh; overflow-y: auto; z-index: 1000; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); transition: transform 0.32s; transform: translateY(100%);}
+      #cart.active { transform: translateY(0);}
+      .footer-bottom { font-size: 0.98rem;}
+      .order-history-btn { width: 100%; }
+      #cart.active ~ .footer { display: none;}
+      .modal-content { width: 99vw !important; padding: 0.7rem !important;}
+    }
+  </style>
   <!-- Schema.org markup for Google -->
   <script type="application/ld+json">
     {
@@ -219,7 +309,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- Menu Container -->
     <div id="menuContainer"></div>
     
-    <!-- Cart (visible on desktop) -->
+    <!-- Cart (visible on desktop, slides up on mobile) -->
     <div id="cart">
       <h3>Your Cart <span class="cart-count">(0)</span></h3>
       <ul id="cartItems">
