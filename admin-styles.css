@@ -271,6 +271,7 @@ body {
   overflow: hidden;
   transition: all 0.3s ease;
   border: 1px solid var(--border-color);
+  margin-bottom: 15px;
 }
 
 .order-card.new-order-notification {
@@ -293,7 +294,10 @@ body {
 }
 
 .order-id {
+  font-family: monospace;
   font-weight: bold;
+  color: var(--primary-color);
+  font-size: 1.1em;
 }
 
 .order-status {
@@ -315,7 +319,7 @@ body {
 
 .order-status.delivering {
   background-color: #4cc9f0;
-  color: #333;
+  color: white;
 }
 
 .order-status.completed {
@@ -329,7 +333,8 @@ body {
 }
 
 .order-time {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  margin-left: auto;
   color: #666;
 }
 
@@ -343,12 +348,22 @@ body {
   margin-bottom: 10px;
   font-size: 0.9rem;
   color: #666;
+  flex-wrap: wrap;
 }
 
 .customer-info span {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+.customer-info a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.customer-info a:hover {
+  text-decoration: underline;
 }
 
 .order-items {
@@ -436,6 +451,15 @@ body {
 .cancel-btn {
   background-color: var(--danger-color);
   color: white;
+}
+
+.whatsapp-btn {
+  background-color: #25D366 !important;
+  color: white !important;
+}
+
+.whatsapp-btn:hover {
+  background-color: #128C7E !important;
 }
 
 .small-btn {
@@ -876,9 +900,24 @@ input:checked + .slider:before {
     flex-direction: column;
   }
   
+  .order-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .order-id, .order-status, .order-time {
+    flex: 1 1 100%;
+  }
+  
   .order-footer {
+    flex-direction: column;
     flex-wrap: wrap;
     justify-content: center;
+  }
+  
+  .order-footer .btn {
+    width: 100%;
+    margin-bottom: 5px;
   }
   
   .customer-info {
@@ -917,5 +956,9 @@ input:checked + .slider:before {
   
   .modal-btn {
     width: 100%;
+  }
+  
+  .business-hours {
+    flex-direction: column;
   }
 }
