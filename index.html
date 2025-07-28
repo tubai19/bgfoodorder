@@ -15,8 +15,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
   <link rel="stylesheet" href="styles.css">
   <script type="application/ld+json">
     {
@@ -203,9 +203,41 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <li>Delivery only available within 8km radius</li>
         <li>Delivery time estimate: 20 minutes preparation + 8 minutes per km travel</li>
       </ul>
-      <div id="locationStatus" class="location-loading" style="display:none;">
-        Calculating your distance from the restaurant...
+      
+      <!-- Location Prompt -->
+      <div id="locationPrompt" class="location-prompt" style="display:none;">
+        <div class="location-prompt-text">
+          <i class="fas fa-map-marker-alt"></i>
+          <span>Please share your location for delivery</span>
+        </div>
+        <button id="quickLocationBtn" class="quick-location-btn">
+          <i class="fas fa-location-arrow"></i> Share My Location
+        </button>
+        <div id="quickLocationStatus" class="quick-location-status"></div>
+        
+        <button id="toggleManualLocation" class="location-method-toggle">
+          Or enter address manually
+        </button>
+        
+        <div id="manualLocationContainer" class="manual-location-container">
+          <textarea id="manualAddress" placeholder="Enter your full address" rows="3"></textarea>
+          <button id="saveManualLocation" class="manual-location-btn">
+            Save Address
+          </button>
+        </div>
       </div>
+      
+      <!-- Location Details -->
+      <div id="locationDetails" style="display:none;">
+        <div id="locationText"></div>
+        <div id="locationMapLink"></div>
+        <div id="deliveryEstimate"></div>
+        <button id="refreshLocationBtn" class="quick-location-btn">
+          <i class="fas fa-sync-alt"></i> Refresh Location
+        </button>
+      </div>
+      
+      <div id="locationStatus" class="location-loading" style="display:none;"></div>
     </div>
 
     <div id="deliveryRestriction" class="delivery-restriction" style="display:none;">
@@ -226,83 +258,56 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
 
   <!-- Order Form Section -->
-  <div class="container form-section">
+  <div class="container form-section" id="orderForm">
     <div id="liveTotal">💰 Total Bill: ₹0</div>
     
-    <div class="form-input">
-      <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
-      <input type="text" id="customerName" placeholder="Enter your name" required>
-    </div>
-    
-    <div class="form-input">
-      <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
-      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required>
-    </div>
-
-    <button id="quickLocationBtn" class="quick-location-btn">
-      <i class="fas fa-map-marker-alt"></i> Share My Current Location
-    </button>
-    <div id="quickLocationStatus" class="quick-location-status"></div>
-    
-    <div class="form-input">
-      <label><i class="fas fa-truck"></i> Order Type</label>
-      <div class="order-type-options">
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="Delivery" checked>
-          <span><i class="fas fa-home"></i> Home Delivery</span>
-        </label>
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="Pickup">
-          <span><i class="fas fa-walking"></i> Pickup</span>
-        </label>
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="DineIn">
-          <span><i class="fas fa-utensils"></i> Dine In</span>
-        </label>
+    <form id="orderForm">
+      <div class="form-input">
+        <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
+        <input type="text" id="customerName" placeholder="Enter your name" required>
       </div>
-    </div>
-    
-    <div class="form-input" id="deliveryAddressContainer" style="display: none;">
-      <label><i class="fas fa-map-marked-alt"></i> Your Location</label>
       
-      <div id="locationPrompt" class="location-prompt" style="display: none;">
-        <div class="location-prompt-text">
-          <i class="fas fa-map-marker-alt"></i>
-          <span>To place a delivery order, please share your current location</span>
+      <div class="form-input">
+        <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
+        <input type="tel" id="phoneNumber" placeholder="Enter phone number" required>
+      </div>
+      
+      <div class="form-input">
+        <label><i class="fas fa-truck"></i> Order Type</label>
+        <div class="order-type-options">
+          <label class="order-type-option">
+            <input type="radio" name="orderType" value="Pickup" checked>
+            <span><i class="fas fa-walking"></i> Pickup</span>
+          </label>
+          <label class="order-type-option">
+            <input type="radio" name="orderType" value="Delivery">
+            <span><i class="fas fa-home"></i> Delivery</span>
+          </label>
+          <label class="order-type-option">
+            <input type="radio" name="orderType" value="DineIn">
+            <span><i class="fas fa-utensils"></i> Dine In</span>
+          </label>
         </div>
-        <button id="shareLocationBtn" class="location-prompt-btn">Share My Location</button>
       </div>
       
-      <div id="locationAccuracyWarning" class="location-accuracy-warning" style="display: none;">
-        <i class="fas fa-exclamation-triangle"></i> Your location accuracy is low. For accurate delivery time and charges, please ensure high accuracy GPS is enabled.
+      <div id="deliveryAddressContainer" style="display:none;">
+        <div class="form-input">
+          <label><i class="fas fa-map-marked-alt"></i> Delivery Address</label>
+          <div id="deliveryChargeDisplay" style="display:none;"></div>
+          <input type="hidden" id="deliveryLatitude">
+          <input type="hidden" id="deliveryLongitude">
+        </div>
       </div>
       
-      <div id="locationDetails" style="background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: none;">
-        <div id="locationText">Detecting your location...</div>
-        <div id="locationMapLink" style="margin-top: 0.5rem;"></div>
-        <div id="deliveryEstimate" style="margin-top: 0.5rem; font-weight: bold;"></div>
+      <div class="form-input">
+        <label for="specialInstructions"><i class="fas fa-comment-alt"></i> Special Instructions</label>
+        <textarea id="specialInstructions" placeholder="Any special requests or instructions"></textarea>
       </div>
       
-      <button id="refreshLocationBtn" style="background: #34a853; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer; width: 100%; display: none;">
-        <i class="fas fa-sync-alt"></i> Refresh Location
+      <button type="button" id="placeOrderBtn" class="place-order-btn">
+        <i class="fas fa-paper-plane"></i> Place Order
       </button>
-      
-      <button id="toggleManualLocation" class="location-method-toggle" style="display: none;">Or enter address manually</button>
-      
-      <div class="manual-location-container" id="manualLocationContainer">
-        <textarea id="manualAddress" placeholder="Enter your full address including landmarks"></textarea>
-        <button id="saveManualLocation" class="manual-location-btn"><i class="fas fa-save"></i> Save Manual Location</button>
-      </div>
-      
-      <input type="hidden" id="deliveryLatitude">
-      <input type="hidden" id="deliveryLongitude">
-    </div>
-    
-    <div id="deliveryChargeDisplay" style="text-align:center; margin:1rem 0; font-weight:bold;"></div>
-    
-    <div class="form-input">
-      <button id="placeOrderBtn"><i class="fas fa-paper-plane"></i> Place Order</button>
-    </div>
+    </form>
   </div>
 
   <!-- Order Confirmation Modal -->

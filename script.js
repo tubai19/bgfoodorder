@@ -10,7 +10,9 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.firestore();
 
 // Full menu data
@@ -602,33 +604,8 @@ const RESTAURANT_LOCATION = {
 const MAX_DELIVERY_DISTANCE = 8; // 8km maximum delivery distance
 const MIN_DELIVERY_ORDER = 200;
 
-// DOM elements
-const selectedItems = [];
-const tabsDiv = document.getElementById("tabs");
-const container = document.getElementById("menuContainer");
-const totalBill = document.getElementById("liveTotal");
-const cartList = document.getElementById("cartItems");
-const searchInput = document.getElementById("searchInput");
-const deliveryChargeDisplay = document.getElementById("deliveryChargeDisplay");
-const locationStatus = document.getElementById("locationStatus");
-const deliveryAddressContainer = document.getElementById("deliveryAddressContainer");
-const locationPrompt = document.getElementById("locationPrompt");
-const shareLocationBtn = document.getElementById("shareLocationBtn");
-const locationDetails = document.getElementById("locationDetails");
-const refreshLocationBtn = document.getElementById("refreshLocationBtn");
-const toggleManualLocation = document.getElementById("toggleManualLocation");
-const locationAccuracyWarning = document.getElementById("locationAccuracyWarning");
-const quickLocationBtn = document.getElementById("quickLocationBtn");
-const quickLocationStatus = document.getElementById("quickLocationStatus");
-const deliveryRestriction = document.getElementById("deliveryRestriction");
-const notification = document.getElementById("notification");
-const notificationText = document.getElementById("notificationText");
-const mobileCartBtn = document.getElementById("mobileCartBtn");
-const cart = document.getElementById("cart");
-const placeOrderBtn = document.getElementById("placeOrderBtn");
-const viewOrderHistoryBtn = document.getElementById("viewOrderHistoryBtn");
-
 // Application state
+const selectedItems = [];
 let currentCategory = null;
 let deliveryDistance = null;
 let isLocationFetching = false;
@@ -636,18 +613,36 @@ let userLocation = null;
 let watchId = null;
 let isManualLocation = false;
 
+// DOM element helper with null check
+function getElement(id) {
+  const el = document.getElementById(id);
+  if (!el) {
+    console.error(`Element with ID '${id}' not found`);
+    return null;
+  }
+  return el;
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
-  initializeTabs();
-  setupEventListeners();
-  
-  if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
-    showLocationPrompt();
+  if (getElement('tabs') && getElement('menuContainer')) {
+    initializeTabs();
+    setupEventListeners();
+    
+    const orderTypeRadio = document.querySelector('input[name="orderType"]:checked');
+    if (orderTypeRadio && orderTypeRadio.value === 'Delivery') {
+      showLocationPrompt();
+    }
+  } else {
+    console.error('Required elements not found for initialization');
   }
 });
 
 // Initialize category tabs
 function initializeTabs() {
+  const tabsDiv = getElement('tabs');
+  if (!tabsDiv) return;
+
   tabsDiv.innerHTML = '';
   
   for (const category in fullMenu) {
@@ -655,9 +650,15 @@ function initializeTabs() {
     tabBtn.textContent = `${categoryIcons[category] || "🍽"} ${category}`;
     tabBtn.dataset.category = category;
     tabBtn.addEventListener('click', () => {
-      searchInput.value = '';
+      const searchInput = getElement('searchInput');
+      if (searchInput) searchInput.value = '';
+      
       renderCategory(category);
-      document.getElementById("menuContainer").scrollIntoView({ behavior: 'smooth' });
+      
+      const menuContainer = getElement('menuContainer');
+      if (menuContainer) {
+        menuContainer.scrollIntoView({ behavior: 'smooth' });
+      }
       
       document.querySelectorAll('#tabs button').forEach(btn => {
         btn.classList.remove('active');
@@ -669,13 +670,17 @@ function initializeTabs() {
   
   const firstCategory = Object.keys(fullMenu)[0];
   if (firstCategory) {
-    tabsDiv.querySelector('button').classList.add('active');
+    const firstTab = tabsDiv.querySelector('button');
+    if (firstTab) firstTab.classList.add('active');
     renderCategory(firstCategory);
   }
 }
 
 // Render menu items for a category
 function renderCategory(category, searchTerm = '') {
+  const container = getElement('menuContainer');
+  if (!container) return;
+
   container.innerHTML = "";
   currentCategory = category;
   
@@ -704,8 +709,8 @@ function renderCategory(category, searchTerm = '') {
     const itemDiv = document.createElement("div");
     itemDiv.className = "menu-item";
     
-    // Disabled state for combos on delivery
-    if (category === "Combos" && document.querySelector('input[name="orderType"]:checked').value === "Delivery") {
+    const orderTypeRadio = document.querySelector('input[name="orderType"]:checked');
+    if (category === "Combos" && orderTypeRadio && orderTypeRadio.value === "Delivery") {
       itemDiv.classList.add("disabled-item");
       const overlay = document.createElement("div");
       overlay.className = "disabled-overlay";
@@ -716,12 +721,10 @@ function renderCategory(category, searchTerm = '') {
     const itemDetails = document.createElement("div");
     itemDetails.className = "menu-item-details";
     
-    // Item name
     const title = document.createElement("div");
     title.className = "menu-item-name";
     title.textContent = item.name;
     
-    // Bengali name if available
     if (item.nameBn) {
       const bn = document.createElement("div");
       bn.className = "menu-item-name-bn";
@@ -729,16 +732,13 @@ function renderCategory(category, searchTerm = '') {
       itemDetails.appendChild(bn);
     }
     
-    // Item description
     const desc = document.createElement("div");
     desc.className = "menu-item-desc";
     desc.textContent = item.desc || "";
     
-    // Variant selector
     const variantDiv = document.createElement("div");
     variantDiv.className = "variant-selector";
     
-    // Create variant options
     Object.entries(item.variants).forEach(([variant, price], index) => {
       const variantOption = document.createElement("div");
       variantOption.className = "variant-option";
@@ -750,7 +750,6 @@ function renderCategory(category, searchTerm = '') {
       input.value = variant;
       input.dataset.price = price;
       
-      // Select first variant by default
       if (index === 0) {
         input.checked = true;
       }
@@ -764,19 +763,16 @@ function renderCategory(category, searchTerm = '') {
       variantDiv.appendChild(variantOption);
     });
     
-    // Price display
     const priceDiv = document.createElement("div");
     priceDiv.className = "menu-item-price";
     priceDiv.textContent = `₹${Object.values(item.variants)[0]}`;
     
-    // Quantity controls
     const controlsDiv = document.createElement("div");
     controlsDiv.className = "menu-item-controls";
     
     const quantityDiv = document.createElement("div");
     quantityDiv.className = "quantity-control";
     
-    // Minus button
     const minusBtn = document.createElement("button");
     minusBtn.className = "quantity-btn minus";
     minusBtn.innerHTML = "-";
@@ -788,12 +784,10 @@ function renderCategory(category, searchTerm = '') {
       }
     });
     
-    // Quantity display
     const quantitySpan = document.createElement("span");
     quantitySpan.className = "quantity";
     quantitySpan.textContent = "0";
     
-    // Plus button
     const plusBtn = document.createElement("button");
     plusBtn.className = "quantity-btn plus";
     plusBtn.innerHTML = "+";
@@ -806,7 +800,6 @@ function renderCategory(category, searchTerm = '') {
     quantityDiv.appendChild(quantitySpan);
     quantityDiv.appendChild(plusBtn);
     
-    // Add to cart button
     const addBtn = document.createElement("button");
     addBtn.className = "add-to-cart";
     addBtn.innerHTML = "Add";
@@ -829,7 +822,6 @@ function renderCategory(category, searchTerm = '') {
     controlsDiv.appendChild(quantityDiv);
     controlsDiv.appendChild(addBtn);
     
-    // Assemble item components
     itemDetails.appendChild(title);
     if (item.desc) itemDetails.appendChild(desc);
     itemDetails.appendChild(variantDiv);
@@ -839,7 +831,6 @@ function renderCategory(category, searchTerm = '') {
     itemDiv.appendChild(itemDetails);
     itemsContainer.appendChild(itemDiv);
     
-    // Update price display when variant changes
     variantDiv.querySelectorAll('input[name^="variant-"]').forEach(input => {
       input.addEventListener('change', () => {
         priceDiv.textContent = `₹${input.dataset.price}`;
@@ -850,100 +841,169 @@ function renderCategory(category, searchTerm = '') {
 
 // Set up event listeners
 function setupEventListeners() {
-  // Order type change handler
-  document.querySelectorAll('input[name="orderType"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-      const isDelivery = this.value === 'Delivery';
-      deliveryAddressContainer.style.display = isDelivery ? 'block' : 'none';
-      deliveryChargeDisplay.style.display = 'none';
-      locationStatus.style.display = 'none';
-      deliveryRestriction.style.display = 'none';
-      
-      if (isDelivery) {
-        showLocationPrompt();
-      } else {
-        stopLocationTracking();
-        deliveryDistance = null;
-      }
-      
-      if (currentCategory) {
-        renderCategory(currentCategory, searchInput.value);
-      }
-      updateCart();
+  // Order type radio buttons
+  const orderTypeRadios = document.querySelectorAll('input[name="orderType"]');
+  if (orderTypeRadios.length) {
+    orderTypeRadios.forEach(radio => {
+      radio.addEventListener('change', function() {
+        const isDelivery = this.value === 'Delivery';
+        const deliveryAddressContainer = getElement('deliveryAddressContainer');
+        const deliveryChargeDisplay = getElement('deliveryChargeDisplay');
+        const locationStatus = getElement('locationStatus');
+        const deliveryRestriction = getElement('deliveryRestriction');
+        
+        if (deliveryAddressContainer) {
+          deliveryAddressContainer.style.display = isDelivery ? 'block' : 'none';
+        }
+        if (deliveryChargeDisplay) {
+          deliveryChargeDisplay.style.display = 'none';
+        }
+        if (locationStatus) {
+          locationStatus.style.display = 'none';
+        }
+        if (deliveryRestriction) {
+          deliveryRestriction.style.display = 'none';
+        }
+        
+        if (isDelivery) {
+          showLocationPrompt();
+        } else {
+          stopLocationTracking();
+          deliveryDistance = null;
+        }
+        
+        if (currentCategory) {
+          renderCategory(currentCategory, getElement('searchInput')?.value);
+        }
+        updateCart();
+      });
     });
-  });
+  }
 
-  // Quick location button
-  quickLocationBtn.addEventListener('click', getQuickLocation);
+  // Location buttons
+  const quickLocationBtn = getElement('quickLocationBtn');
+  if (quickLocationBtn) {
+    quickLocationBtn.addEventListener('click', getQuickLocation);
+  }
 
-  // Share location button
-  shareLocationBtn.addEventListener('click', startLocationTracking);
+  const shareLocationBtn = getElement('shareLocationBtn');
+  if (shareLocationBtn) {
+    shareLocationBtn.addEventListener('click', startLocationTracking);
+  }
 
-  // Refresh location button
-  refreshLocationBtn.addEventListener('click', function() {
-    stopLocationTracking();
-    startLocationTracking();
-  });
-
-  // Manual location toggle
-  toggleManualLocation.addEventListener('click', function() {
-    isManualLocation = !isManualLocation;
-    const manualContainer = document.getElementById('manualLocationContainer');
-    
-    if (isManualLocation) {
-      manualContainer.style.display = 'block';
-      this.textContent = 'Use automatic location detection';
+  const refreshLocationBtn = getElement('refreshLocationBtn');
+  if (refreshLocationBtn) {
+    refreshLocationBtn.addEventListener('click', function() {
       stopLocationTracking();
-      document.getElementById('locationText').textContent = 'Using manual address entry';
-      document.getElementById('deliveryEstimate').textContent = 'Distance will be estimated from address';
-    } else {
-      manualContainer.style.display = 'none';
-      this.textContent = 'Or enter address manually';
       startLocationTracking();
-    }
-  });
-  
-  // Save manual address
-  document.getElementById('saveManualLocation').addEventListener('click', function() {
-    const address = document.getElementById('manualAddress').value.trim();
-    if (!address) {
-      alert('Please enter your address');
-      return;
-    }
-    
-    deliveryDistance = 3 + Math.random() * 5;
-    document.getElementById('locationText').textContent = `📍 Manual address saved`;
-    document.getElementById('locationMapLink').innerHTML = `<div style="color: var(--primary-color);">${address}</div>`;
-    
-    const estimatedTime = calculateDeliveryTime(deliveryDistance);
-    document.getElementById('deliveryEstimate').innerHTML = 
-      `📏 Estimated Distance: <strong>${deliveryDistance.toFixed(1)}km</strong> | 
-       ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
-    
-    updateCart();
-    checkDeliveryRestriction();
-  });
+    });
+  }
 
-  // Mobile cart toggle
-  mobileCartBtn.addEventListener('click', function() {
-    cart.classList.toggle('active');
-  });
+  const toggleManualLocation = getElement('toggleManualLocation');
+  if (toggleManualLocation) {
+    toggleManualLocation.addEventListener('click', function() {
+      isManualLocation = !isManualLocation;
+      const manualContainer = getElement('manualLocationContainer');
+      
+      if (manualContainer) {
+        manualContainer.style.display = isManualLocation ? 'block' : 'none';
+        this.textContent = isManualLocation ? 'Use automatic location detection' : 'Or enter address manually';
+        
+        if (!isManualLocation) {
+          startLocationTracking();
+        } else {
+          stopLocationTracking();
+          const locationText = getElement('locationText');
+          if (locationText) {
+            locationText.textContent = 'Using manual address entry';
+          }
+          const deliveryEstimate = getElement('deliveryEstimate');
+          if (deliveryEstimate) {
+            deliveryEstimate.textContent = 'Distance will be estimated from address';
+          }
+        }
+      }
+    });
+  }
+  
+  const saveManualLocation = getElement('saveManualLocation');
+  if (saveManualLocation) {
+    saveManualLocation.addEventListener('click', function() {
+      const manualAddress = getElement('manualAddress');
+      if (!manualAddress) return;
+      
+      const address = manualAddress.value.trim();
+      if (!address) {
+        alert('Please enter your address');
+        return;
+      }
+      
+      deliveryDistance = 3 + Math.random() * 5;
+      const locationText = getElement('locationText');
+      if (locationText) {
+        locationText.textContent = `📍 Manual address saved`;
+      }
+      
+      const locationMapLink = getElement('locationMapLink');
+      if (locationMapLink) {
+        locationMapLink.innerHTML = `<div style="color: var(--primary-color);">${address}</div>`;
+      }
+      
+      const deliveryEstimate = getElement('deliveryEstimate');
+      if (deliveryEstimate) {
+        const estimatedTime = calculateDeliveryTime(deliveryDistance);
+        deliveryEstimate.innerHTML = 
+          `📏 Estimated Distance: <strong>${deliveryDistance.toFixed(1)}km</strong> | 
+           ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
+      }
+      
+      updateCart();
+      checkDeliveryRestriction();
+    });
+  }
 
-  // Place order button
-  placeOrderBtn.addEventListener('click', confirmOrder);
+  // Cart and order buttons
+  const mobileCartBtn = getElement('mobileCartBtn');
+  if (mobileCartBtn) {
+    mobileCartBtn.addEventListener('click', function() {
+      const cart = getElement('cart');
+      if (cart) cart.classList.toggle('active');
+    });
+  }
+
+  const closeCartBtn = getElement('closeCartBtn');
+  if (closeCartBtn) {
+    closeCartBtn.addEventListener('click', function() {
+      const cart = getElement('cart');
+      if (cart) cart.classList.remove('active');
+    });
+  }
+
+  const placeOrderBtn = getElement('placeOrderBtn');
+  if (placeOrderBtn) {
+    placeOrderBtn.addEventListener('click', confirmOrder);
+  }
+
+  const viewOrderHistoryBtn = getElement('viewOrderHistoryBtn');
+  if (viewOrderHistoryBtn) {
+    viewOrderHistoryBtn.addEventListener('click', showOrderHistory);
+  }
   
-  // View order history
-  viewOrderHistoryBtn.addEventListener('click', showOrderHistory);
+  // Modal close buttons
+  const closeHistoryBtn = getElement('closeHistoryBtn');
+  if (closeHistoryBtn) {
+    closeHistoryBtn.addEventListener('click', function() {
+      const orderHistoryModal = getElement('orderHistoryModal');
+      if (orderHistoryModal) orderHistoryModal.style.display = 'none';
+    });
+  }
   
-  // Close history modal
-  document.getElementById('closeHistoryBtn').addEventListener('click', function() {
-    document.getElementById('orderHistoryModal').style.display = 'none';
-  });
+  const clearHistoryBtn = getElement('clearHistoryBtn');
+  if (clearHistoryBtn) {
+    clearHistoryBtn.addEventListener('click', clearOrderHistory);
+  }
   
-  // Clear history
-  document.getElementById('clearHistoryBtn').addEventListener('click', clearOrderHistory);
-  
-  // Close modals when clicking outside
+  // Window click handler for modals
   window.addEventListener('click', function(event) {
     if (event.target.classList.contains('modal')) {
       event.target.style.display = 'none';
@@ -951,34 +1011,63 @@ function setupEventListeners() {
   });
 
   // Search input
-  searchInput.addEventListener('input', (e) => {
-    if (currentCategory) {
-      renderCategory(currentCategory, e.target.value);
+  const searchInput = getElement('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      if (currentCategory) {
+        renderCategory(currentCategory, e.target.value);
+      }
+    });
+  }
+
+  // Floating footer
+  const footerViewCartBtn = getElement('footerViewCartBtn');
+  if (footerViewCartBtn) {
+    footerViewCartBtn.addEventListener('click', function() {
+      const formSection = getElement('orderForm');
+      if (formSection) {
+        formSection.scrollIntoView({ behavior: 'smooth' });
+      }
+      
+      if (window.innerWidth <= 768) {
+        const cart = getElement('cart');
+        if (cart) cart.classList.add('active');
+      }
+    });
+  }
+
+  // Hash change handler
+  window.addEventListener('hashchange', function() {
+    if (window.location.hash === '#orderForm' && window.innerWidth <= 768) {
+      const cart = getElement('cart');
+      if (cart) cart.classList.add('active');
     }
   });
 }
 
 // Show notification
 function showNotification(message) {
-  notificationText.textContent = message;
-  notification.classList.add('show');
-  setTimeout(() => {
-    notification.classList.remove('show');
-  }, 3000);
+  const notification = getElement('notification');
+  const notificationText = getElement('notificationText');
+  
+  if (notification && notificationText) {
+    notificationText.textContent = message;
+    notification.classList.add('show');
+    setTimeout(() => {
+      notification.classList.remove('show');
+    }, 3000);
+  }
 }
 
 // Add item to order
 function addToOrder(name, variant, price, quantity = 1) {
-  // Check if item already exists in cart
   const existingItemIndex = selectedItems.findIndex(
     item => item.name === name && item.variant === variant
   );
   
   if (existingItemIndex !== -1) {
-    // Update quantity if item exists
     selectedItems[existingItemIndex].quantity += quantity;
   } else {
-    // Add new item to cart
     selectedItems.push({ 
       name, 
       variant, 
@@ -993,26 +1082,38 @@ function addToOrder(name, variant, price, quantity = 1) {
 
 // Update cart display
 function updateCart() {
+  const cartList = getElement('cartItems');
+  const totalBill = getElement('liveTotal');
+  const floatingFooter = getElement('floatingFooter');
+  const footerItemCount = getElement('footerItemCount');
+  const footerTotalAmount = getElement('footerTotalAmount');
+  
+  if (!cartList || !totalBill) return;
+
   cartList.innerHTML = "";
   const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
   let deliveryCharge = 0;
   let deliveryMessage = "";
-  const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  const orderTypeRadio = document.querySelector('input[name="orderType"]:checked');
+  const orderType = orderTypeRadio ? orderTypeRadio.value : 'Pickup';
   
   if (orderType === 'Delivery') {
     const result = calculateDeliveryCharge(subtotal, deliveryDistance);
     deliveryCharge = result.charge || 0;
     deliveryMessage = result.message;
     
-    if (deliveryCharge !== null) {
-      deliveryMessage += ` | ⏳ Est. Delivery: ${calculateDeliveryTime(deliveryDistance)}`;
-      deliveryChargeDisplay.textContent = deliveryMessage;
-      deliveryChargeDisplay.style.display = 'block';
-    } else {
-      deliveryChargeDisplay.textContent = deliveryMessage;
-      deliveryChargeDisplay.style.color = 'var(--error-color)';
-      deliveryChargeDisplay.style.display = 'block';
+    const deliveryChargeDisplay = getElement('deliveryChargeDisplay');
+    if (deliveryChargeDisplay) {
+      if (deliveryCharge !== null) {
+        deliveryMessage += ` | ⏳ Est. Delivery: ${calculateDeliveryTime(deliveryDistance)}`;
+        deliveryChargeDisplay.textContent = deliveryMessage;
+        deliveryChargeDisplay.style.display = 'block';
+      } else {
+        deliveryChargeDisplay.textContent = deliveryMessage;
+        deliveryChargeDisplay.style.color = 'var(--error-color)';
+        deliveryChargeDisplay.style.display = 'block';
+      }
     }
   }
 
@@ -1067,6 +1168,19 @@ function updateCart() {
   document.querySelectorAll('.cart-count, .cart-badge').forEach(el => {
     el.textContent = itemCount;
   });
+
+  // Update floating footer
+  if (floatingFooter && footerItemCount && footerTotalAmount) {
+    footerItemCount.textContent = itemCount;
+    footerTotalAmount.textContent = `₹${total}`;
+    
+    // Show/hide floating footer based on item count
+    if (itemCount > 0) {
+      floatingFooter.style.display = 'flex';
+    } else {
+      floatingFooter.style.display = 'none';
+    }
+  }
 }
 
 // Calculate delivery time estimate
@@ -1090,40 +1204,54 @@ function calculateDeliveryCharge(total, distance) {
 
 // Check if delivery is restricted based on distance
 function checkDeliveryRestriction() {
-  if (!deliveryDistance) {
-    deliveryRestriction.style.display = 'none';
-    return;
-  }
+  const deliveryRestriction = getElement('deliveryRestriction');
+  if (!deliveryRestriction) return;
   
   deliveryRestriction.style.display = deliveryDistance > MAX_DELIVERY_DISTANCE ? 'block' : 'none';
 }
 
 // Show location prompt
 function showLocationPrompt() {
-  locationPrompt.style.display = 'flex';
-  locationDetails.style.display = 'none';
-  refreshLocationBtn.style.display = 'none';
-  toggleManualLocation.style.display = 'none';
-  document.getElementById('manualLocationContainer').style.display = 'none';
+  const locationPrompt = getElement('locationPrompt');
+  const locationDetails = getElement('locationDetails');
+  const refreshLocationBtn = getElement('refreshLocationBtn');
+  const toggleManualLocation = getElement('toggleManualLocation');
+  const manualLocationContainer = getElement('manualLocationContainer');
+  
+  if (locationPrompt) locationPrompt.style.display = 'flex';
+  if (locationDetails) locationDetails.style.display = 'none';
+  if (refreshLocationBtn) refreshLocationBtn.style.display = 'none';
+  if (toggleManualLocation) toggleManualLocation.style.display = 'none';
+  if (manualLocationContainer) manualLocationContainer.style.display = 'none';
 }
 
 // Hide location prompt
 function hideLocationPrompt() {
-  locationPrompt.style.display = 'none';
-  locationDetails.style.display = 'block';
-  refreshLocationBtn.style.display = 'block';
-  toggleManualLocation.style.display = 'block';
+  const locationPrompt = getElement('locationPrompt');
+  const locationDetails = getElement('locationDetails');
+  const refreshLocationBtn = getElement('refreshLocationBtn');
+  const toggleManualLocation = getElement('toggleManualLocation');
+  
+  if (locationPrompt) locationPrompt.style.display = 'none';
+  if (locationDetails) locationDetails.style.display = 'block';
+  if (refreshLocationBtn) refreshLocationBtn.style.display = 'block';
+  if (toggleManualLocation) toggleManualLocation.style.display = 'block';
 }
 
 // Get quick location
 function getQuickLocation() {
-  quickLocationStatus.style.display = 'block';
-  quickLocationStatus.className = 'location-loading';
-  quickLocationStatus.textContent = "Detecting your location...";
+  const quickLocationStatus = getElement('quickLocationStatus');
+  if (quickLocationStatus) {
+    quickLocationStatus.style.display = 'block';
+    quickLocationStatus.className = 'location-loading';
+    quickLocationStatus.textContent = "Detecting your location...";
+  }
   
   if (!navigator.geolocation) {
-    quickLocationStatus.className = 'location-error';
-    quickLocationStatus.textContent = "Geolocation is not supported by your browser.";
+    if (quickLocationStatus) {
+      quickLocationStatus.className = 'location-error';
+      quickLocationStatus.textContent = "Geolocation is not supported by your browser.";
+    }
     return;
   }
 
@@ -1133,15 +1261,19 @@ function getQuickLocation() {
       const userLng = position.coords.longitude;
       userLocation = { lat: userLat, lng: userLng };
       
-      document.getElementById('deliveryLatitude').value = userLat;
-      document.getElementById('deliveryLongitude').value = userLng;
+      const deliveryLatitude = getElement('deliveryLatitude');
+      const deliveryLongitude = getElement('deliveryLongitude');
+      if (deliveryLatitude) deliveryLatitude.value = userLat;
+      if (deliveryLongitude) deliveryLongitude.value = userLng;
       
       calculateRoadDistance(userLat, userLng, (distance) => {
         deliveryDistance = distance;
-        quickLocationStatus.className = 'location-success';
-        quickLocationStatus.innerHTML = `📍 Location shared successfully! Distance: ${distance.toFixed(1)}km`;
+        if (quickLocationStatus) {
+          quickLocationStatus.className = 'location-success';
+          quickLocationStatus.innerHTML = `📍 Location shared successfully! Distance: ${distance.toFixed(1)}km`;
+        }
         
-        if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
+        if (document.querySelector('input[name="orderType"]:checked')?.value === 'Delivery') {
           updateLocationDisplay(userLat, userLng, deliveryDistance);
           hideLocationPrompt();
         }
@@ -1151,19 +1283,21 @@ function getQuickLocation() {
       });
     },
     (error) => {
-      quickLocationStatus.className = 'location-error';
-      switch(error.code) {
-        case error.PERMISSION_DENIED:
-          quickLocationStatus.textContent = "Location access was denied. Please enable it in your browser settings.";
-          break;
-        case error.POSITION_UNAVAILABLE:
-          quickLocationStatus.textContent = "Location information is unavailable.";
-          break;
-        case error.TIMEOUT:
-          quickLocationStatus.textContent = "The request to get location timed out.";
-          break;
-        default:
-          quickLocationStatus.textContent = "An unknown error occurred while getting location.";
+      if (quickLocationStatus) {
+        quickLocationStatus.className = 'location-error';
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            quickLocationStatus.textContent = "Location access was denied. Please enable it in your browser settings.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            quickLocationStatus.textContent = "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            quickLocationStatus.textContent = "The request to get location timed out.";
+            break;
+          default:
+            quickLocationStatus.textContent = "An unknown error occurred while getting location.";
+        }
       }
     },
     { enableHighAccuracy: true, timeout: 10000 }
@@ -1207,13 +1341,18 @@ function startLocationTracking() {
   if (isLocationFetching) return;
   
   isLocationFetching = true;
-  locationStatus.style.display = 'block';
-  locationStatus.className = 'location-loading';
-  locationStatus.textContent = "Calculating road distance from restaurant...";
+  const locationStatus = getElement('locationStatus');
+  if (locationStatus) {
+    locationStatus.style.display = 'block';
+    locationStatus.className = 'location-loading';
+    locationStatus.textContent = "Calculating road distance from restaurant...";
+  }
   
   if (!navigator.geolocation) {
-    locationStatus.className = 'location-error';
-    locationStatus.textContent = "Geolocation is not supported by your browser.";
+    if (locationStatus) {
+      locationStatus.className = 'location-error';
+      locationStatus.textContent = "Geolocation is not supported by your browser.";
+    }
     isLocationFetching = false;
     return;
   }
@@ -1226,39 +1365,48 @@ function startLocationTracking() {
       const userLng = position.coords.longitude;
       userLocation = { lat: userLat, lng: userLng };
       
-      document.getElementById('deliveryLatitude').value = userLat;
-      document.getElementById('deliveryLongitude').value = userLng;
+      const deliveryLatitude = getElement('deliveryLatitude');
+      const deliveryLongitude = getElement('deliveryLongitude');
+      if (deliveryLatitude) deliveryLatitude.value = userLat;
+      if (deliveryLongitude) deliveryLongitude.value = userLng;
       
       calculateRoadDistance(userLat, userLng, (distance) => {
         deliveryDistance = distance;
         updateLocationDisplay(userLat, userLng, deliveryDistance);
-        locationStatus.className = 'location-success';
-        locationStatus.innerHTML = `Location tracking active (road distance calculated)`;
+        if (locationStatus) {
+          locationStatus.className = 'location-success';
+          locationStatus.innerHTML = `Location tracking active (road distance calculated)`;
+        }
         isLocationFetching = false;
         updateCart();
         checkDeliveryRestriction();
         
-        locationAccuracyWarning.style.display = position.coords.accuracy > 100 ? 'flex' : 'none';
+        const locationAccuracyWarning = getElement('locationAccuracyWarning');
+        if (locationAccuracyWarning) {
+          locationAccuracyWarning.style.display = position.coords.accuracy > 100 ? 'flex' : 'none';
+        }
       });
     },
     (error) => {
-      locationStatus.className = 'location-error';
-      switch(error.code) {
-        case error.PERMISSION_DENIED:
-          locationStatus.textContent = "Location access was denied. Please enable it.";
-          showLocationPrompt();
-          break;
-        case error.POSITION_UNAVAILABLE:
-          locationStatus.textContent = "Location information is unavailable.";
-          showLocationPrompt();
-          break;
-        case error.TIMEOUT:
-          locationStatus.textContent = "The request to get location timed out.";
-          showLocationPrompt();
-          break;
-        default:
-          locationStatus.textContent = "An unknown error occurred.";
-          showLocationPrompt();
+      if (locationStatus) {
+        locationStatus.className = 'location-error';
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            locationStatus.textContent = "Location access was denied. Please enable it.";
+            showLocationPrompt();
+            break;
+          case error.POSITION_UNAVAILABLE:
+            locationStatus.textContent = "Location information is unavailable.";
+            showLocationPrompt();
+            break;
+          case error.TIMEOUT:
+            locationStatus.textContent = "The request to get location timed out.";
+            showLocationPrompt();
+            break;
+          default:
+            locationStatus.textContent = "An unknown error occurred.";
+            showLocationPrompt();
+        }
       }
       isLocationFetching = false;
     },
@@ -1268,16 +1416,24 @@ function startLocationTracking() {
 
 // Update location display with map link and delivery estimate
 function updateLocationDisplay(lat, lng, distance) {
-  document.getElementById('locationText').textContent = `📍 Your location detected`;
-  document.getElementById('locationMapLink').innerHTML = 
-    `<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color: var(--primary-color);">
-       View on Google Maps
-     </a>`;
+  const locationText = getElement('locationText');
+  const locationMapLink = getElement('locationMapLink');
+  const deliveryEstimate = getElement('deliveryEstimate');
   
-  const estimatedTime = calculateDeliveryTime(distance);
-  document.getElementById('deliveryEstimate').innerHTML = 
-    `📏 Road Distance: <strong>${distance.toFixed(1)}km</strong> | 
-     ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
+  if (locationText) locationText.textContent = `📍 Your location detected`;
+  if (locationMapLink) {
+    locationMapLink.innerHTML = 
+      `<a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="color: var(--primary-color);">
+        View on Google Maps
+      </a>`;
+  }
+  
+  if (deliveryEstimate) {
+    const estimatedTime = calculateDeliveryTime(distance);
+    deliveryEstimate.innerHTML = 
+      `📏 Road Distance: <strong>${distance.toFixed(1)}km</strong> | 
+       ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
+  }
 }
 
 // Stop location tracking
@@ -1290,11 +1446,26 @@ function stopLocationTracking() {
 
 // Confirm order and show confirmation modal
 function confirmOrder() {
-  const name = document.getElementById("customerName").value.trim();
-  const phone = document.getElementById("phoneNumber").value.trim();
-  const orderType = document.querySelector('input[name="orderType"]:checked').value;
-  const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const nameInput = getElement("customerName");
+  const phoneInput = getElement("phoneNumber");
   
+  if (!nameInput || !phoneInput) {
+    alert("Form elements not found. Please refresh the page.");
+    return;
+  }
+
+  const name = nameInput.value.trim();
+  const phone = phoneInput.value.trim();
+  const orderTypeRadio = document.querySelector('input[name="orderType"]:checked');
+  
+  if (!orderTypeRadio) {
+    alert("Order type not selected.");
+    return;
+  }
+  
+  const orderType = orderTypeRadio.value;
+  const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
   // Check if any combo items are in cart for delivery
   if (orderType === "Delivery") {
     const hasCombos = selectedItems.some(item => {
@@ -1328,7 +1499,10 @@ function confirmOrder() {
     if (!userLocation && !isManualLocation) {
       alert("Please share your location or enter your address to proceed with delivery.");
       showLocationPrompt();
-      document.getElementById('deliveryAddressContainer').scrollIntoView({ behavior: 'smooth' });
+      const deliveryAddressContainer = getElement('deliveryAddressContainer');
+      if (deliveryAddressContainer) {
+        deliveryAddressContainer.scrollIntoView({ behavior: 'smooth' });
+      }
       return;
     }
     
@@ -1366,7 +1540,10 @@ function confirmOrder() {
   // Add delivery location if applicable
   if (orderType === 'Delivery') {
     if (isManualLocation) {
-      orderData.deliveryAddress = document.getElementById('manualAddress').value;
+      const manualAddress = getElement('manualAddress');
+      if (manualAddress) {
+        orderData.deliveryAddress = manualAddress.value;
+      }
     } else if (userLocation) {
       orderData.deliveryLocation = new firebase.firestore.GeoPoint(userLocation.lat, userLocation.lng);
     }
@@ -1374,6 +1551,14 @@ function confirmOrder() {
   }
 
   // Show confirmation modal
+  const orderConfirmationDetails = getElement('orderConfirmationDetails');
+  const orderConfirmationModal = getElement('orderConfirmationModal');
+  
+  if (!orderConfirmationDetails || !orderConfirmationModal) {
+    alert("Confirmation modal elements not found.");
+    return;
+  }
+
   let confirmationHTML = `
     <div class="order-summary-item"><strong>Customer:</strong> ${name}</div>
     <div class="order-summary-item"><strong>Phone:</strong> ${phone}</div>
@@ -1382,9 +1567,12 @@ function confirmOrder() {
   if (orderType === 'Delivery') {
     const estimatedTime = calculateDeliveryTime(deliveryDistance);
     if (isManualLocation) {
-      confirmationHTML += `
-        <div class="order-summary-item"><strong>Address:</strong> ${orderData.deliveryAddress}</div>
-        <div class="order-summary-item"><strong>Estimated Distance:</strong> ${deliveryDistance.toFixed(1)}km</div>`;
+      const manualAddress = getElement('manualAddress');
+      if (manualAddress) {
+        confirmationHTML += `
+          <div class="order-summary-item"><strong>Address:</strong> ${manualAddress.value}</div>
+          <div class="order-summary-item"><strong>Estimated Distance:</strong> ${deliveryDistance.toFixed(1)}km</div>`;
+      }
     } else if (userLocation) {
       confirmationHTML += `
         <div class="order-summary-item"><strong>Location:</strong> 
@@ -1421,43 +1609,61 @@ function confirmOrder() {
       <strong>Total Amount:</strong> ₹${total}
     </div>`;
   
-  document.getElementById("orderConfirmationDetails").innerHTML = confirmationHTML;
-  const modal = document.getElementById("orderConfirmationModal");
-  modal.style.display = "block";
+  orderConfirmationDetails.innerHTML = confirmationHTML;
+  orderConfirmationModal.style.display = "block";
   
-  document.querySelector(".close-modal").onclick = 
-  document.getElementById("cancelOrderBtn").onclick = function() {
-    modal.style.display = "none";
-  };
+  const closeModalBtn = document.querySelector(".close-modal");
+  const cancelOrderBtn = getElement("cancelOrderBtn");
+  const confirmOrderBtn = getElement("confirmOrderBtn");
+  const downloadBillBtn = getElement("downloadBillBtn");
+  const saveOrderBtn = getElement("saveOrderBtn");
   
-  document.getElementById("confirmOrderBtn").onclick = function() {
-    modal.style.display = "none";
-    
-    // Save order to Firebase
-    db.collection("orders").add(orderData)
-      .then((docRef) => {
-        console.log("Order saved with ID: ", docRef.id);
-        orderData.id = docRef.id;
-        saveOrderToHistory(orderData);
-        sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total);
-        document.getElementById('downloadBillBtn').style.display = 'inline-block';
-        document.getElementById('saveOrderBtn').style.display = 'inline-block';
-      })
-      .catch((error) => {
-        console.error("Error saving order: ", error);
-        alert("There was an error saving your order. Please try again.");
-      });
-  };
+  if (closeModalBtn) {
+    closeModalBtn.onclick = function() {
+      orderConfirmationModal.style.display = "none";
+    };
+  }
   
-  document.getElementById("downloadBillBtn").onclick = function() {
-    generatePDFBill(orderData);
-  };
+  if (cancelOrderBtn) {
+    cancelOrderBtn.onclick = function() {
+      orderConfirmationModal.style.display = "none";
+    };
+  }
   
-  document.getElementById("saveOrderBtn").onclick = function() {
-    saveOrderToHistory(orderData);
-    showNotification('Order saved to your history');
-    modal.style.display = "none";
-  };
+  if (confirmOrderBtn) {
+    confirmOrderBtn.onclick = function() {
+      orderConfirmationModal.style.display = "none";
+      
+      // Save order to Firebase
+      db.collection("orders").add(orderData)
+        .then((docRef) => {
+          console.log("Order saved with ID: ", docRef.id);
+          orderData.id = docRef.id;
+          saveOrderToHistory(orderData);
+          sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total);
+          if (downloadBillBtn) downloadBillBtn.style.display = 'inline-block';
+          if (saveOrderBtn) saveOrderBtn.style.display = 'inline-block';
+        })
+        .catch((error) => {
+          console.error("Error saving order: ", error);
+          alert("There was an error saving your order. Please try again.");
+        });
+    };
+  }
+  
+  if (downloadBillBtn) {
+    downloadBillBtn.onclick = function() {
+      generatePDFBill(orderData);
+    };
+  }
+  
+  if (saveOrderBtn) {
+    saveOrderBtn.onclick = function() {
+      saveOrderToHistory(orderData);
+      showNotification('Order saved to your history');
+      orderConfirmationModal.style.display = "none";
+    };
+  }
 }
 
 // Save order to local storage history
@@ -1465,7 +1671,6 @@ function saveOrderToHistory(orderData) {
   const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
   orders.unshift({
     ...orderData,
-    // Convert Firestore timestamp to ISO string if it exists
     timestamp: orderData.timestamp?.toDate?.()?.toISOString?.() || new Date().toISOString()
   });
   if (orders.length > 50) orders.pop();
@@ -1474,8 +1679,11 @@ function saveOrderToHistory(orderData) {
 
 // Show order history from local storage
 function showOrderHistory() {
-  const orderHistoryModal = document.getElementById('orderHistoryModal');
-  const orderHistoryList = document.getElementById('orderHistoryList');
+  const orderHistoryModal = getElement('orderHistoryModal');
+  const orderHistoryList = getElement('orderHistoryList');
+  
+  if (!orderHistoryModal || !orderHistoryList) return;
+
   const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
   
   if (orders.length === 0) {
@@ -1554,13 +1762,21 @@ function reorderFromHistory(orderIndex) {
       });
     });
     
-    document.getElementById('customerName').value = order.customerName;
-    document.getElementById('phoneNumber').value = order.phoneNumber;
-    document.querySelector(`input[name="orderType"][value="${order.orderType}"]`).checked = true;
+    const nameInput = getElement('customerName');
+    const phoneInput = getElement('phoneNumber');
+    if (nameInput) nameInput.value = order.customerName;
+    if (phoneInput) phoneInput.value = order.phoneNumber;
+    
+    const orderTypeRadio = document.querySelector(`input[name="orderType"][value="${order.orderType}"]`);
+    if (orderTypeRadio) orderTypeRadio.checked = true;
     
     updateCart();
-    document.getElementById('orderHistoryModal').style.display = 'none';
-    document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+    const orderHistoryModal = getElement('orderHistoryModal');
+    if (orderHistoryModal) orderHistoryModal.style.display = 'none';
+    
+    const orderForm = getElement('orderForm');
+    if (orderForm) orderForm.scrollIntoView({ behavior: 'smooth' });
+    
     showNotification('Order loaded from history');
   }
 }
@@ -1656,7 +1872,10 @@ function sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, tot
 
   if (orderType === "Delivery") {
     if (isManualLocation) {
-      orderDetails += `\n\n📍 Delivery Address:\n${document.getElementById('manualAddress').value}`;
+      const manualAddress = getElement('manualAddress');
+      if (manualAddress) {
+        orderDetails += `\n\n📍 Delivery Address:\n${manualAddress.value}`;
+      }
     } else if (userLocation) {
       orderDetails += `\n\n📍 Delivery Location:\nhttps://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
     }
@@ -1670,6 +1889,8 @@ function sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, tot
   // Clear cart after order
   selectedItems.length = 0;
   updateCart();
-  document.getElementById("customerName").value = "";
-  document.getElementById("phoneNumber").value = "";
+  const nameInput = getElement("customerName");
+  const phoneInput = getElement("phoneNumber");
+  if (nameInput) nameInput.value = "";
+  if (phoneInput) phoneInput.value = "";
 }
