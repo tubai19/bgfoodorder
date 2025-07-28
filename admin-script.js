@@ -442,10 +442,32 @@ async function sendWhatsAppUpdate(order, isStatusUpdate = false) {
     `91${order.phoneNumber.replace(/\D/g, '')}`;
 
   const statusTemplates = {
-    preparing: `🛒 Order ${order.orderNumber ? '#' + order.orderNumber : ''}\n\n` +
-               `👨‍🍳 We're preparing your order!\n` +
-               `⏳ Ready in 20-30 minutes\n\n` +
-               `Thank you for choosing Bake & Grill!`,
+    preparing: (order) => {
+        let message = `🛒 Order ${order.orderNumber ? '#' + order.orderNumber : ''}\n\n`;
+        message += `👨‍🍳 We're preparing your order!\n`;
+        message += `⏳ Ready in 20-30 minutes\n\n`;
+        
+        // Add order items
+        if (order.items && order.items.length > 0) {
+            message += `📝 Your order:\n`;
+            order.items.forEach(item => {
+                message += `- ${item.name} x${item.quantity}`;
+                if (item.price) {
+                    message += ` (₹${(item.price * item.quantity).toFixed(2)})`;
+                }
+                message += `\n`;
+            });
+            message += `\n`;
+        }
+        
+        // Add total if available
+        if (order.total) {
+            message += `💵 Total: ₹${order.total.toFixed(2)}\n\n`;
+        }
+        
+        message += `Thank you for choosing Bake & Grill!`;
+        return message;
+    }
     delivering: `🛵 Order ${order.orderNumber ? '#' + order.orderNumber : ''}\n\n` +
                 `🚀 Your order is out for delivery!\n` +
                 `📱 Contact: +91 8240266267\n\n` +
