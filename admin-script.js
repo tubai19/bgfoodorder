@@ -431,46 +431,43 @@ async function saveSettings() {
 }
 
 // WhatsApp Integration
-function sendWhatsAppUpdate(order) {
+async function sendWhatsAppUpdate(order, isStatusUpdate = false) {
   if (!order.phoneNumber) {
     showError('Customer phone number not available');
     return;
   }
 
-  // Format the order items for the message
-  const itemsList = order.items.map(item => 
-    `- ${item.name} (${item.variant}) x ${item.quantity} = ₹${item.price * item.quantity}`
-  ).join('\n');
+  const formattedPhone = order.phoneNumber.startsWith('+') ? 
+    order.phoneNumber.replace(/\D/g, '') : 
+    `91${order.phoneNumber.replace(/\D/g, '')}`;
 
-  // Create different message templates based on status
-  let message = '';
-  
-  if (order.status === 'completed') {
-    message = `*Order Completed - ${order.id.substring(0,8)}*\n\n` +
-      `Your order has been successfully delivered!\n\n` +
-      `*Items Ordered:*\n${itemsList}\n\n` +
-      `Subtotal: ₹${order.subtotal}\n` +
-      `${order.deliveryCharge > 0 ? `Delivery Charge: ₹${order.deliveryCharge}\n` : ''}` +
-      `*Total Paid: ₹${order.total}*\n\n` +
-      `Thank you for your order! We hope you enjoyed your meal.`;
-  } else {
-    message = `*Order Update - ${order.id.substring(0,8)}*\n\n` +
+  const statusTemplates = {
+    preparing: `🛒 Order ${order.orderNumber ? '#' + order.orderNumber : ''}\n\n` +
+               `👨‍🍳 We're preparing your order!\n` +
+               `⏳ Ready in 20-30 minutes\n\n` +
+               `Thank you for choosing Bake & Grill!`,
+    delivering: `🛵 Order ${order.orderNumber ? '#' + order.orderNumber : ''}\n\n` +
+                `🚀 Your order is out for delivery!\n` +
+                `📱 Contact: +91 8240266267\n\n` +
+                `Thank you for your patience!`,
+    completed: `✅ Order ${order.orderNumber ? '#' + order.orderNumber : ''}\n\n` +
+               `🎉 Order delivered successfully!\n\n` +
+               `We hope you enjoyed your meal from Bake & Grill!`
+  };
+
+  const message = isStatusUpdate && statusTemplates[order.status.toLowerCase()] 
+    ? statusTemplates[order.status.toLowerCase()]
+    : `*Order Update*\n\n` +
+      `Order: ${order.orderNumber ? '#' + order.orderNumber : ''}\n` +
       `Status: ${order.status}\n\n` +
-      `*Items:*\n${itemsList}\n\n` +
-      `Subtotal: ₹${order.subtotal}\n` +
-      `${order.deliveryCharge > 0 ? `Delivery Charge: ₹${order.deliveryCharge}\n` : ''}` +
+      `*Items*\n${order.items.map(item => 
+        `- ${item.name} (${item.variant}) x ${item.quantity} = ₹${item.price * item.quantity}`
+      ).join('\n')}\n\n` +
       `*Total: ₹${order.total}*\n\n` +
-      `Thank you for your order!`;
-  }
+      `Thank you for choosing Bake & Grill!`;
 
-  // Encode the message for URL
   const encodedMessage = encodeURIComponent(message);
-  
-  // Create WhatsApp URL
-  const whatsappUrl = `https://wa.me/${order.phoneNumber.replace(/\D/g, '')}?text=${encodedMessage}`;
-  
-  // Open in new tab
-  window.open(whatsappUrl, '_blank');
+  window.open(`https://wa.me/${formattedPhone}?text=${encodedMessage}`, '_blank');
 }
 
 // Analytics Functions
@@ -548,6 +545,7 @@ function renderOrderCard(order) {
   const orderCard = document.createElement('div');
   orderCard.className = 'order-card';
   orderCard.dataset.orderId = order.id;
+  orderCard.dataset.orderNumber = order.orderNumber || '';
   
   // Add new order notification class if this is the latest order
   if (order.id === lastOrderId) {
@@ -562,20 +560,21 @@ function renderOrderCard(order) {
   
   // Format timestamp
   const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp || Date.now());
-  const dateString = formatOrderDate(orderDate);
+  const phoneNumber = order.phoneNumber || 'N/A';
+  const formattedPhone = phoneNumber === 'N/A' ? 'N/A' : `+91 ${phoneNumber.slice(0, 5)} ${phoneNumber.slice(5)}`;
+  const displayOrderNumber = order.orderNumber ? `#${order.orderNumber}` : `#${order.id.substring(0, 6)}`;
   
   // Create order card HTML
   orderCard.innerHTML = `
     <div class="order-header">
-      <span class="order-id">#${order.id.substring(0, 8)}</span>
+      <span class="order-id">${displayOrderNumber}</span>
       <span class="order-status ${statusInfo.class}">${statusInfo.text}</span>
-      <span class="order-time">${dateString}</span>
-      <span class="order-date">${orderDate.toLocaleDateString('en-IN')} ${orderDate.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'})}</span>
+      <span class="order-time">${formatOrderDate(orderDate)}</span>
     </div>
     <div class="order-body">
       <div class="customer-info">
-        <span><i class="fas fa-user"></i> ${order.customerName}</span>
-        <span><i class="fas fa-phone"></i> ${order.phoneNumber || 'N/A'}</span>
+        <span><i class="fas fa-user"></i> ${order.customerName || 'Customer'}</span>
+        <span><i class="fas fa-phone"></i> <a href="tel:+91${phoneNumber.replace(/\D/g, '')}">${formattedPhone}</a></span>
         <span><i class="fas fa-${order.orderType === 'Delivery' ? 'truck' : 'walking'}"></i> ${order.orderType} ${order.deliveryDistance ? `(${order.deliveryDistance}km)` : ''}</span>
       </div>
       <div class="order-items">
@@ -587,9 +586,9 @@ function renderOrderCard(order) {
         `).join('')}
       </div>
       <div class="order-total">
-        <span>Total: ₹${order.subtotal}</span>
+        <span>Subtotal: ₹${order.subtotal}</span>
         ${order.deliveryCharge > 0 ? `<span>Delivery: ₹${order.deliveryCharge}</span>` : ''}
-        <span>Grand Total: ₹${order.total}</span>
+        <span>Total: ₹${order.total}</span>
       </div>
     </div>
     <div class="order-footer">
@@ -1040,7 +1039,7 @@ async function updateOrderStatus(data) {
     // Automatically send WhatsApp update
     const updatedOrder = (await orderRef.get()).data();
     if (['preparing', 'delivering', 'completed'].includes(data.status)) {
-      sendWhatsAppUpdate(updatedOrder);
+      sendWhatsAppUpdate(updatedOrder, true);
     }
     
     showError(`Order status updated to ${data.status}`);
@@ -1136,23 +1135,14 @@ function formatOrderDate(date) {
     date = new Date(date);
   }
   
-  const now = new Date();
-  const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-  
-  if (diffInHours < 24) {
-    return `Today at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-  } else if (diffInHours < 48) {
-    return `Yesterday at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-  } else {
-    return date.toLocaleString('en-IN', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 }
 
 function loadMenu() {
@@ -1160,4 +1150,23 @@ function loadMenu() {
   db.collection('menuCategories').get().then(() => {
     console.log("Menu reloaded");
   });
+}
+
+/* ======================== */
+/*    ORDER NUMBER SYSTEM   */
+/* ======================== */
+
+async function getNextOrderNumber() {
+  const orderCountRef = db.collection('counters').doc('orders');
+  try {
+    return await db.runTransaction(async (transaction) => {
+      const counterDoc = await transaction.get(orderCountRef);
+      const newCount = (counterDoc.data()?.count || 1000) + 1;
+      transaction.set(orderCountRef, { count: newCount }, { merge: true });
+      return String(newCount).padStart(6, '0');
+    });
+  } catch (error) {
+    console.error("Error getting order number:", error);
+    return String(Date.now()).slice(-6);
+  }
 }
