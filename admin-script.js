@@ -13,11 +13,6 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Sound notification for new orders
-const newOrderSound = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3');
-newOrderSound.volume = 0.5;
-let lastOrderId = null;
-
 // Admin configuration
 const ADMIN_EMAIL = "suvradeep.pal93@gmail.com";
 
@@ -36,8 +31,6 @@ const ordersListContainer = document.getElementById('ordersListContainer');
 const addCategoryBtn = document.getElementById('addCategoryBtn');
 const menuCategoriesContainer = document.getElementById('menuCategoriesContainer');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-const shopOpenToggle = document.getElementById('shopOpenToggle');
-const deliveryOpenToggle = document.getElementById('deliveryOpenToggle');
 
 // Modal elements
 const addCategoryModal = document.getElementById('addCategoryModal');
@@ -124,12 +117,6 @@ function setupEventListeners() {
 
   // Settings
   saveSettingsBtn.addEventListener('click', saveSettings);
-  shopOpenToggle.addEventListener('change', () => {
-    console.log('Shop status changed:', shopOpenToggle.checked);
-  });
-  deliveryOpenToggle.addEventListener('change', () => {
-    console.log('Delivery status changed:', deliveryOpenToggle.checked);
-  });
 
   // Modal controls
   closeModalButtons.forEach(button => {
@@ -249,11 +236,6 @@ function showConfirmation(title, message, action, data = null) {
   showModal(confirmationModal);
 }
 
-function playNewOrderSound() {
-  newOrderSound.currentTime = 0;
-  newOrderSound.play().catch(e => console.log("Sound playback prevented:", e));
-}
-
 // Setup real-time Firestore listeners
 function setupRealtimeListeners() {
   // Real-time orders listener
@@ -266,17 +248,6 @@ function setupRealtimeListeners() {
       if (snapshot.empty) {
         ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
         return;
-      }
-      
-      // Check for new orders
-      if (snapshot.docs.length > 0) {
-        const latestOrder = snapshot.docs[0];
-        if (lastOrderId !== latestOrder.id) {
-          if (lastOrderId !== null) { // Don't play sound on first load
-            playNewOrderSound();
-          }
-          lastOrderId = latestOrder.id;
-        }
       }
       
       snapshot.forEach(doc => {
@@ -329,9 +300,7 @@ async function loadSettings() {
         charge04km: 0,
         charge46km: 20,
         charge68km: 30,
-        freeDeliveryAbove: 500,
-        isShopOpen: true,
-        isDeliveryAvailable: true
+        freeDeliveryAbove: 500
       };
       await db.collection('settings').doc('restaurantSettings').set(settingsData);
       updateSettingsForm(settingsData);
@@ -341,111 +310,17 @@ async function loadSettings() {
   }
 }
 
-function updateSettingsForm(settings) {
-  restaurantNameInput.value = settings.restaurantName || 'Bake & Grill';
-  contactNumberInput.value = settings.contactNumber || '+918240266267';
-  deliveryRadiusInput.value = settings.deliveryRadius || 8;
-  minDeliveryOrderInput.value = settings.minDeliveryOrder || 200;
-  charge04kmInput.value = settings.charge04km || 0;
-  charge46kmInput.value = settings.charge46km || 20;
-  charge68kmInput.value = settings.charge68km || 30;
-  freeDeliveryAboveInput.value = settings.freeDeliveryAbove || 500;
-  shopOpenToggle.checked = settings.isShopOpen !== false;
-  deliveryOpenToggle.checked = settings.isDeliveryAvailable !== false;
-}
-
-async function saveSettings() {
-  const settings = {
-    restaurantName: restaurantNameInput.value.trim(),
-    contactNumber: contactNumberInput.value.trim(),
-    deliveryRadius: Number(deliveryRadiusInput.value),
-    minDeliveryOrder: Number(minDeliveryOrderInput.value),
-    charge04km: Number(charge04kmInput.value),
-    charge46km: Number(charge46kmInput.value),
-    charge68km: Number(charge68kmInput.value),
-    freeDeliveryAbove: Number(freeDeliveryAboveInput.value),
-    isShopOpen: shopOpenToggle.checked,
-    isDeliveryAvailable: deliveryOpenToggle.checked,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-  
-  try {
-    await db.collection('settings').doc('restaurantSettings').set(settings, { merge: true });
-    await db.collection('publicStatus').doc('current').set({
-      isShopOpen: settings.isShopOpen,
-      isDeliveryAvailable: settings.isDeliveryAvailable,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    
-    showError('Settings saved successfully');
-  } catch (error) {
-    console.error("Error saving settings:", error);
-    showError('Failed to save settings');
-  }
-}
-
-// WhatsApp Integration
-function sendWhatsAppUpdate(order) {
-  if (!order.phoneNumber) {
-    showError('Customer phone number not available');
-    return;
-  }
-
-  // Format the order items for the message
-  const itemsList = order.items.map(item => 
-    `- ${item.name} (${item.variant}) x ${item.quantity} = ₹${item.price * item.quantity}`
-  ).join('\n');
-
-  // Create different message templates based on status
-  let message = '';
-  
-  if (order.status === 'completed') {
-    message = `*Order Completed - ${order.id.substring(0,8)}*\n\n` +
-      `Your order has been successfully delivered!\n\n` +
-      `*Items Ordered:*\n${itemsList}\n\n` +
-      `Subtotal: ₹${order.subtotal}\n` +
-      `${order.deliveryCharge > 0 ? `Delivery Charge: ₹${order.deliveryCharge}\n` : ''}` +
-      `*Total Paid: ₹${order.total}*\n\n` +
-      `Thank you for your order! We hope you enjoyed your meal.`;
-  } else {
-    message = `*Order Update - ${order.id.substring(0,8)}*\n\n` +
-      `Status: ${order.status}\n\n` +
-      `*Items:*\n${itemsList}\n\n` +
-      `Subtotal: ₹${order.subtotal}\n` +
-      `${order.deliveryCharge > 0 ? `Delivery Charge: ₹${order.deliveryCharge}\n` : ''}` +
-      `*Total: ₹${order.total}*\n\n` +
-      `Thank you for your order!`;
-  }
-
-  // Encode the message for URL
-  const encodedMessage = encodeURIComponent(message);
-  
-  // Create WhatsApp URL
-  const whatsappUrl = `https://wa.me/${order.phoneNumber.replace(/\D/g, '')}?text=${encodedMessage}`;
-  
-  // Open in new tab
-  window.open(whatsappUrl, '_blank');
-}
-
 // Rendering Functions
 function renderOrderCard(order) {
   const orderCard = document.createElement('div');
   orderCard.className = 'order-card';
   orderCard.dataset.orderId = order.id;
   
-  // Add new order notification class if this is the latest order
-  if (order.id === lastOrderId) {
-    orderCard.classList.add('new-order-notification');
-    setTimeout(() => {
-      orderCard.classList.remove('new-order-notification');
-    }, 10000);
-  }
-  
   // Determine status class and text
   const statusInfo = getStatusInfo(order.status);
   
   // Format timestamp
-  const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp || Date.now());
+  const orderDate = new Date(order.timestamp);
   const dateString = formatOrderDate(orderDate);
   
   // Create order card HTML
@@ -454,12 +329,11 @@ function renderOrderCard(order) {
       <span class="order-id">#${order.id.substring(0, 8)}</span>
       <span class="order-status ${statusInfo.class}">${statusInfo.text}</span>
       <span class="order-time">${dateString}</span>
-      <span class="order-date">${orderDate.toLocaleDateString('en-IN')} ${orderDate.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'})}</span>
     </div>
     <div class="order-body">
       <div class="customer-info">
         <span><i class="fas fa-user"></i> ${order.customerName}</span>
-        <span><i class="fas fa-phone"></i> ${order.phoneNumber || 'N/A'}</span>
+        <span><i class="fas fa-phone"></i> ${order.phone}</span>
         <span><i class="fas fa-${order.orderType === 'Delivery' ? 'truck' : 'walking'}"></i> ${order.orderType} ${order.deliveryDistance ? `(${order.deliveryDistance}km)` : ''}</span>
       </div>
       <div class="order-items">
@@ -484,8 +358,6 @@ function renderOrderCard(order) {
       ` : ''}
       <button class="btn complete-btn ${order.status === 'completed' ? 'active' : ''}" data-action="completed" data-order-id="${order.id}"><i class="fas fa-check"></i> Complete</button>
       <button class="btn cancel-btn ${order.status === 'cancelled' ? 'active' : ''}" data-action="cancelled" data-order-id="${order.id}"><i class="fas fa-times"></i> Cancel</button>
-      <button class="btn whatsapp-btn" data-order-id="${order.id}"><i class="fab fa-whatsapp"></i> Notify Customer</button>
-      <button class="btn status-history-btn" data-order-id="${order.id}"><i class="fas fa-history"></i> Status History</button>
     </div>
   `;
   
@@ -493,77 +365,18 @@ function renderOrderCard(order) {
   const buttons = orderCard.querySelectorAll('.btn');
   buttons.forEach(button => {
     button.addEventListener('click', (e) => {
-      e.stopPropagation();
       const action = e.target.closest('button').dataset.action;
       const orderId = e.target.closest('button').dataset.orderId;
-      
-      if (action) {
-        // For preparing/delivering/completed, update status and open WhatsApp immediately
-        if (['preparing', 'delivering', 'completed'].includes(action)) {
-          updateOrderStatus({ orderId, status: action });
-        } 
-        // For other actions, show confirmation
-        else {
-          showConfirmation(
-            'Confirm Action',
-            `Are you sure you want to mark this order as ${action}?`,
-            'updateOrderStatus',
-            { orderId, status: action }
-          );
-        }
-      } else if (e.target.closest('.whatsapp-btn')) {
-        sendWhatsAppUpdate(order);
-      } else if (e.target.closest('.status-history-btn')) {
-        showStatusHistory(order.id, order.statusHistory || []);
-      }
+      showConfirmation(
+        'Confirm Action',
+        `Are you sure you want to mark this order as ${action}?`,
+        'updateOrderStatus',
+        { orderId, status: action }
+      );
     });
   });
   
   ordersListContainer.appendChild(orderCard);
-}
-
-function showStatusHistory(orderId, history) {
-  const modal = document.createElement('div');
-  modal.className = 'modal status-history-modal';
-  
-  let historyHTML = '<h3>Order Status History</h3>';
-  
-  if (history.length === 0) {
-    historyHTML += '<p>No status history available</p>';
-  } else {
-    historyHTML += '<ul class="status-history-list">';
-    history.forEach(item => {
-      const date = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
-      historyHTML += `
-        <li>
-          <span class="status-badge ${item.status.toLowerCase()}">${item.status}</span>
-          <span class="status-date">${date.toLocaleString()}</span>
-          ${item.changedBy ? `<span class="status-changed-by">by ${item.changedBy}</span>` : ''}
-          ${item.cancellationReason ? `<div class="cancellation-reason">Reason: ${item.cancellationReason}</div>` : ''}
-        </li>
-      `;
-    });
-    historyHTML += '</ul>';
-  }
-  
-  modal.innerHTML = `
-    <div class="modal-content">
-      ${historyHTML}
-      <button class="btn close-modal">Close</button>
-    </div>
-  `;
-  
-  document.body.appendChild(modal);
-  
-  modal.querySelector('.close-modal').addEventListener('click', () => {
-    modal.remove();
-  });
-  
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.remove();
-    }
-  });
 }
 
 function renderCategoryCard(category) {
@@ -911,7 +724,6 @@ async function updateOrderStatus(data) {
       const reason = prompt('Please enter cancellation reason:');
       if (reason) {
         updateData.cancellationReason = reason;
-        newStatusEntry.cancellationReason = reason;
       }
     }
     
@@ -920,12 +732,6 @@ async function updateOrderStatus(data) {
     await orderRef.update({
       statusHistory: firebase.firestore.FieldValue.arrayUnion(newStatusEntry)
     });
-    
-    // Automatically send WhatsApp update
-    const updatedOrder = (await orderRef.get()).data();
-    if (['preparing', 'delivering', 'completed'].includes(data.status)) {
-      sendWhatsAppUpdate(updatedOrder);
-    }
     
     showError(`Order status updated to ${data.status}`);
   } catch (error) {
@@ -973,6 +779,28 @@ async function deleteMenuItem(data) {
   }
 }
 
+async function saveSettings() {
+  const settings = {
+    restaurantName: restaurantNameInput.value.trim(),
+    contactNumber: contactNumberInput.value.trim(),
+    deliveryRadius: Number(deliveryRadiusInput.value),
+    minDeliveryOrder: Number(minDeliveryOrderInput.value),
+    charge04km: Number(charge04kmInput.value),
+    charge46km: Number(charge46kmInput.value),
+    charge68km: Number(charge68kmInput.value),
+    freeDeliveryAbove: Number(freeDeliveryAboveInput.value),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  
+  try {
+    await db.collection('settings').doc('restaurantSettings').set(settings, { merge: true });
+    showError('Settings saved successfully');
+  } catch (error) {
+    console.error("Error saving settings:", error);
+    showError('Failed to save settings');
+  }
+}
+
 // Helper Functions
 function filterOrders() {
   const statusFilter = orderFilter.value;
@@ -1004,6 +832,17 @@ function filterOrders() {
   }
 }
 
+function updateSettingsForm(settings) {
+  restaurantNameInput.value = settings.restaurantName || '';
+  contactNumberInput.value = settings.contactNumber || '';
+  deliveryRadiusInput.value = settings.deliveryRadius || 8;
+  minDeliveryOrderInput.value = settings.minDeliveryOrder || 200;
+  charge04kmInput.value = settings.charge04km || 0;
+  charge46kmInput.value = settings.charge46km || 20;
+  charge68kmInput.value = settings.charge68km || 30;
+  freeDeliveryAboveInput.value = settings.freeDeliveryAbove || 500;
+}
+
 function getStatusInfo(status) {
   switch(status) {
     case 'pending': return { class: 'pending', text: 'Pending' };
@@ -1016,23 +855,19 @@ function getStatusInfo(status) {
 }
 
 function formatOrderDate(date) {
-  if (!(date instanceof Date)) {
-    date = new Date(date);
-  }
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
   
-  const now = new Date();
-  const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
-  
-  if (diffInHours < 24) {
-    return `Today at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-  } else if (diffInHours < 48) {
-    return `Yesterday at ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+  if (date.toDateString() === today.toDateString()) {
+    return `Today, ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return `Yesterday, ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
   } else {
     return date.toLocaleString('en-IN', {
       weekday: 'short',
-      day: 'numeric',
       month: 'short',
-      year: 'numeric',
+      day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     });

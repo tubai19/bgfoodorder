@@ -5,15 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bake & Grill - Admin Dashboard</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
   <link rel="stylesheet" href="admin-styles.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 </head>
-<body class="light-mode">
+<body>
   <!-- Login Screen -->
   <div id="loginScreen" class="login-container">
     <div class="login-box">
@@ -26,7 +23,6 @@
         <div class="form-group">
           <label for="adminPassword">Password</label>
           <input type="password" id="adminPassword" required>
-          <a href="#" onclick="showPasswordReset()" class="forgot-password">Forgot Password?</a>
         </div>
         <button type="submit" class="login-btn">Login</button>
       </form>
@@ -42,9 +38,6 @@
         <p>Order Management System</p>
       </div>
       <div class="header-right">
-        <button id="darkModeToggle" class="icon-btn" title="Toggle Dark Mode">
-          <i class="fas fa-moon"></i>
-        </button>
         <span id="currentTime"></span>
         <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
       </div>
@@ -56,9 +49,7 @@
           <ul>
             <li class="active" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</li>
             <li data-section="menu"><i class="fas fa-edit"></i> Menu Management</li>
-            <li data-section="analytics"><i class="fas fa-chart-bar"></i> Analytics</li>
             <li data-section="settings"><i class="fas fa-cog"></i> Settings</li>
-            <li data-section="admin"><i class="fas fa-users-cog"></i> Admin Users</li>
           </ul>
         </nav>
       </aside>
@@ -78,9 +69,6 @@
                 <option value="cancelled">Cancelled</option>
               </select>
               <input type="text" id="orderSearch" placeholder="Search orders...">
-              <button class="btn bulk-action-btn" onclick="bulkUpdateStatus('preparing')">
-                <i class="fas fa-utensils"></i> Mark Selected as Preparing
-              </button>
             </div>
           </div>
           <div class="orders-list" id="ordersListContainer">
@@ -99,43 +87,6 @@
           </div>
         </section>
 
-        <!-- Analytics Section -->
-        <section id="analyticsSection" class="content-section" style="display: none;">
-          <div class="section-header">
-            <h2><i class="fas fa-chart-bar"></i> Sales Analytics</h2>
-            <div class="date-filters">
-              <input type="date" id="startDate">
-              <input type="date" id="endDate">
-              <button onclick="loadAnalytics()" class="btn primary-btn">Apply</button>
-            </div>
-          </div>
-          <div class="analytics-container">
-            <div class="analytics-card">
-              <h3>Today's Sales</h3>
-              <div class="chart-container">
-                <canvas id="dailySalesChart"></canvas>
-              </div>
-            </div>
-            <div class="analytics-card">
-              <h3>Top Items</h3>
-              <div class="chart-container">
-                <canvas id="topItemsChart"></canvas>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Admin Management Section -->
-        <section id="adminSection" class="content-section" style="display: none;">
-          <div class="section-header">
-            <h2><i class="fas fa-users-cog"></i> Admin Users</h2>
-            <button id="addAdminBtn" class="btn primary-btn"><i class="fas fa-plus"></i> Add Admin</button>
-          </div>
-          <div class="admin-list" id="adminListContainer">
-            <div class="loading">Loading admins...</div>
-          </div>
-        </section>
-
         <!-- Settings Section -->
         <section id="settingsSection" class="content-section" style="display: none;">
           <div class="section-header">
@@ -151,15 +102,31 @@
               <input type="tel" id="contactNumber">
             </div>
             <div class="form-group">
-              <label>Business Hours</label>
-              <div class="business-hours">
+              <label>Delivery Radius (km)</label>
+              <input type="number" id="deliveryRadius">
+            </div>
+            <div class="form-group">
+              <label>Minimum Order for Delivery (₹)</label>
+              <input type="number" id="minDeliveryOrder">
+            </div>
+            <div class="form-group">
+              <label>Delivery Charges</label>
+              <div class="delivery-charges">
                 <div>
-                  <label>Opening Time</label>
-                  <input type="time" id="openingTime">
+                  <label>0-4km</label>
+                  <input type="number" id="charge04km">
                 </div>
                 <div>
-                  <label>Closing Time</label>
-                  <input type="time" id="closingTime">
+                  <label>4-6km</label>
+                  <input type="number" id="charge46km">
+                </div>
+                <div>
+                  <label>6-8km</label>
+                  <input type="number" id="charge68km">
+                </div>
+                <div>
+                  <label>Free delivery above (₹)</label>
+                  <input type="number" id="freeDeliveryAbove">
                 </div>
               </div>
             </div>
@@ -172,7 +139,26 @@
 
   <!-- Modals -->
   <div id="addCategoryModal" class="modal">
-    <!-- ... (same as before) ... -->
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add New Category</h3>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Category Name</label>
+          <input type="text" id="categoryName">
+        </div>
+        <div class="form-group">
+          <label>Icon (Emoji or Font Awesome class)</label>
+          <input type="text" id="categoryIcon" placeholder="🍕 or fas fa-pizza-slice">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn cancel-btn">Cancel</button>
+        <button id="confirmAddCategoryBtn" class="btn primary-btn">Add Category</button>
+      </div>
+    </div>
   </div>
 
   <div id="menuItemModal" class="modal">
@@ -185,11 +171,6 @@
         <input type="hidden" id="currentCategoryId">
         <input type="hidden" id="currentItemId">
         <div class="form-group">
-          <label>Item Image</label>
-          <input type="file" id="itemImage" accept="image/*">
-          <img id="itemImagePreview" style="max-width: 100px; display: none;">
-        </div>
-        <div class="form-group">
           <label>Item Name</label>
           <input type="text" id="itemName">
         </div>
@@ -200,10 +181,6 @@
         <div class="form-group">
           <label>Description</label>
           <textarea id="itemDesc"></textarea>
-        </div>
-        <div class="form-group">
-          <label>Stock Quantity</label>
-          <input type="number" id="itemStock" min="0" value="0">
         </div>
         <div class="form-group">
           <label>Variants</label>
@@ -218,34 +195,21 @@
     </div>
   </div>
 
-  <div id="addAdminModal" class="modal">
+  <div id="confirmationModal" class="modal">
     <div class="modal-content small-modal">
       <div class="modal-header">
-        <h3>Add New Admin</h3>
+        <h3 id="confirmationTitle">Confirm Action</h3>
         <span class="close-modal">&times;</span>
       </div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>Admin Email</label>
-          <input type="email" id="newAdminEmail" placeholder="admin@example.com">
-        </div>
-        <div class="form-group">
-          <label>Role</label>
-          <select id="adminRole">
-            <option value="super">Super Admin</option>
-            <option value="manager">Manager</option>
-            <option value="kitchen">Kitchen Staff</option>
-          </select>
-        </div>
+        <p id="confirmationMessage">Are you sure you want to perform this action?</p>
       </div>
       <div class="modal-footer">
         <button class="btn cancel-btn">Cancel</button>
-        <button id="confirmAddAdminBtn" class="btn primary-btn">Add Admin</button>
+        <button id="confirmActionBtn" class="btn primary-btn">Confirm</button>
       </div>
     </div>
   </div>
-
-  <!-- ... (other modals remain same) ... -->
 
   <script src="admin-script.js"></script>
 </body>
