@@ -1182,17 +1182,4 @@ input, textarea, select {
   .form-input textarea,
   .form-input select {
     color: #bbb;
-    background-color: #333;
-    border-color: #444;
-  }
-  
-  .variant-option label {
-    background-color: #333;
-    color: #bbb;
-  }
-  
-  .variant-option input:checked + label {
-    background-color: var(--primary-color);
-    color: white;
-  }
-}
+    background-colo
