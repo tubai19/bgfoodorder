@@ -1,3 +1,25 @@
+// Firebase configuration and initialization
+const firebaseConfig = {
+  apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
+  authDomain: "bakeandgrill-44c25.firebaseapp.com",
+  projectId: "bakeandgrill-44c25",
+  storageBucket: "bakeandgrill-44c25.appspot.com",
+  messagingSenderId: "713279633359",
+  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
+  measurementId: "G-SLG2R88J72"
+};
+
+// Initialize Firebase
+const firebaseApp = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let messaging;
+
+try {
+  messaging = firebase.messaging();
+} catch (err) {
+  console.error("Unable to initialize Firebase Messaging", err);
+}
+
 // Full menu data
 const fullMenu = {
   "Veg Pizzas": [
@@ -579,9 +601,7 @@ const categoryIcons = {
   "Combos": "🎁"
 };
 
-// Main application code
-const { jsPDF } = window.jspdf;
-    
+// Restaurant location and delivery settings
 const RESTAURANT_LOCATION = {
   lat: 22.3908,
   lng: 88.2189
@@ -589,6 +609,7 @@ const RESTAURANT_LOCATION = {
 const MAX_DELIVERY_DISTANCE = 8; // 8km maximum delivery distance
 const MIN_DELIVERY_ORDER = 200;
 
+// DOM elements
 const selectedItems = [];
 const tabsDiv = document.getElementById("tabs");
 const container = document.getElementById("menuContainer");
@@ -607,6 +628,16 @@ const locationAccuracyWarning = document.getElementById("locationAccuracyWarning
 const quickLocationBtn = document.getElementById("quickLocationBtn");
 const quickLocationStatus = document.getElementById("quickLocationStatus");
 const deliveryRestriction = document.getElementById("deliveryRestriction");
+const notification = document.getElementById("notification");
+const notificationText = document.getElementById("notificationText");
+const mobileCartBtn = document.getElementById("mobileCartBtn");
+const cart = document.getElementById("cart");
+const placeOrderBtn = document.getElementById("placeOrderBtn");
+const viewOrderHistoryBtn = document.getElementById("viewOrderHistoryBtn");
+const clearCartBtn = document.getElementById("clearCartBtn");
+const checkoutBtn = document.getElementById("checkoutBtn");
+
+// Application state
 let currentCategory = null;
 let deliveryDistance = null;
 let isLocationFetching = false;
@@ -614,18 +645,440 @@ let userLocation = null;
 let watchId = null;
 let isManualLocation = false;
 
+// ======================
+// NOTIFICATION SYSTEM
+// ======================
+
+// Firebase Messaging variables
+const vapidKey = 'BKTsteSYE7yggmmbvQnPzDt0wFuHADZxcJpR8hu_bGOE8RpyBx4AamyQ2TIyItS6uvwZ79EzBp1rWOpuT4KHHDY';
+let isTokenRegistered = false;
+
+// Initialize Firebase Messaging
+function initializeFirebaseMessaging() {
+  try {
+    if (firebase.messaging.isSupported()) {
+      messaging = firebase.messaging();
+      console.log("Firebase Messaging initialized");
+      return true;
+    }
+    console.warn("Firebase Messaging not supported");
+    return false;
+  } catch (error) {
+    console.error("Messaging init error:", error);
+    return false;
+  }
+}
+
+// Register Service Worker
+async function registerServiceWorker() {
+  try {
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('SW registered:', registration.scope);
+    
+    // Check for updates hourly
+    setInterval(() => registration.update(), 3600000);
+    
+    return registration;
+  } catch (error) {
+    console.error('SW registration failed:', error);
+    throw error;
+  }
+}
+
+// Register FCM Token
+async function registerToken() {
+  if (!messaging || isTokenRegistered) return;
+  
+  try {
+    const currentToken = await messaging.getToken({ 
+      vapidKey,
+      serviceWorkerRegistration: await navigator.serviceWorker.ready
+    });
+
+    if (currentToken) {
+      console.log('FCM token:', currentToken);
+      await saveTokenToFirestore(currentToken);
+      isTokenRegistered = true;
+    } else {
+      console.log('No FCM token available');
+      requestNotificationPermission();
+    }
+  } catch (error) {
+    console.error('Token error:', error);
+    handleTokenError(error);
+  }
+}
+
+// Save token to Firestore
+async function saveTokenToFirestore(token) {
+  try {
+    const phone = document.getElementById('phoneNumber')?.value || 'pending';
+    await db.collection('fcmTokens').doc(token).set({
+      token,
+      phone,
+      userAgent: navigator.userAgent,
+      lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    console.log('Token saved for:', phone);
+  } catch (error) {
+    console.error('Save token error:', error);
+  }
+}
+
+// Handle token errors
+function handleTokenError(error) {
+  if (error.code === 'messaging/permission-blocked') {
+    console.log('Notifications blocked');
+  } else if (error.code === 'messaging/permission-default') {
+    requestNotificationPermission();
+  }
+}
+
+// Setup message handlers
+function setupMessageHandlers() {
+  if (!messaging) return;
+
+  // Foreground messages
+  messaging.onMessage((payload) => {
+    console.log('Foreground message:', payload);
+    showCustomNotification(payload);
+  });
+
+  // Token refresh
+  messaging.onTokenRefresh(() => {
+    console.log('Token refreshing...');
+    isTokenRegistered = false;
+    registerToken();
+  });
+}
+
+// Request notification permission
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    console.log('Notifications not supported');
+    return;
+  }
+
+  Notification.requestPermission().then(permission => {
+    console.log('Permission:', permission);
+    if (permission === 'granted') initializeNotifications();
+  });
+}
+
+// Initialize notifications
+async function initializeNotifications() {
+  try {
+    if (!initializeFirebaseMessaging()) return;
+    
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      console.log('Notifications enabled');
+      await registerServiceWorker();
+      await registerToken();
+      setupMessageHandlers();
+    }
+  } catch (error) {
+    console.error('Notification init failed:', error);
+  }
+}
+
+// Show custom notification
+function showCustomNotification(payload) {
+  const container = document.getElementById('notification-container') || createNotificationContainer();
+  
+  const notification = document.createElement('div');
+  notification.className = `notification ${payload.data?.status || 'default'}`;
+  
+  notification.innerHTML = `
+    <div class="notification-icon">
+      <i class="fas ${getStatusIcon(payload.data?.status)}"></i>
+    </div>
+    <div class="notification-content">
+      <h4>${escapeHtml(payload.notification?.title || 'Order Update')}</h4>
+      <p>${escapeHtml(payload.notification?.body || 'Status updated')}</p>
+      <small>${formatTime(payload.data?.timestamp || new Date())}</small>
+    </div>
+    <button class="notification-close">&times;</button>
+  `;
+
+  container.prepend(notification);
+  setTimeout(() => notification.classList.add('show'), 10);
+
+  // Setup close button
+  notification.querySelector('.notification-close').addEventListener('click', () => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  });
+
+  // Auto-dismiss
+  const dismissTimer = setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, 8000);
+
+  notification.addEventListener('mouseenter', () => clearTimeout(dismissTimer));
+  notification.addEventListener('mouseleave', () => {
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+  });
+}
+
+// Helper functions for notifications
+function getStatusIcon(status) {
+  const icons = {
+    pending: 'fa-clock',
+    preparing: 'fa-utensils',
+    delivering: 'fa-truck',
+    completed: 'fa-check-circle',
+    cancelled: 'fa-times-circle',
+    default: 'fa-bell'
+  };
+  return icons[status] || icons.default;
+}
+
+function formatTime(timestamp) {
+  try {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function createNotificationContainer() {
+  const container = document.createElement('div');
+  container.id = 'notification-container';
+  document.body.appendChild(container);
+  return container;
+}
+
+// ======================
+// MAIN APPLICATION
+// ======================
+
+// Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
   initializeTabs();
   setupEventListeners();
   
-  // Show location prompt if delivery is selected by default
   if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
     showLocationPrompt();
   }
+
+  // Initialize notifications after user interaction
+  document.body.addEventListener('click', () => {
+    initializeNotifications().catch(console.error);
+  }, { once: true });
+  
+  // Update token when phone number changes
+  document.getElementById('phoneNumber')?.addEventListener('change', async () => {
+    if (messaging && isTokenRegistered) {
+      const token = await messaging.getToken();
+      if (token) await saveTokenToFirestore(token);
+    }
+  });
 });
 
+// Initialize category tabs
+function initializeTabs() {
+  tabsDiv.innerHTML = '';
+  
+  for (const category in fullMenu) {
+    const tabBtn = document.createElement("button");
+    tabBtn.textContent = `${categoryIcons[category] || "🍽"} ${category}`;
+    tabBtn.dataset.category = category;
+    tabBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      renderCategory(category);
+      document.getElementById("menuContainer").scrollIntoView({ behavior: 'smooth' });
+      
+      document.querySelectorAll('#tabs button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      tabBtn.classList.add('active');
+    });
+    tabsDiv.appendChild(tabBtn);
+  }
+  
+  const firstCategory = Object.keys(fullMenu)[0];
+  if (firstCategory) {
+    tabsDiv.querySelector('button').classList.add('active');
+    renderCategory(firstCategory);
+  }
+}
+
+// Render menu items for a category
+function renderCategory(category, searchTerm = '') {
+  container.innerHTML = "";
+  currentCategory = category;
+  
+  const section = document.createElement("div");
+  section.className = "menu-category";
+  section.innerHTML = `<h3>${categoryIcons[category] || "🍽"} ${category}</h3>`;
+  container.appendChild(section);
+
+  const filteredItems = fullMenu[category].filter(item => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return item.name.toLowerCase().includes(term) || 
+           (item.desc && item.desc.toLowerCase().includes(term));
+  });
+
+  if (filteredItems.length === 0) {
+    container.innerHTML = '<div class="no-results">No items found matching your search.</div>';
+    return;
+  }
+
+  const itemsContainer = document.createElement("div");
+  itemsContainer.className = "menu-items";
+  container.appendChild(itemsContainer);
+
+  filteredItems.forEach((item) => {
+    const itemDiv = document.createElement("div");
+    itemDiv.className = "menu-item";
+    
+    if (category === "Combos" && document.querySelector('input[name="orderType"]:checked').value === "Delivery") {
+      itemDiv.classList.add("disabled-item");
+      const overlay = document.createElement("div");
+      overlay.className = "disabled-overlay";
+      overlay.textContent = "Combos not available for delivery";
+      itemDiv.appendChild(overlay);
+    }
+
+    const itemDetails = document.createElement("div");
+    itemDetails.className = "menu-item-details";
+    
+    const title = document.createElement("div");
+    title.className = "menu-item-name";
+    title.textContent = item.name;
+    
+    if (item.nameBn) {
+      const bn = document.createElement("div");
+      bn.className = "menu-item-name-bn";
+      bn.textContent = item.nameBn;
+      itemDetails.appendChild(bn);
+    }
+    
+    const desc = document.createElement("div");
+    desc.className = "menu-item-desc";
+    desc.textContent = item.desc || "";
+    
+    const variantDiv = document.createElement("div");
+    variantDiv.className = "variant-selector";
+    
+    Object.entries(item.variants).forEach(([variant, price], index) => {
+      const variantOption = document.createElement("div");
+      variantOption.className = "variant-option";
+      
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = `variant-${item.name.replace(/\s+/g, '-')}`;
+      input.id = `variant-${item.name.replace(/\s+/g, '-')}-${variant.replace(/\s+/g, '-')}`;
+      input.value = variant;
+      input.dataset.price = price;
+      
+      if (index === 0) {
+        input.checked = true;
+      }
+      
+      const label = document.createElement("label");
+      label.htmlFor = input.id;
+      label.textContent = `${variant} - ₹${price}`;
+      
+      variantOption.appendChild(input);
+      variantOption.appendChild(label);
+      variantDiv.appendChild(variantOption);
+    });
+    
+    const priceDiv = document.createElement("div");
+    priceDiv.className = "menu-item-price";
+    priceDiv.textContent = `₹${Object.values(item.variants)[0]}`;
+    
+    const controlsDiv = document.createElement("div");
+    controlsDiv.className = "menu-item-controls";
+    
+    const quantityDiv = document.createElement("div");
+    quantityDiv.className = "quantity-control";
+    
+    const minusBtn = document.createElement("button");
+    minusBtn.className = "quantity-btn minus";
+    minusBtn.innerHTML = "-";
+    minusBtn.addEventListener('click', () => {
+      const quantitySpan = minusBtn.nextElementSibling;
+      let quantity = parseInt(quantitySpan.textContent);
+      if (quantity > 0) {
+        quantitySpan.textContent = quantity - 1;
+      }
+    });
+    
+    const quantitySpan = document.createElement("span");
+    quantitySpan.className = "quantity";
+    quantitySpan.textContent = "0";
+    
+    const plusBtn = document.createElement("button");
+    plusBtn.className = "quantity-btn plus";
+    plusBtn.innerHTML = "+";
+    plusBtn.addEventListener('click', () => {
+      const quantitySpan = plusBtn.previousElementSibling;
+      quantitySpan.textContent = parseInt(quantitySpan.textContent) + 1;
+    });
+    
+    quantityDiv.appendChild(minusBtn);
+    quantityDiv.appendChild(quantitySpan);
+    quantityDiv.appendChild(plusBtn);
+    
+    const addBtn = document.createElement("button");
+    addBtn.className = "add-to-cart";
+    addBtn.innerHTML = "Add";
+    addBtn.addEventListener('click', () => {
+      const quantity = parseInt(quantitySpan.textContent);
+      if (quantity > 0) {
+        const selectedVariant = variantDiv.querySelector('input[name^="variant-"]:checked');
+        if (selectedVariant) {
+          addToOrder(
+            item.name,
+            selectedVariant.value,
+            parseInt(selectedVariant.dataset.price),
+            quantity
+          );
+          quantitySpan.textContent = "0";
+        }
+      }
+    });
+    
+    controlsDiv.appendChild(quantityDiv);
+    controlsDiv.appendChild(addBtn);
+    
+    itemDetails.appendChild(title);
+    if (item.desc) itemDetails.appendChild(desc);
+    itemDetails.appendChild(variantDiv);
+    itemDetails.appendChild(priceDiv);
+    itemDetails.appendChild(controlsDiv);
+    
+    itemDiv.appendChild(itemDetails);
+    itemsContainer.appendChild(itemDiv);
+    
+    variantDiv.querySelectorAll('input[name^="variant-"]').forEach(input => {
+      input.addEventListener('change', () => {
+        priceDiv.textContent = `₹${input.dataset.price}`;
+      });
+    });
+  });
+}
+
+// Set up event listeners
 function setupEventListeners() {
-  // Order type radio button change handler
   document.querySelectorAll('input[name="orderType"]').forEach(radio => {
     radio.addEventListener('change', function() {
       const isDelivery = this.value === 'Delivery';
@@ -641,7 +1094,6 @@ function setupEventListeners() {
         deliveryDistance = null;
       }
       
-      // Re-render current category to update disabled state
       if (currentCategory) {
         renderCategory(currentCategory, searchInput.value);
       }
@@ -649,33 +1101,23 @@ function setupEventListeners() {
     });
   });
 
-  // Quick location button click handler
-  quickLocationBtn.addEventListener('click', function() {
-    getQuickLocation();
-  });
+  quickLocationBtn.addEventListener('click', getQuickLocation);
+  shareLocationBtn.addEventListener('click', startLocationTracking);
 
-  // Share location button click handler
-  shareLocationBtn.addEventListener('click', function() {
-    startLocationTracking();
-  });
-
-  // Refresh location button click handler
   refreshLocationBtn.addEventListener('click', function() {
     stopLocationTracking();
     startLocationTracking();
   });
 
-  // Manual location toggle handler
   toggleManualLocation.addEventListener('click', function() {
-    const manualContainer = document.getElementById('manualLocationContainer');
     isManualLocation = !isManualLocation;
+    const manualContainer = document.getElementById('manualLocationContainer');
     
     if (isManualLocation) {
       manualContainer.style.display = 'block';
       this.textContent = 'Use automatic location detection';
       stopLocationTracking();
       document.getElementById('locationText').textContent = 'Using manual address entry';
-      document.getElementById('locationMapLink').innerHTML = '';
       document.getElementById('deliveryEstimate').textContent = 'Distance will be estimated from address';
     } else {
       manualContainer.style.display = 'none';
@@ -684,7 +1126,6 @@ function setupEventListeners() {
     }
   });
   
-  // Save manual address handler
   document.getElementById('saveManualLocation').addEventListener('click', function() {
     const address = document.getElementById('manualAddress').value.trim();
     if (!address) {
@@ -692,13 +1133,9 @@ function setupEventListeners() {
       return;
     }
     
-    // In a real app, you would geocode this address to get coordinates
-    // For this example, we'll just use a fake distance
-    deliveryDistance = 3 + Math.random() * 5; // Random distance between 3-8km
-    
+    deliveryDistance = 3 + Math.random() * 5;
     document.getElementById('locationText').textContent = `📍 Manual address saved`;
-    document.getElementById('locationMapLink').innerHTML = 
-      `<div style="color: var(--primary-color);">${address}</div>`;
+    document.getElementById('locationMapLink').innerHTML = `<div style="color: var(--primary-color);">${address}</div>`;
     
     const estimatedTime = calculateDeliveryTime(deliveryDistance);
     document.getElementById('deliveryEstimate').innerHTML = 
@@ -708,21 +1145,214 @@ function setupEventListeners() {
     updateCart();
     checkDeliveryRestriction();
   });
+
+  mobileCartBtn.addEventListener('click', function() {
+    cart.classList.toggle('active');
+  });
+
+  placeOrderBtn.addEventListener('click', confirmOrder);
+  viewOrderHistoryBtn.addEventListener('click', showOrderHistory);
+  
+  document.getElementById('closeHistoryBtn').addEventListener('click', function() {
+    document.getElementById('orderHistoryModal').style.display = 'none';
+  });
+  
+  document.getElementById('clearHistoryBtn').addEventListener('click', clearOrderHistory);
+  
+  window.addEventListener('click', function(event) {
+    if (event.target.classList.contains('modal')) {
+      event.target.style.display = 'none';
+    }
+  });
+
+  searchInput.addEventListener('input', (e) => {
+    if (currentCategory) {
+      renderCategory(currentCategory, e.target.value);
+    }
+  });
+
+  // Clear cart button
+  clearCartBtn.addEventListener('click', function() {
+    if (selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
+      selectedItems.length = 0;
+      updateCart();
+      showNotification('Cart cleared');
+    }
+  });
+
+  // Checkout button
+  checkoutBtn.addEventListener('click', function() {
+    if (selectedItems.length === 0) {
+      showNotification('Your cart is empty');
+      return;
+    }
+    document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+  });
 }
 
+// Show notification
+function showNotification(message) {
+  notificationText.textContent = message;
+  notification.classList.add('show');
+  setTimeout(() => {
+    notification.classList.remove('show');
+  }, 3000);
+}
+
+// Add item to order
+function addToOrder(name, variant, price, quantity = 1) {
+  const existingItemIndex = selectedItems.findIndex(
+    item => item.name === name && item.variant === variant
+  );
+  
+  if (existingItemIndex !== -1) {
+    selectedItems[existingItemIndex].quantity += quantity;
+  } else {
+    selectedItems.push({ 
+      name, 
+      variant, 
+      price, 
+      quantity 
+    });
+  }
+  
+  updateCart();
+  showNotification(`${quantity > 1 ? quantity + 'x ' : ''}${name} (${variant}) added to cart!`);
+}
+
+// Update cart display
+function updateCart() {
+  cartList.innerHTML = "";
+  const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  let deliveryCharge = 0;
+  let deliveryMessage = "";
+  const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  
+  if (orderType === 'Delivery') {
+    const result = calculateDeliveryCharge(subtotal, deliveryDistance);
+    deliveryCharge = result.charge || 0;
+    deliveryMessage = result.message;
+    
+    if (deliveryCharge !== null) {
+      deliveryMessage += ` | ⏳ Est. Delivery: ${calculateDeliveryTime(deliveryDistance)}`;
+      deliveryChargeDisplay.textContent = deliveryMessage;
+      deliveryChargeDisplay.style.display = 'block';
+    } else {
+      deliveryChargeDisplay.textContent = deliveryMessage;
+      deliveryChargeDisplay.style.color = 'var(--error-color)';
+      deliveryChargeDisplay.style.display = 'block';
+    }
+  }
+
+  const total = subtotal + (deliveryCharge || 0);
+  
+  // Update cart items list
+  selectedItems.forEach((item, index) => {
+    const li = document.createElement("li");
+    li.className = "cart-item";
+    
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "cart-item-name";
+    nameSpan.textContent = `${item.name} (${item.variant}) x ${item.quantity}`;
+    
+    const priceSpan = document.createElement("span");
+    priceSpan.className = "cart-item-price";
+    priceSpan.textContent = `₹${item.price * item.quantity}`;
+    
+    const controlsDiv = document.createElement("div");
+    controlsDiv.className = "cart-item-controls";
+    
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "cart-item-remove";
+    removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    removeBtn.addEventListener('click', () => {
+      selectedItems.splice(index, 1);
+      updateCart();
+      showNotification("Item removed from cart");
+    });
+    
+    controlsDiv.appendChild(removeBtn);
+    li.appendChild(nameSpan);
+    li.appendChild(priceSpan);
+    li.appendChild(controlsDiv);
+    cartList.appendChild(li);
+  });
+
+  // Update cart total
+  let cartTotalText = `Subtotal: ₹${subtotal}`;
+  if (deliveryCharge > 0) {
+    cartTotalText += ` + Delivery: ₹${deliveryCharge}`;
+  } else if (orderType === 'Delivery' && deliveryCharge === 0) {
+    cartTotalText += ` + Delivery: Free`;
+  }
+  cartTotalText += ` = Total: ₹${total}`;
+  
+  if (orderType === 'Delivery' && deliveryCharge === null) {
+    cartTotalText += " (Delivery not available)";
+  }
+  
+  // Update both cart total and live total displays
+  document.getElementById('cartTotal').textContent = cartTotalText;
+  totalBill.innerHTML = cartTotalText;
+  
+  const itemCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  document.querySelectorAll('.cart-count, .cart-badge').forEach(el => {
+    el.textContent = itemCount;
+  });
+
+  // Show/hide clear cart and checkout buttons based on cart content
+  clearCartBtn.style.display = itemCount > 0 ? 'block' : 'none';
+  checkoutBtn.style.display = itemCount > 0 ? 'block' : 'none';
+}
+
+// Calculate delivery time estimate
+function calculateDeliveryTime(distanceKm) {
+  if (!distanceKm) return "Unknown";
+  const preparationTime = 20;
+  const travelTime = Math.round(distanceKm * 8);
+  return `${preparationTime + travelTime} minutes (${preparationTime} min prep + ${travelTime} min travel)`;
+}
+
+// Calculate delivery charge based on distance and order total
+function calculateDeliveryCharge(total, distance) {
+  if (!distance) return { charge: null, message: "Please share your location to calculate delivery" };
+  if (distance > MAX_DELIVERY_DISTANCE) return { charge: null, message: "⚠️ Delivery not available beyond 8km" };
+  if (total >= 500) return { charge: 0, message: "🎉 Free delivery (order above ₹500)" };
+  if (distance <= 4) return { charge: 0, message: "Free delivery (within 4km)" };
+  if (distance <= 6) return { charge: 20, message: `Delivery charge: ₹20 (${distance.toFixed(1)}km)` };
+  if (distance <= 8) return { charge: 30, message: `Delivery charge: ₹30 (${distance.toFixed(1)}km)` };
+  return { charge: null, message: "⚠️ Delivery not available beyond 8km" };
+}
+
+// Check if delivery is restricted based on distance
 function checkDeliveryRestriction() {
   if (!deliveryDistance) {
     deliveryRestriction.style.display = 'none';
     return;
   }
   
-  if (deliveryDistance > MAX_DELIVERY_DISTANCE) {
-    deliveryRestriction.style.display = 'block';
-  } else {
-    deliveryRestriction.style.display = 'none';
-  }
+  deliveryRestriction.style.display = deliveryDistance > MAX_DELIVERY_DISTANCE ? 'block' : 'none';
 }
 
+// Show location prompt
+function showLocationPrompt() {
+  locationPrompt.style.display = 'flex';
+  locationDetails.style.display = 'none';
+  refreshLocationBtn.style.display = 'none';
+  toggleManualLocation.style.display = 'none';
+  document.getElementById('manualLocationContainer').style.display = 'none';
+}
+
+// Hide location prompt
+function hideLocationPrompt() {
+  locationPrompt.style.display = 'none';
+  locationDetails.style.display = 'block';
+  refreshLocationBtn.style.display = 'block';
+  toggleManualLocation.style.display = 'block';
+}
+
+// Get quick location
 function getQuickLocation() {
   quickLocationStatus.style.display = 'block';
   quickLocationStatus.className = 'location-loading';
@@ -748,7 +1378,6 @@ function getQuickLocation() {
         quickLocationStatus.className = 'location-success';
         quickLocationStatus.innerHTML = `📍 Location shared successfully! Distance: ${distance.toFixed(1)}km`;
         
-        // Update the main location display if delivery address container is visible
         if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
           updateLocationDisplay(userLat, userLng, deliveryDistance);
           hideLocationPrompt();
@@ -778,6 +1407,7 @@ function getQuickLocation() {
   );
 }
 
+// Calculate road distance using OSRM API with fallback to haversine
 async function calculateRoadDistance(originLat, originLng, callback) {
   const origin = `${originLng},${originLat}`;
   const destination = `${RESTAURANT_LOCATION.lng},${RESTAURANT_LOCATION.lat}`;
@@ -787,69 +1417,29 @@ async function calculateRoadDistance(originLat, originLng, callback) {
     const data = await response.json();
     
     if (data.routes && data.routes.length > 0) {
-      const distanceKm = data.routes[0].distance / 1000;
-      callback(distanceKm);
+      callback(data.routes[0].distance / 1000);
     } else {
-      // Fallback to haversine if OSRM fails
-      const distance = calculateHaversineDistance(
-        originLat, originLng,
-        RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng
-      );
-      callback(distance);
+      callback(calculateHaversineDistance(originLat, originLng, RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng));
     }
   } catch (error) {
     console.error("Error calculating road distance:", error);
-    // Fallback to haversine if API fails
-    const distance = calculateHaversineDistance(
-      originLat, originLng,
-      RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng
-    );
-    callback(distance);
+    callback(calculateHaversineDistance(originLat, originLng, RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng));
   }
 }
 
+// Calculate haversine distance between two points
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
 }
 
-function showLocationPrompt() {
-  locationPrompt.style.display = 'flex';
-  locationDetails.style.display = 'none';
-  refreshLocationBtn.style.display = 'none';
-  toggleManualLocation.style.display = 'none';
-  document.getElementById('manualLocationContainer').style.display = 'none';
-}
-
-function hideLocationPrompt() {
-  locationPrompt.style.display = 'none';
-  locationDetails.style.display = 'block';
-  refreshLocationBtn.style.display = 'block';
-  toggleManualLocation.style.display = 'block';
-}
-
-function initializeTabs() {
-  for (const category in fullMenu) {
-    const tabBtn = document.createElement("button");
-    tabBtn.textContent = category;
-    tabBtn.onclick = () => {
-      searchInput.value = '';
-      renderCategory(category);
-      document.getElementById("menuContainer").scrollIntoView({ behavior: 'smooth' });
-    };
-    tabsDiv.appendChild(tabBtn);
-  }
-  const firstCategory = Object.keys(fullMenu)[0];
-  if (firstCategory) renderCategory(firstCategory);
-}
-
+// Start continuous location tracking
 function startLocationTracking() {
   if (isLocationFetching) return;
   
@@ -878,7 +1468,6 @@ function startLocationTracking() {
       
       calculateRoadDistance(userLat, userLng, (distance) => {
         deliveryDistance = distance;
-        
         updateLocationDisplay(userLat, userLng, deliveryDistance);
         locationStatus.className = 'location-success';
         locationStatus.innerHTML = `Location tracking active (road distance calculated)`;
@@ -886,11 +1475,7 @@ function startLocationTracking() {
         updateCart();
         checkDeliveryRestriction();
         
-        if (position.coords.accuracy > 100) {
-          locationAccuracyWarning.style.display = 'flex';
-        } else {
-          locationAccuracyWarning.style.display = 'none';
-        }
+        locationAccuracyWarning.style.display = position.coords.accuracy > 100 ? 'flex' : 'none';
       });
     },
     (error) => {
@@ -914,14 +1499,11 @@ function startLocationTracking() {
       }
       isLocationFetching = false;
     },
-    { 
-      enableHighAccuracy: true, 
-      timeout: 10000, 
-      maximumAge: 0 
-    }
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
 
+// Update location display with map link and delivery estimate
 function updateLocationDisplay(lat, lng, distance) {
   document.getElementById('locationText').textContent = `📍 Your location detected`;
   document.getElementById('locationMapLink').innerHTML = 
@@ -935,6 +1517,7 @@ function updateLocationDisplay(lat, lng, distance) {
      ⏳ Est. Delivery: <strong>${estimatedTime}</strong>`;
 }
 
+// Stop location tracking
 function stopLocationTracking() {
   if (watchId) {
     navigator.geolocation.clearWatch(watchId);
@@ -942,198 +1525,17 @@ function stopLocationTracking() {
   }
 }
 
-function renderCategory(category, searchTerm = '') {
-  container.innerHTML = "";
-  currentCategory = category;
-  
-  const section = document.createElement("div");
-  section.className = "category";
-  section.innerHTML = `<span style="font-size: 1.5rem; margin-right: 0.5rem;">${categoryIcons[category] || "🍽"}</span>${category}`;
-  container.appendChild(section);
-
-  const filteredItems = fullMenu[category].filter(item => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      item.name.toLowerCase().includes(term) ||
-      (item.nameBn && item.nameBn.includes(term)) ||
-      item.desc.toLowerCase().includes(term)
-    );
-  });
-
-  if (filteredItems.length === 0) {
-    const noResults = document.createElement("div");
-    noResults.className = "no-results";
-    noResults.textContent = "No items found matching your search.";
-    container.appendChild(noResults);
-    return;
-  }
-
-  filteredItems.forEach((item) => {
-    const itemDiv = document.createElement("div");
-    itemDiv.className = "item";
-    
-    // Add disabled class if combo and delivery
-    if (category === "Combos" && document.querySelector('input[name="orderType"]:checked').value === "Delivery") {
-      itemDiv.classList.add("disabled-item");
-      itemDiv.title = "Combos not available for delivery";
-    }
-
-    const title = document.createElement("h3");
-    title.textContent = item.name;
-
-    const bn = document.createElement("small");
-    bn.textContent = item.nameBn || "";
-
-    const desc = document.createElement("p");
-    desc.className = "desc";
-    desc.textContent = item.desc || "";
-
-    const variantDiv = document.createElement("div");
-    variantDiv.className = "variants";
-    for (const [variant, price] of Object.entries(item.variants)) {
-      const label = document.createElement("label");
-      label.textContent = `${variant} ₹${price}`;
-      
-      // Disable click if combo and delivery
-      if (category === "Combos" && document.querySelector('input[name="orderType"]:checked').value === "Delivery") {
-        label.style.opacity = "0.6";
-        label.style.cursor = "not-allowed";
-        label.title = "Combos not available for delivery";
-      } else {
-        label.onclick = () => addToOrder(item.name, variant, price);
-      }
-      
-      variantDiv.appendChild(label);
-    }
-
-    itemDiv.appendChild(title);
-    itemDiv.appendChild(bn);
-    itemDiv.appendChild(desc);
-    itemDiv.appendChild(variantDiv);
-    container.appendChild(itemDiv);
-  });
-}
-
-searchInput.addEventListener('input', (e) => {
-  if (currentCategory) {
-    renderCategory(currentCategory, e.target.value);
-  }
-});
-
-function addToOrder(name, variant, price) {
-  selectedItems.push({ name, variant, price });
-  updateCart();
-  
-  const itemAdded = document.createElement("div");
-  itemAdded.textContent = `Added ${name} (${variant}) to cart!`;
-  itemAdded.style.position = "fixed";
-  itemAdded.style.bottom = "20px";
-  itemAdded.style.right = "20px";
-  itemAdded.style.backgroundColor = "#4CAF50";
-  itemAdded.style.color = "white";
-  itemAdded.style.padding = "10px 20px";
-  itemAdded.style.borderRadius = "5px";
-  itemAdded.style.zIndex = "1000";
-  itemAdded.style.boxShadow = "0 2px 5px rgba(0,0,0,0.2)";
-  document.body.appendChild(itemAdded);
-  
-  setTimeout(() => {
-    itemAdded.style.transition = "opacity 0.5s";
-    itemAdded.style.opacity = "0";
-    setTimeout(() => itemAdded.remove(), 500);
-  }, 2000);
-}
-
-function updateCart() {
-  cartList.innerHTML = "";
-  const subtotal = selectedItems.reduce((sum, item) => sum + item.price, 0);
-  
-  let deliveryCharge = 0;
-  let deliveryMessage = "";
-  const orderType = document.querySelector('input[name="orderType"]:checked').value;
-  
-  if (orderType === 'Delivery') {
-    const result = calculateDeliveryCharge(subtotal, deliveryDistance);
-    deliveryCharge = result.charge || 0;
-    deliveryMessage = result.message;
-    
-    if (deliveryCharge !== null) {
-      const estimatedTime = calculateDeliveryTime(deliveryDistance);
-      deliveryMessage += ` | ⏳ Est. Delivery: ${estimatedTime}`;
-      deliveryChargeDisplay.textContent = deliveryMessage;
-      deliveryChargeDisplay.style.display = 'block';
-    } else {
-      deliveryChargeDisplay.textContent = deliveryMessage;
-      deliveryChargeDisplay.style.color = 'var(--error-color)';
-      deliveryChargeDisplay.style.display = 'block';
-    }
-  }
-
-  const total = subtotal + (deliveryCharge || 0);
-  
-  selectedItems.forEach((item, index) => {
-    const li = document.createElement("li");
-    li.textContent = `${index + 1}. ${item.name} (${item.variant}) - ₹${item.price}`;
-
-    const removeBtn = document.createElement("button");
-    removeBtn.textContent = "Remove";
-    removeBtn.className = "remove-btn";
-    removeBtn.onclick = () => {
-      selectedItems.splice(index, 1);
-      updateCart();
-    };
-    li.appendChild(removeBtn);
-    cartList.appendChild(li);
-  });
-
-  let billText = `Subtotal: ₹${subtotal}`;
-  if (deliveryCharge > 0) {
-    billText += ` + Delivery: ₹${deliveryCharge}`;
-  } else if (orderType === 'Delivery' && deliveryCharge === 0) {
-    billText += ` + Delivery: Free`;
-  }
-  billText += ` = Total: ₹${total}`;
-  
-  if (orderType === 'Delivery' && deliveryCharge === null) {
-    billText += " (Delivery not available)";
-  }
-  
-  totalBill.innerHTML = billText;
-}
-
-function calculateDeliveryTime(distanceKm) {
-  if (!distanceKm) return "Unknown";
-  const preparationTime = 20; // 20 minutes food preparation
-  const travelTimePerKm = 8;  // 8 minutes per km travel
-  const travelTime = Math.round(distanceKm * travelTimePerKm);
-  const totalTime = preparationTime + travelTime;
-  
-  return `${totalTime} minutes (${preparationTime} min prep + ${travelTime} min travel)`;
-}
-
-function calculateDeliveryCharge(total, distance) {
-  if (!distance) return { charge: null, message: "Please share your location to calculate delivery" };
-  if (distance > MAX_DELIVERY_DISTANCE) return { charge: null, message: "⚠️ Delivery not available beyond 8km" };
-  if (total >= 500) return { charge: 0, message: "🎉 Free delivery (order above ₹500)" };
-  if (distance <= 4) return { charge: 0, message: "Free delivery (within 4km)" };
-  if (distance <= 6) return { charge: 20, message: `Delivery charge: ₹20 (${distance.toFixed(1)}km)` };
-  if (distance <= 8) return { charge: 30, message: `Delivery charge: ₹30 (${distance.toFixed(1)}km)` };
-  return { charge: null, message: "⚠️ Delivery not available beyond 8km" };
-}
-
+// Confirm order and show confirmation modal
 function confirmOrder() {
   const name = document.getElementById("customerName").value.trim();
   const phone = document.getElementById("phoneNumber").value.trim();
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
-  const subtotal = selectedItems.reduce((sum, item) => sum + item.price, 0);
+  const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
-  // Check if any combo items are in cart for delivery
   if (orderType === "Delivery") {
     const hasCombos = selectedItems.some(item => {
       return Object.keys(fullMenu).some(category => {
-        return category === "Combos" && 
-               fullMenu[category].some(combo => combo.name === item.name);
+        return category === "Combos" && fullMenu[category].some(combo => combo.name === item.name);
       });
     });
     
@@ -1158,7 +1560,6 @@ function confirmOrder() {
     return;
   }
 
-  // Check if location is required and available
   if (orderType === 'Delivery') {
     if (!userLocation && !isManualLocation) {
       alert("Please share your location or enter your address to proceed with delivery.");
@@ -1179,20 +1580,17 @@ function confirmOrder() {
   }
 
   let deliveryCharge = 0;
-  let deliveryMessage = "";
   if (orderType === 'Delivery') {
     const result = calculateDeliveryCharge(subtotal, deliveryDistance);
     deliveryCharge = result.charge || 0;
-    deliveryMessage = result.message;
   }
   const total = subtotal + deliveryCharge;
 
-  // Prepare order data for Firebase
   const orderData = {
     customerName: name,
     phoneNumber: phone,
     orderType: orderType,
-    items: selectedItems,
+    items: [...selectedItems],
     subtotal: subtotal,
     deliveryCharge: deliveryCharge,
     total: total,
@@ -1200,15 +1598,11 @@ function confirmOrder() {
     timestamp: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-  // Add delivery location if applicable
   if (orderType === 'Delivery') {
     if (isManualLocation) {
       orderData.deliveryAddress = document.getElementById('manualAddress').value;
     } else if (userLocation) {
-      orderData.deliveryLocation = {
-        lat: userLocation.lat,
-        lng: userLocation.lng
-      };
+      orderData.deliveryLocation = new firebase.firestore.GeoPoint(userLocation.lat, userLocation.lng);
     }
     orderData.deliveryDistance = deliveryDistance;
   }
@@ -1221,15 +1615,15 @@ function confirmOrder() {
   if (orderType === 'Delivery') {
     const estimatedTime = calculateDeliveryTime(deliveryDistance);
     if (isManualLocation) {
-      const address = document.getElementById('manualAddress').value;
       confirmationHTML += `
-        <div class="order-summary-item"><strong>Address:</strong> ${address}</div>
-        <div class="order-summary-item"><strong>Estimated Distance:</strong> ${deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>`;
+        <div class="order-summary-item"><strong>Address:</strong> ${orderData.deliveryAddress}</div>
+        <div class="order-summary-item"><strong>Estimated Distance:</strong> ${deliveryDistance.toFixed(1)}km</div>`;
     } else if (userLocation) {
-      const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
       confirmationHTML += `
-        <div class="order-summary-item"><strong>Location:</strong> <a href="${mapsLink}" target="_blank">View on Map</a></div>
-        <div class="order-summary-item"><strong>Distance:</strong> ${deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>`;
+        <div class="order-summary-item"><strong>Location:</strong> 
+          <a href="https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}" target="_blank">View on Map</a>
+        </div>
+        <div class="order-summary-item"><strong>Distance:</strong> ${deliveryDistance.toFixed(1)}km</div>`;
     }
     confirmationHTML += `
       <div class="order-summary-item"><strong>Estimated Delivery:</strong> ${estimatedTime}</div>`;
@@ -1240,7 +1634,7 @@ function confirmOrder() {
   selectedItems.forEach((item, index) => {
     confirmationHTML += `
       <div class="order-summary-item">
-        ${index + 1}. ${item.name} (${item.variant}) - ₹${item.price}
+        ${index + 1}. ${item.name} (${item.variant}) x ${item.quantity} - ₹${item.price * item.quantity}
       </div>`;
   });
   
@@ -1264,35 +1658,153 @@ function confirmOrder() {
   const modal = document.getElementById("orderConfirmationModal");
   modal.style.display = "block";
   
-  document.querySelector(".close-modal").onclick = function() {
-    modal.style.display = "none";
-  }
-  
+  document.querySelector(".close-modal").onclick = 
   document.getElementById("cancelOrderBtn").onclick = function() {
     modal.style.display = "none";
-  }
+  };
   
   document.getElementById("confirmOrderBtn").onclick = function() {
-    // Save to Firebase before sending WhatsApp
+    modal.style.display = "none";
+    
     db.collection("orders").add(orderData)
       .then((docRef) => {
         console.log("Order saved with ID: ", docRef.id);
-        modal.style.display = "none";
+        orderData.id = docRef.id;
+        saveOrderToHistory(orderData);
         sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total);
+        document.getElementById('downloadBillBtn').style.display = 'inline-block';
+        document.getElementById('saveOrderBtn').style.display = 'inline-block';
       })
       .catch((error) => {
-        console.error("Error adding order: ", error);
+        console.error("Error saving order: ", error);
         alert("There was an error saving your order. Please try again.");
       });
+  };
+  
+  document.getElementById("downloadBillBtn").onclick = function() {
+    generatePDFBill(orderData);
+  };
+  
+  document.getElementById("saveOrderBtn").onclick = function() {
+    saveOrderToHistory(orderData);
+    showNotification('Order saved to your history');
+    modal.style.display = "none";
+  };
+}
+
+// Save order to local storage history
+function saveOrderToHistory(orderData) {
+  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+  orders.unshift({
+    ...orderData,
+    timestamp: orderData.timestamp?.toDate?.()?.toISOString?.() || new Date().toISOString()
+  });
+  if (orders.length > 50) orders.pop();
+  localStorage.setItem('bakeAndGrillOrders', JSON.stringify(orders));
+}
+
+// Show order history from local storage
+function showOrderHistory() {
+  const orderHistoryModal = document.getElementById('orderHistoryModal');
+  const orderHistoryList = document.getElementById('orderHistoryList');
+  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+  
+  if (orders.length === 0) {
+    orderHistoryList.innerHTML = '<div class="no-orders">No orders found in your history.</div>';
+  } else {
+    orderHistoryList.innerHTML = '';
+    
+    orders.forEach((order, index) => {
+      const orderElement = document.createElement('div');
+      orderElement.className = 'order-history-item';
+      
+      orderElement.innerHTML = `
+        <div class="order-history-header">
+          <span class="order-number">Order #${index + 1}</span>
+          <span class="order-date">${new Date(order.timestamp).toLocaleString()}</span>
+          <span class="order-total">₹${order.total}</span>
+        </div>
+        <div class="order-history-details">
+          <div><strong>Name:</strong> ${order.customerName}</div>
+          <div><strong>Phone:</strong> ${order.phoneNumber}</div>
+          <div><strong>Type:</strong> ${order.orderType}</div>
+          ${order.orderType === 'Delivery' ? `<div><strong>Distance:</strong> ${order.deliveryDistance ? order.deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>` : ''}
+          <div class="order-items">
+            <strong>Items:</strong>
+            <ul>
+              ${order.items.map(item => `<li>${item.name} (${item.variant}) x ${item.quantity} - ₹${item.price * item.quantity}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+        <div class="order-history-actions">
+          <button class="reorder-btn" data-index="${index}"><i class="fas fa-redo"></i> Reorder</button>
+          <button class="download-btn" data-index="${index}"><i class="fas fa-file-pdf"></i> Download</button>
+        </div>
+      `;
+      
+      orderHistoryList.appendChild(orderElement);
+    });
+    
+    document.querySelectorAll('.reorder-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        reorderFromHistory(parseInt(this.dataset.index));
+      });
+    });
+    
+    document.querySelectorAll('.download-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        downloadOrderFromHistory(parseInt(this.dataset.index));
+      });
+    });
   }
   
-  window.onclick = function(event) {
-    if (event.target == modal) {
-      modal.style.display = "none";
-    }
+  orderHistoryModal.style.display = 'block';
+}
+
+// Clear order history from local storage
+function clearOrderHistory() {
+  if (confirm('Are you sure you want to clear your entire order history?')) {
+    localStorage.removeItem('bakeAndGrillOrders');
+    showOrderHistory();
+    showNotification('Order history cleared');
   }
 }
 
+// Reorder items from history
+function reorderFromHistory(orderIndex) {
+  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+  if (orderIndex >= 0 && orderIndex < orders.length) {
+    const order = orders[orderIndex];
+    selectedItems.length = 0;
+    order.items.forEach(item => {
+      selectedItems.push({
+        name: item.name,
+        variant: item.variant,
+        price: item.price,
+        quantity: item.quantity
+      });
+    });
+    
+    document.getElementById('customerName').value = order.customerName;
+    document.getElementById('phoneNumber').value = order.phoneNumber;
+    document.querySelector(`input[name="orderType"][value="${order.orderType}"]`).checked = true;
+    
+    updateCart();
+    document.getElementById('orderHistoryModal').style.display = 'none';
+    document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+    showNotification('Order loaded from history');
+  }
+}
+
+// Download PDF for order from history
+function downloadOrderFromHistory(orderIndex) {
+  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+  if (orderIndex >= 0 && orderIndex < orders.length) {
+    generatePDFBill(orders[orderIndex]);
+  }
+}
+
+// Generate PDF bill for an order
 function generatePDFBill(orderDetails) {
   const doc = new jsPDF();
   
@@ -1308,28 +1820,30 @@ function generatePDFBill(orderDetails) {
   
   doc.setFontSize(12);
   doc.setTextColor(40, 40, 40);
-  doc.text(`Order #: ${Math.floor(100000 + Math.random() * 900000)}`, 15, 50);
-  doc.text(`Date: ${new Date().toLocaleString()}`, 15, 58);
-  doc.text(`Customer: ${orderDetails.name}`, 15, 66);
-  doc.text(`Phone: ${orderDetails.phone}`, 15, 74);
+  doc.text(`Order #: ${orderDetails.id || Math.floor(100000 + Math.random() * 900000)}`, 15, 50);
+  doc.text(`Date: ${new Date(orderDetails.timestamp).toLocaleString()}`, 15, 58);
+  doc.text(`Customer: ${orderDetails.customerName}`, 15, 66);
+  doc.text(`Phone: ${orderDetails.phoneNumber}`, 15, 74);
   doc.text(`Order Type: ${orderDetails.orderType}`, 15, 82);
   
   if (orderDetails.orderType === 'Delivery') {
-    if (orderDetails.userLocation) {
-      doc.text(`Location: ${orderDetails.userLocation.lat}, ${orderDetails.userLocation.lng}`, 15, 90);
+    if (orderDetails.deliveryLocation) {
+      doc.text(`Location: ${orderDetails.deliveryLocation.latitude}, ${orderDetails.deliveryLocation.longitude}`, 15, 90);
+    } else if (orderDetails.deliveryAddress) {
+      doc.text(`Address: ${orderDetails.deliveryAddress}`, 15, 90);
     }
-    doc.text(`Distance: ${orderDetails.distance}`, 15, 98);
-    doc.text(`Est. Delivery: ${calculateDeliveryTime(orderDetails.distance)}`, 15, 106);
+    doc.text(`Distance: ${orderDetails.deliveryDistance ? orderDetails.deliveryDistance.toFixed(1)+'km' : 'Unknown'}`, 15, 98);
   }
   
   doc.autoTable({
     startY: 120,
-    head: [['#', 'Item', 'Variant', 'Price (₹)']],
+    head: [['#', 'Item', 'Variant', 'Qty', 'Price (₹)']],
     body: orderDetails.items.map((item, index) => [
       index + 1,
       item.name,
       item.variant,
-      item.price
+      item.quantity,
+      item.price * item.quantity
     ]),
     theme: 'grid',
     headStyles: {
@@ -1356,63 +1870,51 @@ function generatePDFBill(orderDetails) {
   doc.text('Thank you for your order!', 105, 280, { align: 'center' });
   doc.text('For any queries, contact: +91 8240266267', 105, 285, { align: 'center' });
   
-  doc.save(`BakeAndGrill_Order_${orderDetails.name}.pdf`);
+  doc.save(`BakeAndGrill_Order_${orderDetails.customerName}.pdf`);
 }
 
+// Send order via WhatsApp
 function sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, total) {
   let orderDetails = "";
   selectedItems.forEach((item, index) => {
-    orderDetails += `${index + 1}. ${item.name} (${item.variant}) - ₹${item.price}\n`;
+    orderDetails += `${index + 1}. ${item.name} (${item.variant}) x ${item.quantity} - ₹${item.price * item.quantity}\n`;
   });
 
   orderDetails += `\nSubtotal: ₹${subtotal}`;
-  if (deliveryCharge > 0) {
-    orderDetails += `\nDelivery Charge: ₹${deliveryCharge}`;
-  } else if (orderType === 'Delivery') {
-    orderDetails += `\nDelivery Charge: Free`;
-  }
+  if (deliveryCharge > 0) orderDetails += `\nDelivery Charge: ₹${deliveryCharge}`;
+  else if (orderType === 'Delivery') orderDetails += `\nDelivery Charge: Free`;
   orderDetails += `\nTotal: ₹${total}`;
 
   if (orderType === "Delivery") {
     if (isManualLocation) {
-      const address = document.getElementById('manualAddress').value;
-      orderDetails += `\n\n📍 Delivery Address:\n${address}`;
-      orderDetails += `\n📏 Estimated Distance: ${deliveryDistance.toFixed(1)}km`;
+      orderDetails += `\n\n📍 Delivery Address:\n${document.getElementById('manualAddress').value}`;
     } else if (userLocation) {
-      const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
-      orderDetails += `\n\n📍 Delivery Location:\n${mapsLink}`;
-      orderDetails += `\n📏 Distance: ${deliveryDistance.toFixed(1)}km`;
+      orderDetails += `\n\n📍 Delivery Location:\nhttps://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
     }
-    
-    const estimatedTime = calculateDeliveryTime(deliveryDistance);
-    const travelTime = Math.round(deliveryDistance * 8);
-    orderDetails += `\n⏳ Estimated Delivery: ${estimatedTime}`;
-    orderDetails += `\n   (20 min preparation + ${travelTime} min travel)`;
+    orderDetails += `\n📏 Distance: ${deliveryDistance.toFixed(1)}km`;
+    orderDetails += `\n⏳ Estimated Delivery: ${calculateDeliveryTime(deliveryDistance)}`;
   }
 
   const message = `🍽 *New ${orderType} Order from Bake & Grill*\n\n👤 Name: ${name}\n📞 Phone: ${phone}\n\n📦 Order Details:\n${orderDetails}`;
-  const whatsappURL = `https://wa.me/918240266267?text=${encodeURIComponent(message)}`;
-  window.open(whatsappURL, '_blank');
+  window.open(`https://wa.me/918240266267?text=${encodeURIComponent(message)}`, '_blank');
   
-  const pdfOrderDetails = {
-    name,
-    phone,
-    orderType,
-    userLocation,
-    distance: deliveryDistance ? deliveryDistance.toFixed(1)+'km' : 'Unknown',
-    items: selectedItems,
-    subtotal,
-    deliveryCharge,
-    total
-  };
-  
-  document.getElementById('downloadBillBtn').style.display = 'block';
-  document.getElementById('downloadBillBtn').onclick = function() {
-    generatePDFBill(pdfOrderDetails);
-  };
-  
+  // Clear cart after order
   selectedItems.length = 0;
   updateCart();
   document.getElementById("customerName").value = "";
   document.getElementById("phoneNumber").value = "";
 }
+
+// Add CSS styles
+const style = document.createElement('style');
+style.textContent = `
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body {
+    overscroll-behavior-y: contain;
+  }
+`;
+document.head.appendChild(style);
