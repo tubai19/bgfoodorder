@@ -1,484 +1,230 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Google Tag Manager -->
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-  })(window,document,'script','dataLayer','GTM-KW9KB9P6');</script>
-  <!-- End Google Tag Manager -->
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bake & Grill - Order Online</title>
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <meta name="theme-color" content="#e63946">
+  <title>BG Food Order</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
-  <link rel="stylesheet" href="styles.css">
-  <!-- Responsive Design CSS -->
   <style>
-    html, body {
-      margin: 0; padding: 0;
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: #fafafa;
+    :root {
+      --clr-primary: #e23744;
+      --clr-bg: #f9f9f9;
+      --clr-card: #fff;
+      --clr-muted: #888;
+      --clr-pill: #f1f1f1;
+      --radius: 14px;
+      --shadow: 0 2px 16px rgba(0,0,0,0.04);
+    }
+    body {
+      margin: 0; background: var(--clr-bg); font-family: 'Segoe UI', Arial, sans-serif;
       color: #222;
-      font-size: 17px;
     }
-    .container, .form-section {
-      max-width: 900px;
-      margin: 0 auto;
-      background: #fff;
-      border-radius: 10px;
-      padding: 1rem 2rem;
-      box-sizing: border-box;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    header {
+      background: var(--clr-card); box-shadow: var(--shadow); padding: 1.2rem 0 0.7rem 0;
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
     }
-    .header, .footer, .hero-banner, .delivery-info, #cart, .footer-bottom {
-      width: 100%;
-      box-sizing: border-box;
+    .logo { font-size: 2rem; color: var(--clr-primary); font-weight: bold; letter-spacing: 2px;}
+    .tagline { color: var(--clr-muted); margin-top: 0.3rem; font-size: 1.1rem;}
+    .hero {
+      background: linear-gradient(110deg,#fff 60%,#ffe5e9 100%);
+      padding: 2.2rem 1rem 2rem 1rem; text-align: center;
     }
-    .header { padding: 1rem 0 0.5rem 0; text-align: center; }
-    .logo { font-size: 2rem; font-weight: bold; color: #e63946; }
-    .tagline { font-size: 1.1rem; color: #444; margin: 0.5rem 0;}
-    .fssai-badge { color: #888; font-size: 0.9rem; }
-    .hero-banner { background: #ffe5e9; text-align: center; padding: 2rem 1rem 1.5rem 1rem; }
-    .hero-content h1 { margin: 0; font-size: 2.5rem; color: #e63946;}
-    .hero-content p { color: #444; margin: 1rem 0;}
-    .cta-btn { background: #e63946; color: #fff; border: none; padding: 0.9rem 2rem; border-radius: 25px; font-weight: bold; font-size: 1.1rem; cursor: pointer; text-decoration: none; }
-    .category-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.5rem 0; }
-    .category-nav > * { flex: 1 1 40%; min-width: 120px; }
-    #searchContainer { display: flex; align-items: center; background: #f1f1f1; border-radius: 6px; padding: 0.5rem; margin-bottom: 1rem;}
-    #searchContainer input { flex: 1; border: none; background: transparent; font-size: 1.1rem; padding: 0.5rem 0.75rem;}
-    #searchContainer i { color: #888; font-size: 1.2rem; }
-    .delivery-info { background: #f8f9fa; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;}
-    .delivery-info ul { padding-left: 1.3rem;}
-    #deliveryRestriction { color: #b71c1c; font-weight: bold; background: #ffe5e5; border: 1px solid #e63946; border-radius: 6px; padding: 0.9rem; margin: 1rem 0;}
-    #menuContainer { margin-bottom: 2rem; }
-    #cart { background: #fff3e6; border-radius: 10px; padding: 1rem; margin: 2rem 0 2rem 0; box-shadow: 0 2px 8px rgba(230,57,70,0.08);}
-    .cart-actions { display: flex; gap: 0.8rem; }
-    .cart-actions button { flex:1 1 45%; }
-    .cart-total { font-weight: bold; margin: 1rem 0; }
-    .form-section { margin-bottom: 2rem;}
-    .form-input { margin-bottom: 1.2rem;}
-    .form-input label { font-weight: 600;}
-    .form-input input, .form-input textarea { width: 100%; padding: 0.7rem; border: 1px solid #ccc; border-radius: 5px; margin-top: 0.3rem; font-size: 1rem;}
-    .order-type-options { display: flex; gap: 1rem; }
-    .order-type-option input { margin-right: 5px; }
-    #placeOrderBtn { background: #e63946; color: #fff; border: none; padding: 1rem; border-radius: 6px; font-size: 1.15rem; width: 100%; font-weight: bold; }
-    .footer { background: #222; color: #fff; padding: 2rem 0 1rem 0; margin-top: 2rem;}
-    .footer-grid { display: flex; flex-wrap: wrap; gap: 2rem; justify-content: space-between; }
-    .footer-section { flex: 1 1 180px; min-width: 160px; }
-    .footer-section h3 { color: #e63946;}
-    .footer a { color: #fff; text-decoration: underline;}
-    .footer-bottom { text-align: center; color: #aaa; margin-top: 1.5rem;}
-    .order-history-btn { background: #e63946; color: #fff; border: none; padding: 0.7rem 1.5rem; border-radius: 25px; margin-top: 0.6rem; cursor: pointer;}
-    .mobile-menu-btn { display: none; position: fixed; right: 18px; bottom: 24px; z-index: 900; background: #e63946; color: #fff; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 2rem; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.18);}
-    .cart-badge { position: absolute; top: 8px; right: 8px; background: #34a853; color: #fff; border-radius: 50%; padding: 3px 8px; font-size: 1rem; }
-    .notification { display: none; position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); background: #34a853; color: #fff; padding: 0.8rem 1.5rem; border-radius: 25px; font-size: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.12); z-index: 10000;}
-    @media (max-width: 800px) {
-      .container, .form-section { padding: 1rem 0.7rem; }
-      .footer-grid { gap: 1.2rem;}
+    .hero h1 { font-size: 2.2rem; color: var(--clr-primary); margin-bottom: 0.4rem;}
+    .hero p { color: #444; margin-top: 0; margin-bottom: 2rem;}
+    .search-bar {
+      display: flex; justify-content: center; gap: 0.5rem; max-width: 550px; margin: 0 auto;
+      background: var(--clr-card); border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 0.5rem 1rem;
     }
-    @media (max-width: 600px) {
-      html, body { font-size: 16px; }
-      .container, .form-section { padding: 0.3rem 0.2rem; border-radius: 0; box-shadow: none;}
-      .header { padding: 0.7rem 0 0.3rem 0;}
-      .logo { font-size: 1.4rem;}
-      .tagline, .fssai-badge { font-size: 0.95rem;}
-      .hero-banner { padding: 1.1rem 0.2rem 0.8rem 0.2rem;}
-      .hero-content h1 { font-size: 1.45rem;}
-      .category-nav { gap: 0.25rem; }
-      #searchContainer { padding: 0.3rem;}
-      .delivery-info { padding: 0.7rem; font-size: 0.95rem;}
-      #cart { margin: 1rem 0;}
-      .footer { padding: 1.5rem 0 0.5rem 0;}
-      .footer-grid { flex-direction: column; gap: 0.6rem;}
-      .footer-section { margin-bottom: 0.9rem;}
-      .mobile-menu-btn { display: flex;}
-      #cart { position: fixed; left: 0; right: 0; bottom: 0; width: 100vw; margin: 0; border-radius: 18px 18px 0 0; max-height: 60vh; overflow-y: auto; z-index: 1000; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); transition: transform 0.32s; transform: translateY(100%);}
-      #cart.active { transform: translateY(0);}
-      .footer-bottom { font-size: 0.98rem;}
-      .order-history-btn { width: 100%; }
-      #cart.active ~ .footer { display: none;}
-      .modal-content { width: 99vw !important; padding: 0.7rem !important;}
+    .search-bar input {
+      border: none; outline: none; font-size: 1.1rem; flex: 1; background: transparent;
+      padding: 0.6rem 0.8rem;
+    }
+    .search-bar button {
+      border: none; background: var(--clr-primary); color: #fff; border-radius: 8px;
+      padding: 0.6rem 1.3rem; font-size: 1rem; cursor: pointer; font-weight: 500;
+    }
+    /* Categories (Pills) */
+    .categories {
+      display: flex; gap: 0.7rem; overflow-x: auto;
+      margin: 1.6rem 0 1.2rem 0; padding: 0 1rem;
+    }
+    .category-pill {
+      background: var(--clr-pill); border-radius: 999px; padding: 0.6rem 1.2rem;
+      font-weight: 500; color: #333; border: none; cursor: pointer;
+      white-space: nowrap; font-size: 1rem; box-shadow: var(--shadow);
+      transition: background 0.14s;
+    }
+    .category-pill.active, .category-pill:hover {
+      background: var(--clr-primary); color: #fff;
+    }
+    /* Restaurant cards grid */
+    .restaurants-section {
+      max-width: 1100px; margin: 0 auto; padding: 0 1rem;
+    }
+    .restaurants-title { font-size: 1.3rem; color: #222; margin-bottom: 1rem; }
+    .restaurants-grid {
+      display: grid; grid-template-columns: repeat(auto-fit,minmax(270px,1fr));
+      gap: 1.5rem;
+    }
+    .restaurant-card {
+      background: var(--clr-card); border-radius: var(--radius); box-shadow: var(--shadow);
+      overflow: hidden; display: flex; flex-direction: column; transition: transform 0.12s;
+    }
+    .restaurant-card:hover { transform: translateY(-4px) scale(1.01);}
+    .restaurant-img {
+      width: 100%; height: 180px; object-fit: cover; background: #eee;
+    }
+    .restaurant-info {
+      padding: 1rem; flex: 1 1 auto; display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .resto-title { font-size: 1.12rem; font-weight: bold;}
+    .resto-meta { color: var(--clr-muted); font-size: 0.97rem;}
+    .resto-rating {
+      background: #43a047; color: #fff; font-weight: 600;
+      border-radius: 8px; padding: 0.2rem 0.7rem; font-size: 0.99rem;
+      display: inline-block; margin-right: 8px;
+    }
+    .resto-order-btn {
+      margin-top: 1rem; background: var(--clr-primary); color: #fff; border: none;
+      padding: 0.62rem 1.1rem; border-radius: 8px; font-size: 1rem; font-weight: 500;
+      cursor: pointer; align-self: flex-start;
+      transition: background 0.14s;
+    }
+    .resto-order-btn:hover { background: #b71c1c;}
+    /* Sticky Cart Button (Mobile) */
+    .cart-fab {
+      display: none; position: fixed; bottom: 18px; right: 18px; background: var(--clr-primary);
+      color: #fff; border-radius: 50%; width: 58px; height: 58px; box-shadow: 0 2px 8px #e2374444;
+      justify-content: center; align-items: center; font-size: 2rem; z-index: 1002; border: none; cursor: pointer;
+    }
+    .cart-fab .cart-badge {
+      position: absolute; top: 7px; right: 7px; background: #43a047; color: #fff;
+      border-radius: 50%; font-size: 0.95rem; font-weight: 700; padding: 0 7px;
+    }
+    @media (max-width: 700px) {
+      .hero { padding: 1.1rem 0.1rem 1.1rem 0.1rem;}
+      .logo { font-size: 1.3rem; }
+      .search-bar { max-width: 99vw; }
+      .restaurant-card { min-width: 0;}
+      .restaurant-info { padding: 0.6rem;}
+      .categories { padding: 0 0.1rem;}
+    }
+    @media (max-width: 540px) {
+      .cart-fab { display: flex;}
+      .restaurants-grid { grid-template-columns: 1fr;}
+    }
+    footer {
+      background: #222; color: #fff; text-align: center; padding: 1.5rem 1rem 1rem 1rem;
+      margin-top: 2rem;
     }
   </style>
-  <!-- Schema.org markup for Google -->
-  <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Restaurant",
-      "name": "Bake & Grill",
-      "description": "Delicious pizzas, burgers & more delivered to your doorstep in Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth",
-      "url": "https://www.bakeandgrillorder.shop",
-      "servesCuisine": ["Indian", "Italian", "Fast Food"],
-      "image": "https://www.bakeandgrillorder.shop/images/restaurant.jpg",
-      "priceRange": "$$",
-      "telephone": "+918240266267",
-      "email": "bakeandgrill@gmail.com",
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "Thakurpukur Bakhrahat Road",
-        "addressLocality": "Sanjua bakhrahat",
-        "addressRegion": "West Bengal",
-        "postalCode": "743377",
-        "addressCountry": "IN"
-      },
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": "22.3908",
-        "longitude": "88.2189"
-      },
-      "openingHoursSpecification": {
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": [
-          "Monday",
-          "Tuesday",
-          "Wednesday",
-          "Thursday",
-          "Friday",
-          "Saturday",
-          "Sunday"
-        ],
-        "opens": "11:00",
-        "closes": "23:00"
-      },
-      "hasMap": "https://maps.google.com/?q=22.3908,88.2189",
-      "areaServed": {
-        "@type": "GeoShape",
-        "circle": "22.3908 88.2189 8000",
-        "description": "Serving Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth"
-      },
-      "hasMenu": {
-        "@type": "Menu",
-        "name": "Bake & Grill Menu",
-        "description": "Our full menu of pizzas, burgers, sandwiches and more",
-        "hasMenuSection": [
-          {
-            "@type": "MenuSection",
-            "name": "Veg Pizzas",
-            "description": "Delicious vegetarian pizzas",
-            "hasMenuItem": [
-              {
-                "@type": "MenuItem",
-                "name": "Farmhouse Special",
-                "description": "Onion, capsicum, tomato, green chili, spicy sauce",
-                "offers": {
-                  "@type": "Offer",
-                  "price": "179",
-                  "priceCurrency": "INR"
-                }
-              },
-              {
-                "@type": "MenuItem",
-                "name": "Spicy Veggie Blast",
-                "description": "Onion, capsicum, tomato, green chili, spicy sauce",
-                "offers": {
-                  "@type": "Offer",
-                  "price": "159",
-                  "priceCurrency": "INR"
-                }
-              }
-            ]
-          },
-          {
-            "@type": "MenuSection",
-            "name": "Non-Veg Pizzas",
-            "description": "Tasty non-vegetarian pizzas",
-            "hasMenuItem": [
-              {
-                "@type": "MenuItem",
-                "name": "Chicken Keema Pizza",
-                "description": "Spicy chicken keema, onion, green chili",
-                "offers": {
-                  "@type": "Offer",
-                  "price": "169",
-                  "priceCurrency": "INR"
-                }
-              },
-              {
-                "@type": "MenuItem",
-                "name": "BBQ Chicken Pizza",
-                "description": "Barbecue chicken, capsicum, onion",
-                "offers": {
-                  "@type": "Offer",
-                  "price": "169",
-                  "priceCurrency": "INR"
-                }
-              }
-            ]
-          },
-          {
-            "@type": "MenuSection",
-            "name": "Burgers",
-            "description": "Juicy burgers with various fillings",
-            "hasMenuItem": [
-              {
-                "@type": "MenuItem",
-                "name": "Veg Burger",
-                "description": "Classic veg patty with fresh veggies",
-                "offers": {
-                  "@type": "Offer",
-                  "price": "40",
-                  "priceCurrency": "INR"
-                }
-              },
-              {
-                "@type": "MenuItem",
-                "name": "Cheese Chicken Burger",
-                "description": "Chicken burger with cheese slice",
-                "offers": {
-                  "@type": "Offer",
-                  "price": "99",
-                  "priceCurrency": "INR"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    }
-  </script>
 </head>
 <body>
-<!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KW9KB9P6"
-height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<!-- End Google Tag Manager (noscript) -->
-  
-  <!-- Header Section -->
-  <header class="header">
-    <div class="logo">Bake & Grill</div>
-    <div class="tagline">Delicious food delivered to your doorstep</div>
-    <div class="fssai-badge">FSSAI Licensed: 10019064001810</div>
+  <header>
+    <div class="logo">BG Food Order</div>
+    <div class="tagline">Delicious food, delivered fast in your area</div>
   </header>
-
-  <!-- Hero Banner Section -->
-  <section class="hero-banner">
-    <div class="hero-content">
-      <h1>🍕 Bake & Grill</h1>
-      <p>Delicious pizzas, burgers & more delivered to your doorstep</p>
-      <a href="#menuContainer" class="cta-btn">Order Now</a>
-    </div>
-  </section>
-
-  <!-- Main Content -->
-  <div class="container">
-    <!-- Search and menu sections -->
-    <div id="searchContainer">
-      <i class="fas fa-search"></i>
-      <input type="text" id="searchInput" placeholder="Search for items...">
-    </div>
-    
-    <!-- Category Navigation -->
-    <div id="tabs" class="category-nav"></div>
-    
-    <!-- Delivery Info -->
-    <div class="delivery-info">
-      <h4><i class="fas fa-info-circle"></i> Delivery Information</h4>
-      <ul>
-        <li>Minimum order for delivery: <strong>₹200</strong></li>
-        <li>Delivery charges:
-          <ul>
-            <li>Free for orders under 4km</li>
-            <li>₹20 for 4-6km</li>
-            <li>₹30 for 6-8km</li>
-            <li>Free for orders above ₹500</li>
-          </ul>
-        </li>
-        <li>Delivery only available within 8km radius</li>
-        <li>Delivery time estimate: 20 minutes preparation + 8 minutes per km travel</li>
-      </ul>
-      <div id="locationStatus" class="location-loading" style="display:none;">
-        Calculating your distance from the restaurant...
-      </div>
-    </div>
-
-    <div id="deliveryRestriction" class="delivery-restriction" style="display:none;">
-      <i class="fas fa-exclamation-triangle"></i> Delivery not available to your location (beyond 8km). Please choose pickup or visit our restaurant.
-    </div>
-
-    <!-- Menu Container -->
-    <div id="menuContainer"></div>
-    
-    <!-- Cart (visible on desktop, slides up on mobile) -->
-    <div id="cart">
-      <h3>Your Cart <span class="cart-count">(0)</span></h3>
-      <ul id="cartItems">
-        <!-- Cart items will be added here -->
-      </ul>
-      <div id="cartTotal" class="cart-total">Total: ₹0</div>
-      <div class="cart-actions">
-        <button id="clearCartBtn" class="clear-cart-btn"><i class="fas fa-trash"></i> Clear Cart</button>
-        <button id="checkoutBtn" class="checkout-btn"><i class="fas fa-shopping-bag"></i> Checkout</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Order Form Section -->
-  <div class="container form-section">
-    <div id="liveTotal">💰 Total Bill: ₹0</div>
-    
-    <div class="form-input">
-      <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
-      <input type="text" id="customerName" placeholder="Enter your name" required>
-    </div>
-    
-    <div class="form-input">
-      <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
-      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required>
-    </div>
-
-    <button id="quickLocationBtn" class="quick-location-btn">
-      <i class="fas fa-map-marker-alt"></i> Share My Current Location
-    </button>
-    <div id="quickLocationStatus" class="quick-location-status"></div>
-    
-    <div class="form-input">
-      <label><i class="fas fa-truck"></i> Order Type</label>
-      <div class="order-type-options">
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="Delivery" checked>
-          <span><i class="fas fa-home"></i> Home Delivery</span>
-        </label>
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="Pickup">
-          <span><i class="fas fa-walking"></i> Pickup</span>
-        </label>
-        <label class="order-type-option">
-          <input type="radio" name="orderType" value="DineIn">
-          <span><i class="fas fa-utensils"></i> Dine In</span>
-        </label>
-      </div>
-    </div>
-    
-    <div class="form-input" id="deliveryAddressContainer" style="display: none;">
-      <label><i class="fas fa-map-marked-alt"></i> Your Location</label>
-      
-      <div id="locationPrompt" class="location-prompt" style="display: none;">
-        <div class="location-prompt-text">
-          <i class="fas fa-map-marker-alt"></i>
-          <span>To place a delivery order, please share your current location</span>
+  <main>
+    <section class="hero">
+      <h1>Order food from your favourite restaurants</h1>
+      <p>Fast delivery in Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth and more.</p>
+      <form class="search-bar" id="searchForm" autocomplete="off">
+        <input type="text" placeholder="Search for restaurants or dishes..." id="searchInput"/>
+        <button type="submit"><i class="fas fa-search"></i> Search</button>
+      </form>
+    </section>
+    <nav class="categories" id="categories">
+      <button class="category-pill active">All</button>
+      <button class="category-pill">Pizza</button>
+      <button class="category-pill">Burger</button>
+      <button class="category-pill">Chinese</button>
+      <button class="category-pill">Biryani</button>
+      <button class="category-pill">Rolls</button>
+      <button class="category-pill">Dessert</button>
+      <button class="category-pill">South Indian</button>
+      <button class="category-pill">Thali</button>
+      <button class="category-pill">Drinks</button>
+    </nav>
+    <section class="restaurants-section">
+      <div class="restaurants-title">Popular Restaurants Near You</div>
+      <div class="restaurants-grid" id="restaurantsGrid">
+        <!-- Example static cards (replace with Firebase data) -->
+        <div class="restaurant-card">
+          <img src="https://source.unsplash.com/400x300/?pizza,restaurant" alt="Pizza Place" class="restaurant-img">
+          <div class="restaurant-info">
+            <div class="resto-title">Pizza Palace</div>
+            <div>
+              <span class="resto-rating"><i class="fas fa-star"></i> 4.5</span>
+              <span class="resto-meta">Pizza, Italian</span>
+            </div>
+            <div class="resto-meta">30 mins • ₹100 for two</div>
+            <button class="resto-order-btn">Order Now</button>
+          </div>
         </div>
-        <button id="shareLocationBtn" class="location-prompt-btn">Share My Location</button>
-      </div>
-      
-      <div id="locationAccuracyWarning" class="location-accuracy-warning" style="display: none;">
-        <i class="fas fa-exclamation-triangle"></i> Your location accuracy is low. For accurate delivery time and charges, please ensure high accuracy GPS is enabled.
-      </div>
-      
-      <div id="locationDetails" style="background: white; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; display: none;">
-        <div id="locationText">Detecting your location...</div>
-        <div id="locationMapLink" style="margin-top: 0.5rem;"></div>
-        <div id="deliveryEstimate" style="margin-top: 0.5rem; font-weight: bold;"></div>
-      </div>
-      
-      <button id="refreshLocationBtn" style="background: #34a853; color: white; border: none; padding: 0.5rem; border-radius: 4px; cursor: pointer; width: 100%; display: none;">
-        <i class="fas fa-sync-alt"></i> Refresh Location
-      </button>
-      
-      <button id="toggleManualLocation" class="location-method-toggle" style="display: none;">Or enter address manually</button>
-      
-      <div class="manual-location-container" id="manualLocationContainer">
-        <textarea id="manualAddress" placeholder="Enter your full address including landmarks"></textarea>
-        <button id="saveManualLocation" class="manual-location-btn"><i class="fas fa-save"></i> Save Manual Location</button>
-      </div>
-      
-      <input type="hidden" id="deliveryLatitude">
-      <input type="hidden" id="deliveryLongitude">
-    </div>
-    
-    <div id="deliveryChargeDisplay" style="text-align:center; margin:1rem 0; font-weight:bold;"></div>
-    
-    <div class="form-input">
-      <button id="placeOrderBtn"><i class="fas fa-paper-plane"></i> Place Order</button>
-    </div>
-  </div>
-
-  <!-- Order Confirmation Modal -->
-  <div id="orderConfirmationModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Confirm Your Order</h2>
-        <span class="close-modal">&times;</span>
-      </div>
-      <div class="order-summary" id="orderConfirmationDetails"></div>
-      <div class="modal-buttons">
-        <button class="modal-btn cancel-btn" id="cancelOrderBtn"><i class="fas fa-times"></i> Cancel</button>
-        <button class="modal-btn confirm-btn" id="confirmOrderBtn"><i class="fab fa-whatsapp"></i> Confirm & Send via WhatsApp</button>
-      </div>
-      <button class="download-btn" id="downloadBillBtn" style="display:none;"><i class="fas fa-file-pdf"></i> Download Bill</button>
-      <button class="download-btn" id="saveOrderBtn" style="display:none; background-color: #4CAF50;"><i class="fas fa-save"></i> Save Order Locally</button>
-    </div>
-  </div>
-
-  <!-- Order History Modal -->
-  <div id="orderHistoryModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Your Order History</h2>
-        <span class="close-modal">&times;</span>
-      </div>
-      <div id="orderHistoryList" class="order-history-list">
-        <!-- Order history will be loaded here -->
-      </div>
-      <div class="modal-buttons">
-        <button class="modal-btn cancel-btn" id="closeHistoryBtn"><i class="fas fa-times"></i> Close</button>
-        <button class="modal-btn" id="clearHistoryBtn" style="background-color: #f44336;"><i class="fas fa-trash"></i> Clear History</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Footer Section -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-section">
-          <h3>About Bake & Grill</h3>
-          <p>Delicious pizzas, burgers & more delivered to your doorstep in Bakhrahat, Amatala, Muchisa, Dongaria, Nodakhali, Bawali, Rasopunja, Mahisgoth</p>
-          <p>FSSAI License: 10019064001810</p>
+        <div class="restaurant-card">
+          <img src="https://source.unsplash.com/400x300/?burger,restaurant" alt="Burger Hut" class="restaurant-img">
+          <div class="restaurant-info">
+            <div class="resto-title">Burger Hut</div>
+            <div>
+              <span class="resto-rating"><i class="fas fa-star"></i> 4.2</span>
+              <span class="resto-meta">Burger, Fast Food</span>
+            </div>
+            <div class="resto-meta">25 mins • ₹70 for two</div>
+            <button class="resto-order-btn">Order Now</button>
+          </div>
         </div>
-        <div class="footer-section">
-          <h3>Contact Us</h3>
-          <p><i class="fas fa-phone"></i> <a href="tel:+918240266267">+91 8240266267</a></p>
-          <p><i class="fas fa-envelope"></i> <a href="mailto:bakeandgrill@gmail.com">bakeandgrill@gmail.com</a></p>
-        </div>
-        <div class="footer-section">
-          <h3>Location</h3>
-          <p><i class="fas fa-map-marker-alt"></i> Thakurpukur Bakhrahat Road, Sanjua bakhrahat, West Bengal 743377</p>
-          <p><a href="https://maps.google.com/?q=22.39083850,88.21888940" target="_blank"><i class="fas fa-map"></i> View on Map</a></p>
-        </div>
-        <div class="footer-section">
-          <h3>Opening Hours</h3>
-          <p><i class="far fa-clock"></i> Monday - Sunday</p>
-          <p> 4:00 PM - 10:00 PM</p>
-        </div>
+        <!-- Add more restaurant cards dynamically using JS/Firebase -->
       </div>
-      <div class="footer-bottom">
-        <p>&copy; 2025 Bake & Grill. All rights reserved.</p>
-        <button id="viewOrderHistoryBtn" class="order-history-btn"><i class="fas fa-history"></i> View Order History</button>
-      </div>
-    </div>
-  </footer>
-
-  <!-- Mobile Menu Button -->
-  <button class="mobile-menu-btn" id="mobileCartBtn">
+    </section>
+  </main>
+  <!-- Sticky cart button (mobile) -->
+  <button class="cart-fab" id="cartFab" style="display:none;">
     <i class="fas fa-shopping-cart"></i>
-    <span class="cart-badge">0</span>
+    <span class="cart-badge" id="cartCount">0</span>
   </button>
+  <footer>
+    <div>© 2025 BG Food Order. Powered by tubai19.</div>
+  </footer>
+  <!-- Firebase scripts (replace config with your own) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script>
+    // Firebase config goes here
+    const firebaseConfig = {
+      apiKey: "YOUR-API-KEY",
+      authDomain: "YOUR-AUTH-DOMAIN",
+      projectId: "YOUR-PROJECT-ID"
+      // ...etc.
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-  <!-- Notification -->
-  <div class="notification" id="notification">
-    <i class="fas fa-check-circle"></i>
-    <span id="notificationText">Item added to cart!</span>
-  </div>
+    // Example: Dynamically load restaurants from Firestore
+    // db.collection('restaurants').get().then(snapshot => {
+    //   const grid = document.getElementById('restaurantsGrid');
+    //   grid.innerHTML = '';
+    //   snapshot.forEach(doc => {
+    //     const data = doc.data();
+    //     // Build card HTML with data and append to grid
+    //   });
+    // });
 
-  <!-- JavaScript -->
-  <script src="script.js"></script>
+    // Cart badge demo (replace with your cart logic)
+    const cartFab = document.getElementById('cartFab');
+    const cartCount = document.getElementById('cartCount');
+    let cartItems = 0;
+    function updateCartFab() {
+      cartCount.textContent = cartItems;
+      cartFab.style.display = cartItems > 0 ? 'flex' : 'none';
+    }
+    document.querySelectorAll('.resto-order-btn').forEach(btn => {
+      btn.onclick = () => {
+        cartItems++;
+        updateCartFab();
+      };
+    });
+  </script>
 </body>
 </html>
