@@ -9,6 +9,17 @@ const firebaseConfig = {
   measurementId: "G-SLG2R88J72"
 };
 
+// Initialize Firebase
+const firebaseApp = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+let messaging;
+
+try {
+  messaging = firebase.messaging();
+} catch (err) {
+  console.error("Unable to initialize Firebase Messaging", err);
+}
+
 // Full menu data
 const fullMenu = {
   "Veg Pizzas": [
@@ -623,15 +634,8 @@ const mobileCartBtn = document.getElementById("mobileCartBtn");
 const cart = document.getElementById("cart");
 const placeOrderBtn = document.getElementById("placeOrderBtn");
 const viewOrderHistoryBtn = document.getElementById("viewOrderHistoryBtn");
-
-// Floating footer elements
-const floatingFooter = document.getElementById("floatingFooter");
-const footerItemCount = document.getElementById("footerItemCount");
-const footerTotalAmount = document.getElementById("footerTotalAmount");
-const footerViewCartBtn = document.getElementById("footerViewCartBtn");
-
-// Initialize floating footer as hidden
-floatingFooter.style.display = 'none';
+const clearCartBtn = document.getElementById("clearCartBtn");
+const checkoutBtn = document.getElementById("checkoutBtn");
 
 // Application state
 let currentCategory = null;
@@ -641,6 +645,228 @@ let userLocation = null;
 let watchId = null;
 let isManualLocation = false;
 
+// ======================
+// NOTIFICATION SYSTEM
+// ======================
+
+// Firebase Messaging variables
+const vapidKey = 'BKTsteSYE7yggmmbvQnPzDt0wFuHADZxcJpR8hu_bGOE8RpyBx4AamyQ2TIyItS6uvwZ79EzBp1rWOpuT4KHHDY';
+let isTokenRegistered = false;
+
+// Initialize Firebase Messaging
+function initializeFirebaseMessaging() {
+  try {
+    if (firebase.messaging.isSupported()) {
+      messaging = firebase.messaging();
+      console.log("Firebase Messaging initialized");
+      return true;
+    }
+    console.warn("Firebase Messaging not supported");
+    return false;
+  } catch (error) {
+    console.error("Messaging init error:", error);
+    return false;
+  }
+}
+
+// Register Service Worker
+async function registerServiceWorker() {
+  try {
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('SW registered:', registration.scope);
+    
+    // Check for updates hourly
+    setInterval(() => registration.update(), 3600000);
+    
+    return registration;
+  } catch (error) {
+    console.error('SW registration failed:', error);
+    throw error;
+  }
+}
+
+// Register FCM Token
+async function registerToken() {
+  if (!messaging || isTokenRegistered) return;
+  
+  try {
+    const currentToken = await messaging.getToken({ 
+      vapidKey,
+      serviceWorkerRegistration: await navigator.serviceWorker.ready
+    });
+
+    if (currentToken) {
+      console.log('FCM token:', currentToken);
+      await saveTokenToFirestore(currentToken);
+      isTokenRegistered = true;
+    } else {
+      console.log('No FCM token available');
+      requestNotificationPermission();
+    }
+  } catch (error) {
+    console.error('Token error:', error);
+    handleTokenError(error);
+  }
+}
+
+// Save token to Firestore
+async function saveTokenToFirestore(token) {
+  try {
+    const phone = document.getElementById('phoneNumber')?.value || 'pending';
+    await db.collection('fcmTokens').doc(token).set({
+      token,
+      phone,
+      userAgent: navigator.userAgent,
+      lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    console.log('Token saved for:', phone);
+  } catch (error) {
+    console.error('Save token error:', error);
+  }
+}
+
+// Handle token errors
+function handleTokenError(error) {
+  if (error.code === 'messaging/permission-blocked') {
+    console.log('Notifications blocked');
+  } else if (error.code === 'messaging/permission-default') {
+    requestNotificationPermission();
+  }
+}
+
+// Setup message handlers
+function setupMessageHandlers() {
+  if (!messaging) return;
+
+  // Foreground messages
+  messaging.onMessage((payload) => {
+    console.log('Foreground message:', payload);
+    showCustomNotification(payload);
+  });
+
+  // Token refresh
+  messaging.onTokenRefresh(() => {
+    console.log('Token refreshing...');
+    isTokenRegistered = false;
+    registerToken();
+  });
+}
+
+// Request notification permission
+function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    console.log('Notifications not supported');
+    return;
+  }
+
+  Notification.requestPermission().then(permission => {
+    console.log('Permission:', permission);
+    if (permission === 'granted') initializeNotifications();
+  });
+}
+
+// Initialize notifications
+async function initializeNotifications() {
+  try {
+    if (!initializeFirebaseMessaging()) return;
+    
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      console.log('Notifications enabled');
+      await registerServiceWorker();
+      await registerToken();
+      setupMessageHandlers();
+    }
+  } catch (error) {
+    console.error('Notification init failed:', error);
+  }
+}
+
+// Show custom notification
+function showCustomNotification(payload) {
+  const container = document.getElementById('notification-container') || createNotificationContainer();
+  
+  const notification = document.createElement('div');
+  notification.className = `notification ${payload.data?.status || 'default'}`;
+  
+  notification.innerHTML = `
+    <div class="notification-icon">
+      <i class="fas ${getStatusIcon(payload.data?.status)}"></i>
+    </div>
+    <div class="notification-content">
+      <h4>${escapeHtml(payload.notification?.title || 'Order Update')}</h4>
+      <p>${escapeHtml(payload.notification?.body || 'Status updated')}</p>
+      <small>${formatTime(payload.data?.timestamp || new Date())}</small>
+    </div>
+    <button class="notification-close">&times;</button>
+  `;
+
+  container.prepend(notification);
+  setTimeout(() => notification.classList.add('show'), 10);
+
+  // Setup close button
+  notification.querySelector('.notification-close').addEventListener('click', () => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  });
+
+  // Auto-dismiss
+  const dismissTimer = setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, 8000);
+
+  notification.addEventListener('mouseenter', () => clearTimeout(dismissTimer));
+  notification.addEventListener('mouseleave', () => {
+    setTimeout(() => {
+      notification.classList.remove('show');
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+  });
+}
+
+// Helper functions for notifications
+function getStatusIcon(status) {
+  const icons = {
+    pending: 'fa-clock',
+    preparing: 'fa-utensils',
+    delivering: 'fa-truck',
+    completed: 'fa-check-circle',
+    cancelled: 'fa-times-circle',
+    default: 'fa-bell'
+  };
+  return icons[status] || icons.default;
+}
+
+function formatTime(timestamp) {
+  try {
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function createNotificationContainer() {
+  const container = document.createElement('div');
+  container.id = 'notification-container';
+  document.body.appendChild(container);
+  return container;
+}
+
+// ======================
+// MAIN APPLICATION
+// ======================
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
   initializeTabs();
@@ -649,6 +875,19 @@ document.addEventListener('DOMContentLoaded', function() {
   if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
     showLocationPrompt();
   }
+
+  // Initialize notifications after user interaction
+  document.body.addEventListener('click', () => {
+    initializeNotifications().catch(console.error);
+  }, { once: true });
+  
+  // Update token when phone number changes
+  document.getElementById('phoneNumber')?.addEventListener('change', async () => {
+    if (messaging && isTokenRegistered) {
+      const token = await messaging.getToken();
+      if (token) await saveTokenToFirestore(token);
+    }
+  });
 });
 
 // Initialize category tabs
@@ -932,15 +1171,22 @@ function setupEventListeners() {
     }
   });
 
-  // Floating footer view cart button
-  footerViewCartBtn.addEventListener('click', function() {
-    // Scroll to the order form section
-    document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
-    
-    // If on mobile, also open the cart
-    if (window.innerWidth <= 768) {
-      cart.classList.add('active');
+  // Clear cart button
+  clearCartBtn.addEventListener('click', function() {
+    if (selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
+      selectedItems.length = 0;
+      updateCart();
+      showNotification('Cart cleared');
     }
+  });
+
+  // Checkout button
+  checkoutBtn.addEventListener('click', function() {
+    if (selectedItems.length === 0) {
+      showNotification('Your cart is empty');
+      return;
+    }
+    document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
   });
 }
 
@@ -1001,6 +1247,7 @@ function updateCart() {
 
   const total = subtotal + (deliveryCharge || 0);
   
+  // Update cart items list
   selectedItems.forEach((item, index) => {
     const li = document.createElement("li");
     li.className = "cart-item";
@@ -1032,35 +1279,31 @@ function updateCart() {
     cartList.appendChild(li);
   });
 
-  let billText = `Subtotal: ₹${subtotal}`;
+  // Update cart total
+  let cartTotalText = `Subtotal: ₹${subtotal}`;
   if (deliveryCharge > 0) {
-    billText += ` + Delivery: ₹${deliveryCharge}`;
+    cartTotalText += ` + Delivery: ₹${deliveryCharge}`;
   } else if (orderType === 'Delivery' && deliveryCharge === 0) {
-    billText += ` + Delivery: Free`;
+    cartTotalText += ` + Delivery: Free`;
   }
-  billText += ` = Total: ₹${total}`;
+  cartTotalText += ` = Total: ₹${total}`;
   
   if (orderType === 'Delivery' && deliveryCharge === null) {
-    billText += " (Delivery not available)";
+    cartTotalText += " (Delivery not available)";
   }
   
-  totalBill.innerHTML = billText;
+  // Update both cart total and live total displays
+  document.getElementById('cartTotal').textContent = cartTotalText;
+  totalBill.innerHTML = cartTotalText;
   
   const itemCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
   document.querySelectorAll('.cart-count, .cart-badge').forEach(el => {
     el.textContent = itemCount;
   });
 
-  // Update floating footer
-  footerItemCount.textContent = itemCount;
-  footerTotalAmount.textContent = `₹${total}`;
-  
-  // Show/hide floating footer based on item count
-  if (itemCount > 0) {
-    floatingFooter.style.display = 'flex';
-  } else {
-    floatingFooter.style.display = 'none';
-  }
+  // Show/hide clear cart and checkout buttons based on cart content
+  clearCartBtn.style.display = itemCount > 0 ? 'block' : 'none';
+  checkoutBtn.style.display = itemCount > 0 ? 'block' : 'none';
 }
 
 // Calculate delivery time estimate
@@ -1289,7 +1532,6 @@ function confirmOrder() {
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
   const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
-  // Check if any combo items are in cart for delivery
   if (orderType === "Delivery") {
     const hasCombos = selectedItems.some(item => {
       return Object.keys(fullMenu).some(category => {
@@ -1344,7 +1586,6 @@ function confirmOrder() {
   }
   const total = subtotal + deliveryCharge;
 
-  // Prepare order data for Firebase
   const orderData = {
     customerName: name,
     phoneNumber: phone,
@@ -1357,7 +1598,6 @@ function confirmOrder() {
     timestamp: firebase.firestore.FieldValue.serverTimestamp()
   };
 
-  // Add delivery location if applicable
   if (orderType === 'Delivery') {
     if (isManualLocation) {
       orderData.deliveryAddress = document.getElementById('manualAddress').value;
@@ -1367,7 +1607,6 @@ function confirmOrder() {
     orderData.deliveryDistance = deliveryDistance;
   }
 
-  // Show confirmation modal
   let confirmationHTML = `
     <div class="order-summary-item"><strong>Customer:</strong> ${name}</div>
     <div class="order-summary-item"><strong>Phone:</strong> ${phone}</div>
@@ -1427,7 +1666,6 @@ function confirmOrder() {
   document.getElementById("confirmOrderBtn").onclick = function() {
     modal.style.display = "none";
     
-    // Save order to Firebase
     db.collection("orders").add(orderData)
       .then((docRef) => {
         console.log("Order saved with ID: ", docRef.id);
@@ -1666,3 +1904,17 @@ function sendWhatsAppOrder(name, phone, orderType, subtotal, deliveryCharge, tot
   document.getElementById("customerName").value = "";
   document.getElementById("phoneNumber").value = "";
 }
+
+// Add CSS styles
+const style = document.createElement('style');
+style.textContent = `
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body {
+    overscroll-behavior-y: contain;
+  }
+`;
+document.head.appendChild(style);

@@ -12,12 +12,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bake & Grill - Order Online</title>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#e63946">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
   <link rel="stylesheet" href="styles.css">
+  <!-- Schema.org markup for Google -->
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -222,20 +226,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <!-- Cart items will be added here -->
       </ul>
       <div id="cartTotal" class="cart-total">Total: ₹0</div>
+      <div class="cart-actions">
+        <button id="clearCartBtn" class="clear-cart-btn"><i class="fas fa-trash"></i> Clear Cart</button>
+        <button id="checkoutBtn" class="checkout-btn"><i class="fas fa-shopping-bag"></i> Checkout</button>
+      </div>
     </div>
-  </div>
-
-  <!-- Floating Order Summary Footer -->
-  <div class="floating-footer" id="floatingFooter">
-    <div class="footer-item-count">
-      <span id="footerItemCount">0</span> items
-    </div>
-    <div class="footer-total">
-      ₹<span id="footerTotalAmount">0</span>
-    </div>
-    <button class="footer-view-cart-btn" id="footerViewCartBtn">
-      View Cart & Order
-    </button>
   </div>
 
   <!-- Order Form Section -->
@@ -369,7 +364,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <div class="footer-section">
           <h3>Location</h3>
           <p><i class="fas fa-map-marker-alt"></i> Thakurpukur Bakhrahat Road, Sanjua bakhrahat, West Bengal 743377</p>
-          <p><a href="https://maps.google.com/?q=22.39083850, 88.21888940" target="_blank"><i class="fas fa-map"></i> View on Map</a></p>
+          <p><a href="https://maps.google.com/?q=22.39083850,88.21888940" target="_blank"><i class="fas fa-map"></i> View on Map</a></p>
         </div>
         <div class="footer-section">
           <h3>Opening Hours</h3>
