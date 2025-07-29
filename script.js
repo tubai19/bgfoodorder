@@ -956,12 +956,11 @@ async function updateCart() {
   });
 
   if (itemCount > 0) {
-    mobileClearCartBtn.style.display = 'block';
-    mobileCheckoutBtn.style.display = 'block';
-  } else {
-    mobileClearCartBtn.style.display = 'none';
-    mobileCheckoutBtn.style.display = 'none';
-  }
+  mobileClearCartBtn.disabled = false;
+  mobileCheckoutBtn.disabled = false;
+} else {
+  mobileClearCartBtn.disabled = true;
+  mobileCheckoutBtn.disabled = true;
 }
 
 // Confirm order

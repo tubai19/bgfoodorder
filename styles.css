@@ -605,6 +605,7 @@ body.mobile-view {
   padding: 15px;
   font-size: 1rem;
   transition: var(--transition);
+  display: block; /* Add this line */
 }
 
 .mobile-clear-btn:hover {
@@ -621,6 +622,7 @@ body.mobile-view {
   font-size: 1rem;
   font-weight: bold;
   transition: var(--transition);
+  display: block; /* Add this line */
 }
 
 .mobile-checkout-btn:hover {
