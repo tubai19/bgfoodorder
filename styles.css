@@ -577,6 +577,7 @@ body.mobile-view {
 
 /* Order Form Section */
 .mobile-form-section {
+  display: none;
   background-color: white;
   padding: 20px;
   border-radius: var(--border-radius) var(--border-radius) 0 0;
@@ -586,6 +587,10 @@ body.mobile-view {
   left: 0;
   right: 0;
   z-index: 90;
+}
+
+.mobile-form-section.visible {
+  display: block;
 }
 
 .mobile-total-display {
@@ -908,6 +913,12 @@ input[name="orderType"]:disabled + span {
   background-color: var(--dark-color);
   color: white;
   padding: 20px 15px;
+  margin-bottom: 0;
+  transition: margin-bottom 0.3s ease;
+}
+
+.mobile-footer.with-form {
+  margin-bottom: 200px;
 }
 
 .footer-content {

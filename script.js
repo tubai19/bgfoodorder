@@ -413,6 +413,7 @@ function setupMobileEventListeners() {
       return;
     }
     toggleMobileCart();
+    document.querySelector('.mobile-form-section').classList.add('visible');
     document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
   });
   
@@ -531,6 +532,30 @@ function setupMobileEventListeners() {
       event.target.style.display = 'none';
     }
   });
+}
+
+// Toggle mobile cart drawer
+function toggleMobileCart() {
+  mobileCartDrawer.classList.toggle('active');
+  document.body.style.overflow = mobileCartDrawer.classList.contains('active') ? 'hidden' : '';
+  
+  // Show order section when cart is opened
+  if (mobileCartDrawer.classList.contains('active')) {
+    document.querySelector('.mobile-form-section').classList.add('visible');
+    document.querySelector('.mobile-footer').classList.add('with-form');
+    document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
+  } else {
+    document.querySelector('.mobile-footer').classList.remove('with-form');
+  }
+  
+  // Create or toggle overlay
+  let overlay = document.querySelector('.overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.toggle('active');
 }
 
 // Initialize OpenStreetMap
@@ -685,21 +710,6 @@ function saveRating(rating, comment = '') {
   db.collection('ratings').add(ratingData)
     .then(() => console.log('Rating saved'))
     .catch(err => console.error('Error saving rating:', err));
-}
-
-// Toggle mobile cart drawer
-function toggleMobileCart() {
-  mobileCartDrawer.classList.toggle('active');
-  document.body.style.overflow = mobileCartDrawer.classList.contains('active') ? 'hidden' : '';
-  
-  // Create or toggle overlay
-  let overlay = document.querySelector('.overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.className = 'overlay';
-    document.body.appendChild(overlay);
-  }
-  overlay.classList.toggle('active');
 }
 
 // Setup delivery info accordion
@@ -1171,6 +1181,7 @@ function reorderFromHistory(orderIndex) {
     
     updateCart();
     document.getElementById('orderHistoryModal').style.display = 'none';
+    document.querySelector('.mobile-form-section').classList.add('visible');
     document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
     showNotification('Order loaded from history');
   }
