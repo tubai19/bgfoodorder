@@ -670,7 +670,7 @@ function updateLocationFromMarker() {
 async function calculateRoadDistance(originLat, originLng, destLat, destLng) {
   try {
     const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLng}?overview=false`
+      `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`
     );
     const data = await response.json();
     
