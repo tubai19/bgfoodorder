@@ -1405,4 +1405,5 @@ function generateWhatsAppMessage(orderData) {
   message += `Please confirm this order. Thank you!`;
   
   return message;
+ }
 }
