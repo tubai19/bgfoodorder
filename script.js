@@ -81,6 +81,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   setupRatingSystem();
   setupDeliveryAccordion();
   
+  // Add this line to check status on initial load
   await updateStatusDisplay();
   setupStatusListener();
 });
@@ -120,10 +121,16 @@ function checkDeliveryStatus() {
 // Update status display
 async function updateStatusDisplay() {
   try {
-    const [isShopOpen, isDeliveryAvailable] = await Promise.all([
-      checkShopStatus(),
-      checkDeliveryStatus()
-    ]);
+    const doc = await db.collection('publicStatus').doc('current').get();
+    
+    if (!doc.exists) {
+      console.log("No status document found");
+      return;
+    }
+
+    const status = doc.data();
+    const isShopOpen = status.isShopOpen !== false;
+    const isDeliveryAvailable = status.isDeliveryAvailable !== false;
 
     shopStatusText.textContent = isShopOpen ? 'Shop: Open' : 'Shop: Closed';
     deliveryStatusText.textContent = isDeliveryAvailable ? 'Delivery: Available' : 'Delivery: Unavailable';
@@ -165,7 +172,6 @@ function setupStatusListener() {
     }
   });
 }
-
 // Load menu from Firestore
 async function loadMenuFromFirestore() {
   try {
