@@ -1100,15 +1100,23 @@ function showOrderConfirmationModal(orderData) {
     console.error("Modal elements not found");
     return;
   }  
+  const escapeHTML = (str) => str.replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+  
   let summaryHTML = `
     <div class="order-summary-section">
       <h3>Order Summary</h3>
-      <p><strong>Name:</strong> ${orderData.customerName}</p>
-      <p><strong>Phone:</strong> ${orderData.phoneNumber}</p>
-      <p><strong>Order Type:</strong> ${orderData.orderType}</p>
+      <p><strong>Name:</strong> ${escapeHTML(orderData.customerName)}</p>
+      <p><strong>Phone:</strong> ${escapeHTML(orderData.phoneNumber)}</p>
+      <p><strong>Order Type:</strong> ${escapeHTML(orderData.orderType)}</p>
       ${orderData.orderType === 'Delivery' ? `
-        <p><strong>Delivery Distance:</strong> ${orderData.deliveryDistance ? orderData.deliveryDistance.toFixed(1)+'km' : 'Unknown'}</p>
-        ${orderData.deliveryAddress ? `<p><strong>Delivery Address:</strong> ${orderData.deliveryAddress}</p>` : ''}
+        <p><strong>Delivery Distance:</strong> ${orderData.deliveryDistance ? escapeHTML(orderData.deliveryDistance.toFixed(1)) + 'km' : 'Unknown'}</p>
+        ${orderData.deliveryAddress ? `<p><strong>Delivery Address:</strong> ${escapeHTML(orderData.deliveryAddress)}</p>` : ''}
       ` : ''}
     </div>
     
