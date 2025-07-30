@@ -1,0 +1,26 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /wp-admin/
+Disallow: /login/
+Disallow: /dashboard/
+Disallow: /controlpanel/
+Disallow: /backend/
+
+# Block common malicious/scraper bots (optional)
+User-agent: AhrefsBot
+Disallow: /
+User-agent: SemrushBot
+Disallow: /
+User-agent: MJ12bot
+Disallow: /
+User-agent: DotBot
+Disallow: /
+
+# Allow Google and Bing (recommended)
+User-agent: Googlebot
+Allow: /
+User-agent: Bingbot
+Allow: /
+
+# Sitemap
+Sitemap: https://www.bakeandgrillorder.shop/sitemap.xml
