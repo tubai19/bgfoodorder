@@ -810,12 +810,13 @@ input[name="orderType"]:disabled + span {
   padding-bottom: 10px;
   position: sticky;
   bottom: 0;
+  margin-top: 20px;
 }
 
 /* Enhanced Place Order Button */
 .mobile-order-btn {
   width: 100%;
-  padding: 18px 15px;
+  height: 56px;
   background: linear-gradient(135deg, var(--primary-purple), var(--primary-orange));
   color: white;
   border: none;
@@ -829,6 +830,10 @@ input[name="orderType"]:disabled + span {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 15px rgba(157, 78, 223, 0.3);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+  padding: 0;
 }
 
 .mobile-order-btn .btn-content {
@@ -837,14 +842,22 @@ input[name="orderType"]:disabled + span {
   gap: 10px;
   position: relative;
   z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 0 20px;
+  transition: transform 0.2s ease;
 }
 
 .mobile-order-btn .btn-text {
   font-weight: 600;
+  margin: 0 12px;
+  flex-grow: 1;
+  text-align: center;
 }
 
 .mobile-order-btn i {
   transition: all 0.3s ease;
+  font-size: 18px;
 }
 
 .mobile-order-btn:hover {
@@ -880,6 +893,45 @@ input[name="orderType"]:disabled + span {
 /* Active state for button press */
 .mobile-order-btn.active {
   transform: scale(0.98);
+  background-color: var(--dark-color);
+}
+
+.mobile-order-btn.active .btn-content {
+  transform: scale(0.96);
+}
+
+/* Disabled State */
+.mobile-order-btn:disabled {
+  opacity: 0.7;
+  background-color: var(--text-light);
+  cursor: not-allowed;
+}
+
+/* Hover State (for desktop) */
+@media (hover: hover) {
+  .mobile-order-btn:not(:disabled):hover {
+    background-color: var(--dark-color);
+  }
+  
+  .mobile-order-btn:not(:disabled):hover i:first-child {
+    transform: translateX(-2px);
+  }
+  
+  .mobile-order-btn:not(:disabled):hover i:last-child {
+    transform: translateX(2px);
+  }
+}
+
+/* Touch Feedback Animation */
+@keyframes buttonTap {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+.mobile-order-btn:active .btn-content,
+.mobile-order-btn.active .btn-content {
+  animation: buttonTap 0.3s ease;
 }
 
 /* Pulse animation for attention */
