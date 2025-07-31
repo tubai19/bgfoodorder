@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bake & Grill -Fresh Food Deliver to You</title>
+  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="MyWebSite" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="mobile-view">
+  
+  <header class="mobile-header">
+    <div class="logo-container">
+      <div class="logo">Bake & Grill</div>
+      <div class="mobile-cart-icon" id="mobileCartBtn">
+        <i class="fas fa-shopping-cart"></i>
+        <span class="cart-badge">0</span>
+      </div>
+    </div>
+    <div class="tagline">Delicious fresh food delivered to your doorstep</div>
+  </header>
+
+  <section class="mobile-hero">
+    <div class="hero-content">
+      <h1>🍕 Bake & Grill</h1>
+      <p>Delicious fresh food delivered to your doorstep</p>
+      <a href="#menuContainer" class="mobile-cta-btn">Order Now</a>
+    </div>
+  </section>
+
+  <div id="statusBanner" class="status-banner">
+    <div id="shopStatusBanner" class="status-item">
+      <i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open</span>
+    </div>
+    <div id="deliveryStatusBanner" class="status-item">
+      <i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available</span>
+    </div>
+  </div>
+
+  <div class="mobile-container">
+    <div id="mobileSearchContainer">
+      <i class="fas fa-search"></i>
+      <input type="text" id="searchInput" placeholder="Search for items..." class="mobile-search">
+    </div>
+    
+    <div id="tabs" class="mobile-category-nav"></div>
+    
+    <div class="mobile-delivery-info">
+      <div class="delivery-header">
+        <h4><i class="fas fa-info-circle"></i> Delivery Information</h4>
+        <i class="fas fa-chevron-down"></i>
+      </div>
+      <div class="delivery-content">
+        <ul>
+          <li>Minimum order for delivery: <strong>₹200</strong></li>
+          <li>Delivery charges:
+            <ul>
+              <li>Free for orders under 4km</li>
+              <li>₹20 for 4-6km</li>
+              <li>₹30 for 6-8km</li>
+              <li>Free for orders above ₹500</li>
+            </ul>
+          </li>
+          <li>Delivery only available within 8km radius</li>
+          <li>Delivery time estimate: 20 minutes preparation + 8 minutes per km travel</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="deliveryRestriction" class="mobile-delivery-restriction" style="display:none;">
+      <i class="fas fa-exclamation-triangle"></i> Delivery not available to your location (beyond 8km). Please choose pickup.
+    </div>
+
+    <div id="menuContainer" class="mobile-menu-container"></div>
+  </div>
+
+  <div id="mobileCartDrawer" class="mobile-cart-drawer">
+    <div class="drawer-header">
+      <h3>Your Order <span class="cart-count">(0)</span></h3>
+      <button class="close-drawer" id="closeCartBtn">&times;</button>
+    </div>
+    <div class="drawer-content">
+      <ul id="cartItems" class="mobile-cart-items"></ul>
+      <div id="cartTotal" class="mobile-cart-total">Total: ₹0</div>
+    </div>
+    <div class="drawer-footer">
+      <button id="mobileClearCartBtn" class="mobile-clear-btn"><i class="fas fa-trash"></i> Clear</button>
+      <button id="mobileCheckoutBtn" class="mobile-checkout-btn"><i class="fas fa-shopping-bag"></i> Checkout</button>
+    </div>
+  </div>
+
+  <div class="mobile-form-section">
+    <div class="form-section-header">
+      <h3>Order Details</h3>
+      <button class="close-form-section" id="closeFormBtn">&times;</button>
+    </div>
+    <div id="mobileLiveTotal" class="mobile-total-display">💰 Total Bill: ₹0</div>
+    
+    <div class="mobile-form-input">
+      <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
+      <input type="text" id="customerName" placeholder="Enter your name" required class="mobile-form-field">
+    </div>
+    
+    <div class="mobile-form-input">
+      <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
+      <input type="tel" id="phoneNumber" placeholder="Enter phone number" required class="mobile-form-field">
+    </div>
+
+    <div class="mobile-form-input" id="locationChoiceBlock" style="display: none;">
+      <label><i class="fas fa-map-marked-alt"></i> Delivery Location</label>
+      <button id="deliveryShareLocationBtn" class="mobile-location-btn">
+        <i class="fas fa-location-arrow"></i> Share Current Location
+      </button>
+      <div id="currentLocStatusMsg" class="mobile-location-status"></div>
+      <button id="deliveryShowManualLocBtn" style="display:none;" class="mobile-alt-location-btn">
+        <i class="fas fa-map-marker-alt"></i> Enter Location Manually
+      </button>
+      <div id="manualLocationFields" style="display:none;">
+        <input type="text" id="manualDeliveryAddress" placeholder="Search for your location..." class="mobile-search">
+        <div id="addressMap" style="height: 200px; width: 100%; margin-top: 10px; border-radius: var(--border-radius);"></div>
+        <small class="map-instructions">Click on the map to set your exact location</small>
+      </div>
+      <div id="deliveryDistanceDisplay" class="mobile-delivery-distance" style="display:none;">
+        <i class="fas fa-map-marker-alt"></i> 
+        <span id="distanceText">Distance: Calculating...</span>
+      </div>
+    </div>
+    
+    <div class="mobile-form-input">
+      <label><i class="fas fa-truck"></i> Order Type</label>
+      <div class="mobile-order-type">
+        <label class="mobile-order-option">
+          <input type="radio" name="orderType" value="Delivery" checked>
+          <span><i class="fas fa-home"></i> Delivery</span>
+        </label>
+        <label class="mobile-order-option">
+          <input type="radio" name="orderType" value="Pickup">
+          <span><i class="fas fa-walking"></i> Pickup</span>
+        </label>
+      </div>
+    </div>
+    
+    <div id="deliveryChargeDisplay" class="mobile-delivery-charge"></div>
+    
+    <div class="mobile-form-input full-width-btn-container">
+      <button id="placeOrderBtn" class="mobile-order-btn">
+        <span class="btn-content">
+          <i class="fas fa-paper-plane"></i>
+          <span class="btn-text">Place Order</span>
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <div id="orderConfirmationModal" class="mobile-modal">
+    <div class="mobile-modal-content">
+      <div class="mobile-modal-header">
+        <h2>Confirm Your Order</h2>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="mobile-order-summary" id="orderConfirmationSummary"></div>
+      <div class="order-rating" style="padding: 0 15px 15px;">
+        <h4>How was your experience?</h4>
+        <div class="rating-stars">
+          <i class="fas fa-star" data-rating="1"></i>
+          <i class="fas fa-star" data-rating="2"></i>
+          <i class="fas fa-star" data-rating="3"></i>
+          <i class="fas fa-star" data-rating="4"></i>
+          <i class="fas fa-star" data-rating="5"></i>
+        </div>
+        <div class="rating-feedback" style="display:none; margin-top:10px;">
+          <textarea placeholder="What could we improve?" class="rating-comment" style="width:100%; min-height:60px; padding:8px;"></textarea>
+        </div>
+      </div>
+      <div class="mobile-modal-buttons">
+        <button class="mobile-modal-btn cancel-btn" id="cancelOrderBtn"><i class="fas fa-times"></i> Cancel</button>
+        <button class="mobile-modal-btn confirm-btn" id="confirmOrderBtn"><i class="fab fa-whatsapp"></i> Confirm via WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="orderHistoryModal" class="mobile-modal">
+    <div class="mobile-modal-content">
+      <div class="mobile-modal-header">
+        <h2>Your Order History</h2>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div id="orderHistoryList" class="mobile-order-history">
+        <!-- Order history will be loaded here -->
+      </div>
+      <div class="mobile-modal-buttons">
+        <button class="mobile-modal-btn" id="closeHistoryBtn"><i class="fas fa-times"></i> Close</button>
+        <button class="mobile-modal-btn clear-btn" id="clearHistoryBtn"><i class="fas fa-trash"></i> Clear History</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mobile-rating-widget">
+    <div class="rating-stars">
+      <span class="rating-title">Rate Us:</span>
+      <i class="fas fa-star" data-rating="1"></i>
+      <i class="fas fa-star" data-rating="2"></i>
+      <i class="fas fa-star" data-rating="3"></i>
+      <i class="fas fa-star" data-rating="4"></i>
+      <i class="fas fa-star" data-rating="5"></i>
+    </div>
+    <div class="rating-feedback" style="display:none;">
+      <textarea placeholder="Optional feedback..." class="rating-comment"></textarea>
+      <button class="submit-rating">Submit</button>
+    </div>
+  </div>
+
+  <footer class="mobile-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3><i class="fas fa-phone"></i> Contact Us</h3>
+        <p><a href="tel:+918240266267">+91 8240266267</a></p>
+      </div>
+      <div class="footer-section">
+        <h3><i class="fas fa-clock"></i> Opening Hours</h3>
+        <p>4:00 PM - 10:00 PM</p>
+      </div>
+      <div class="footer-bottom">
+        <button id="viewOrderHistoryBtn" class="mobile-history-btn"><i class="fas fa-history"></i> Order History</button>
+        <p>&copy; 2025 Bake & Grill</p>
+      </div>
+    </div>
+  </footer>
+
+  <div class="mobile-notification" id="notification">
+    <i class="fas fa-check-circle"></i>
+    <span id="notificationText">Item added to cart!</span>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
