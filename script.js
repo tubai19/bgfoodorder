@@ -12,6 +12,29 @@ const firebaseConfig = {
 // Initialize Firebase
 const firebaseApp = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const messaging = firebase.messaging();
+
+// Request notification permission
+function requestNotificationPermission() {
+  Notification.requestPermission().then(permission => {
+    if (permission === 'granted') {
+      console.log('Notification permission granted.');
+      // Get FCM token
+      messaging.getToken({ vapidKey: 'YOUR_VAPID_KEY' }).then((currentToken) => {
+        if (currentToken) {
+          console.log('FCM Token:', currentToken);
+          // Send the token to your server for notifications
+        } else {
+          console.log('No registration token available.');
+        }
+      }).catch((err) => {
+        console.log('An error occurred while retrieving token. ', err);
+      });
+    } else {
+      console.log('Unable to get permission to notify.');
+    }
+  });
+}
 
 // Dynamic menu data loaded from Firestore
 let fullMenu = {};
@@ -37,7 +60,7 @@ const MAX_DELIVERY_DISTANCE = 8; // 8km maximum delivery distance
 const MIN_DELIVERY_ORDER = 200;
 
 // DOM elements
-const selectedItems = [];
+const selectedItems = JSON.parse(localStorage.getItem('cartItems')) || [];
 const tabsDiv = document.getElementById("tabs");
 const container = document.getElementById("menuContainer");
 const totalBill = document.getElementById("mobileLiveTotal");
@@ -61,6 +84,9 @@ const shopStatusText = document.getElementById("shopStatusText");
 const deliveryStatusText = document.getElementById("deliveryStatusText");
 const distanceText = document.getElementById("distanceText");
 const deliveryDistanceDisplay = document.getElementById("deliveryDistanceDisplay");
+const installPrompt = document.getElementById("installPrompt");
+const installConfirmBtn = document.getElementById("installConfirmBtn");
+const installCancelBtn = document.getElementById("installCancelBtn");
 
 // Location variables
 let map;
@@ -70,11 +96,14 @@ let usingManualLoc = false;
 let deliveryDistance = null;
 let currentRating = 0;
 let modalRating = 0;
+let deferredPrompt;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function() {
+  // Set up passive event listeners for better scrolling performance
   document.body.addEventListener('touchstart', function() {}, { passive: true });
   
+  // Load menu and setup
   await loadMenuFromFirestore();
   setupMobileEventListeners();
   updateCart();
@@ -84,7 +113,50 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Check status on initial load
   await updateStatusDisplay();
   setupStatusListener();
+  
+  // Set up install prompt
+  setupInstallPrompt();
+  
+  // Request notification permission
+  requestNotificationPermission();
+  
+  // Set up messaging
+  setupMessaging();
 });
+
+// Set up Firebase messaging
+function setupMessaging() {
+  messaging.onMessage((payload) => {
+    console.log('Message received. ', payload);
+    showNotification(payload.notification.body);
+  });
+}
+
+// Set up install prompt
+function setupInstallPrompt() {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installPrompt.style.display = 'block';
+  });
+  
+  installConfirmBtn.addEventListener('click', () => {
+    installPrompt.style.display = 'none';
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+      } else {
+        console.log('User dismissed the install prompt');
+      }
+      deferredPrompt = null;
+    });
+  });
+  
+  installCancelBtn.addEventListener('click', () => {
+    installPrompt.style.display = 'none';
+  });
+}
 
 // Check shop status
 function checkShopStatus() {
@@ -403,10 +475,11 @@ function setupMobileEventListeners() {
     document.querySelector('.mobile-footer').classList.remove('with-form');
   });
   
-  // Mobile clear cart
+  // Mobile clear cart - FIXED
   mobileClearCartBtn.addEventListener('click', function() {
     if (selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
       selectedItems.length = 0;
+      localStorage.removeItem('cartItems');
       updateCart();
       showNotification('Cart cleared');
       if ('vibrate' in navigator) navigator.vibrate(50);
@@ -421,6 +494,7 @@ function setupMobileEventListeners() {
     }
     toggleMobileCart();
     document.querySelector('.mobile-form-section').classList.add('visible');
+    document.querySelector('.mobile-footer').classList.add('with-form');
     document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
   });
   
@@ -588,20 +662,16 @@ function toggleMobileCart() {
   document.body.style.overflow = mobileCartDrawer.classList.contains('active') ? 'hidden' : '';
   
   if (mobileCartDrawer.classList.contains('active')) {
-    document.querySelector('.mobile-form-section').classList.add('visible');
-    document.querySelector('.mobile-footer').classList.add('with-form');
-    document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
+    let overlay = document.querySelector('.overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'overlay';
+      document.body.appendChild(overlay);
+    }
+    overlay.classList.add('active');
   } else {
-    document.querySelector('.mobile-footer').classList.remove('with-form');
+    document.querySelector('.overlay')?.classList.remove('active');
   }
-  
-  let overlay = document.querySelector('.overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.className = 'overlay';
-    document.body.appendChild(overlay);
-  }
-  overlay.classList.toggle('active');
 }
 
 // Initialize OpenStreetMap with enhanced search functionality
@@ -1066,6 +1136,9 @@ function addToOrder(name, variant, price, quantity = 1) {
     });
   }
   
+  // Save to localStorage
+  localStorage.setItem('cartItems', JSON.stringify(selectedItems));
+  
   updateCart();
   showNotification(`${quantity > 1 ? quantity + 'x ' : ''}${name} (${variant}) added to cart!`);
   
@@ -1145,6 +1218,7 @@ async function updateCart() {
     removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
     removeBtn.addEventListener('click', () => {
       selectedItems.splice(index, 1);
+      localStorage.setItem('cartItems', JSON.stringify(selectedItems));
       updateCart();
       showNotification("Item removed from cart");
     });
@@ -1383,6 +1457,7 @@ function showOrderConfirmationModal(orderData) {
         sendWhatsAppOrder(orderData);
         
         selectedItems.length = 0;
+        localStorage.removeItem('cartItems');
         updateCart();
         
         document.getElementById('orderConfirmationModal').style.display = 'none';
@@ -1504,6 +1579,7 @@ function reorderFromHistory(orderIndex) {
     updateCart();
     document.getElementById('orderHistoryModal').style.display = 'none';
     document.querySelector('.mobile-form-section').classList.add('visible');
+    document.querySelector('.mobile-footer').classList.add('with-form');
     document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
     showNotification('Order loaded from history');
   }
@@ -1628,3 +1704,21 @@ function generateWhatsAppMessage(orderData) {
   
   return message;
 }
+
+// Check if running as PWA
+function isRunningAsPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         window.navigator.standalone ||
+         document.referrer.includes('android-app://');
+}
+
+// Show PWA-specific UI adjustments
+function adjustUIForPWA() {
+  if (isRunningAsPWA()) {
+    document.body.classList.add('pwa-mode');
+    // Add any PWA-specific UI adjustments here
+  }
+}
+
+// Initialize PWA adjustments
+adjustUIForPWA();
