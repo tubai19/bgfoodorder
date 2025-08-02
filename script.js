@@ -87,6 +87,7 @@ const deliveryDistanceDisplay = document.getElementById("deliveryDistanceDisplay
 const installPrompt = document.getElementById("installPrompt");
 const installConfirmBtn = document.getElementById("installConfirmBtn");
 const installCancelBtn = document.getElementById("installCancelBtn");
+const locationChoiceBlock = document.getElementById('locationChoiceBlock');
 
 // Location variables
 let map;
@@ -234,6 +235,21 @@ async function updateStatusDisplay() {
   } catch (error) {
     console.error("Error updating status display:", error);
   }
+}
+
+// Show or hide location block based on order type
+function showOrHideLocationBlock() {
+  if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
+    resetLocationChoiceBlock();
+    locationChoiceBlock.style.display = 'block';
+    deliveryDistanceDisplay.style.display = deliveryDistance ? 'block' : 'none';
+  } else {
+    locationChoiceBlock.style.display = 'none';
+    deliveryDistanceDisplay.style.display = 'none';
+    locationObj = null;
+    usingManualLoc = false;
+  }
+  updateCart();
 }
 
 // Set up real-time listener for status changes
@@ -502,8 +518,6 @@ function setupMobileEventListeners() {
   document.querySelector('.overlay')?.addEventListener('click', toggleMobileCart);
   
   // For mandatory location on delivery
-  const orderTypeRadios = document.querySelectorAll('input[name="orderType"]');
-  const locationChoiceBlock = document.getElementById('locationChoiceBlock');
   const deliveryShareLocationBtn = document.getElementById('deliveryShareLocationBtn');
   const deliveryShowManualLocBtn = document.getElementById('deliveryShowManualLocBtn');
   const currentLocStatusMsg = document.getElementById('currentLocStatusMsg');
@@ -521,20 +535,7 @@ function setupMobileEventListeners() {
     deliveryDistanceDisplay.style.display = 'none';
   }
 
-  function showOrHideLocationBlock() {
-    if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
-      resetLocationChoiceBlock();
-      locationChoiceBlock.style.display = 'block';
-      deliveryDistanceDisplay.style.display = deliveryDistance ? 'block' : 'none';
-    } else {
-      locationChoiceBlock.style.display = 'none';
-      deliveryDistanceDisplay.style.display = 'none';
-      locationObj = null;
-      usingManualLoc = false;
-    }
-    updateCart();
-  }
-
+  const orderTypeRadios = document.querySelectorAll('input[name="orderType"]');
   orderTypeRadios.forEach(radio => {
     radio.addEventListener('change', showOrHideLocationBlock);
   });

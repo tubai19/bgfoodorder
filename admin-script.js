@@ -508,7 +508,7 @@ async function sendWhatsAppUpdate(order) {
   window.open(`https://wa.me/${formattedPhone}?text=${encodedMessage}`, '_blank');
 }
 
-// Order Status Update Function
+// Order Status Update Function (Fixed Version)
 async function updateOrderStatus(data) {
   const orderCard = document.querySelector(`.order-card[data-order-id="${data.orderId}"]`);
   if (orderCard) {
@@ -526,10 +526,10 @@ async function updateOrderStatus(data) {
     const orderData = orderDoc.data();
     const statusHistory = orderData.statusHistory || [];
     
-    // Create new status entry
+    // Create new status entry with a timestamp
     const newStatusEntry = {
       status: data.status,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      timestamp: new Date(), // Use client-side timestamp temporarily
       changedBy: auth.currentUser.email
     };
 
@@ -538,23 +538,43 @@ async function updateOrderStatus(data) {
       const reason = prompt('Please enter cancellation reason:');
       if (reason) {
         newStatusEntry.cancellationReason = reason;
+      } else {
+        throw new Error('Cancellation reason is required');
       }
     }
 
-    // Update order document
-    await orderRef.update({
+    // First update the status and updatedAt fields
+    const updateData = {
       status: data.status,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Then add the new status entry to history
+    await orderRef.update(updateData);
+    
+    // Now that we have the server timestamp, update the status entry
+    newStatusEntry.timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    await orderRef.update({
       statusHistory: firebase.firestore.FieldValue.arrayUnion(newStatusEntry)
     });
 
     // Send notification to customer
-    await sendOrderNotification(data.orderId, data.status, orderData.phoneNumber);
+    try {
+      await sendOrderNotification(data.orderId, data.status, orderData.phoneNumber);
+    } catch (notificationError) {
+      console.error("Notification error:", notificationError);
+      // Don't fail the whole operation if notification fails
+    }
     
     showError(`Order status updated to ${data.status}`);
   } catch (error) {
     console.error("Error updating order status:", error);
     showError(error.message || 'Failed to update order status');
+    
+    // If it's a cancellation without reason, don't show the generic error
+    if (error.message === 'Cancellation reason is required') {
+      return;
+    }
   } finally {
     if (orderCard) {
       orderCard.classList.remove('updating');
