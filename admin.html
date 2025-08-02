@@ -26,28 +26,10 @@
         <div class="form-group">
           <label for="adminPassword">Password</label>
           <input type="password" id="adminPassword" required placeholder="••••••••">
-          <a href="#" onclick="showPasswordReset()" class="forgot-password">Forgot Password?</a>
         </div>
         <button type="submit" class="login-btn">Login</button>
       </form>
       <div id="loginError" class="error-message"></div>
-    </div>
-  </div>
-
-  <!-- Password Reset Screen -->
-  <div id="passwordResetScreen" class="login-container" style="display: none;">
-    <div class="login-box">
-      <h2><i class="fas fa-key"></i> Reset Password</h2>
-      <form id="passwordResetForm">
-        <div class="form-group">
-          <label for="resetEmail">Email</label>
-          <input type="email" id="resetEmail" required placeholder="admin@example.com">
-        </div>
-        <button type="submit" class="login-btn">Send Reset Link</button>
-      </form>
-      <div id="resetError" class="error-message"></div>
-      <div id="resetSuccess" class="success-message" style="display: none;"></div>
-      <button onclick="backToLogin()" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Login</button>
     </div>
   </div>
 
@@ -75,7 +57,6 @@
             <li data-section="menu"><i class="fas fa-edit"></i> Menu Management</li>
             <li data-section="analytics"><i class="fas fa-chart-bar"></i> Analytics</li>
             <li data-section="settings"><i class="fas fa-cog"></i> Settings</li>
-            <li data-section="admin"><i class="fas fa-users-cog"></i> Admin Users</li>
           </ul>
         </nav>
       </aside>
@@ -95,9 +76,6 @@
                 <option value="cancelled">Cancelled</option>
               </select>
               <input type="text" id="orderSearch" placeholder="Search orders...">
-              <button class="btn bulk-action-btn" onclick="bulkUpdateStatus('preparing')">
-                <i class="fas fa-utensils"></i> Mark Selected as Preparing
-              </button>
             </div>
           </div>
           <div class="orders-list" id="ordersListContainer">
@@ -132,14 +110,13 @@
                 <input type="date" id="endDate">
               </div>
               <button id="applyAnalyticsBtn" class="btn primary-btn">Apply</button>
-              <button id="exportAnalyticsBtn" class="btn secondary-btn"><i class="fas fa-download"></i> Export</button>
             </div>
           </div>
           <div class="analytics-container">
             <div class="analytics-summary">
               <div class="summary-card">
                 <h3>Total Sales</h3>
-                <p id="totalSalesAmount">$0.00</p>
+                <p id="totalSalesAmount">₹0.00</p>
               </div>
               <div class="summary-card">
                 <h3>Orders Count</h3>
@@ -147,7 +124,7 @@
               </div>
               <div class="summary-card">
                 <h3>Average Order</h3>
-                <p id="averageOrderAmount">$0.00</p>
+                <p id="averageOrderAmount">₹0.00</p>
               </div>
             </div>
             <div class="analytics-card">
@@ -165,31 +142,12 @@
           </div>
         </section>
 
-        <!-- Admin Management Section -->
-        <section id="adminSection" class="content-section" style="display: none;">
-          <div class="section-header">
-            <h2><i class="fas fa-users-cog"></i> Admin Users</h2>
-            <button id="addAdminBtn" class="btn primary-btn"><i class="fas fa-plus"></i> Add Admin</button>
-          </div>
-          <div class="admin-list" id="adminListContainer">
-            <div class="loading">Loading admins...</div>
-          </div>
-        </section>
-
         <!-- Settings Section -->
         <section id="settingsSection" class="content-section" style="display: none;">
           <div class="section-header">
             <h2><i class="fas fa-cog"></i> Settings</h2>
           </div>
           <div class="settings-form">
-            <div class="form-group">
-              <label>Restaurant Name</label>
-              <input type="text" id="restaurantName">
-            </div>
-            <div class="form-group">
-              <label>Contact Number</label>
-              <input type="tel" id="contactNumber">
-            </div>
             <div class="form-group">
               <label>Shop Status</label>
               <label class="switch">
@@ -220,17 +178,38 @@
               </div>
             </div>
             <div class="form-group">
-              <label>Delivery Fee</label>
-              <input type="number" id="deliveryFee" min="0" step="0.01">
+              <label>Delivery Settings</label>
+              <div class="delivery-settings">
+                <div>
+                  <label>Max Delivery Distance (km)</label>
+                  <input type="number" id="deliveryRadius" min="1" step="1">
+                </div>
+                <div>
+                  <label>Min Order Amount (₹)</label>
+                  <input type="number" id="minDeliveryOrder" min="0" step="50">
+                </div>
+                <div>
+                  <label>Free Delivery Above (₹)</label>
+                  <input type="number" id="freeDeliveryAbove" min="0" step="50">
+                </div>
+              </div>
             </div>
             <div class="form-group">
-              <label>Minimum Order Amount</label>
-              <input type="number" id="minOrderAmount" min="0" step="0.01">
-            </div>
-            <div class="form-group">
-              <label>Restaurant Logo</label>
-              <input type="file" id="restaurantLogo" accept="image/*">
-              <img id="logoPreview" style="max-width: 100px; display: none;">
+              <label>Delivery Charges</label>
+              <div class="delivery-charges">
+                <div>
+                  <label>0-4 km (₹)</label>
+                  <input type="number" id="charge04km" min="0" step="10">
+                </div>
+                <div>
+                  <label>4-6 km (₹)</label>
+                  <input type="number" id="charge46km" min="0" step="10">
+                </div>
+                <div>
+                  <label>6-8 km (₹)</label>
+                  <input type="number" id="charge68km" min="0" step="10">
+                </div>
+              </div>
             </div>
             <button id="saveSettingsBtn" class="btn primary-btn"><i class="fas fa-save"></i> Save Settings</button>
           </div>
@@ -249,12 +228,11 @@
       <div class="modal-body">
         <div class="form-group">
           <label>Category Name</label>
-          <input type="text" id="categoryName" placeholder="e.g., Main Courses">
+          <input type="text" id="categoryName" placeholder="e.g., Veg Pizzas">
         </div>
         <div class="form-group">
-          <label>Icon Class (Font Awesome)</label>
-          <input type="text" id="categoryIcon" placeholder="fas fa-utensils">
-          <small class="hint">Example: fas fa-pizza-slice, fas fa-hamburger</small>
+          <label>Icon (Emoji)</label>
+          <input type="text" id="categoryIcon" placeholder="🍕">
         </div>
       </div>
       <div class="modal-footer">
@@ -274,26 +252,16 @@
         <input type="hidden" id="currentCategoryId">
         <input type="hidden" id="currentItemId">
         <div class="form-group">
-          <label>Item Image</label>
-          <input type="file" id="itemImage" accept="image/*">
-          <img id="itemImagePreview" style="max-width: 100px; display: none;">
-          <button id="removeImageBtn" class="btn small-btn danger-btn" style="display: none;">Remove Image</button>
-        </div>
-        <div class="form-group">
           <label>Item Name</label>
-          <input type="text" id="itemName" placeholder="e.g., Chicken Burger">
+          <input type="text" id="itemName" placeholder="e.g., Margherita Pizza">
         </div>
         <div class="form-group">
           <label>Item Name (Bengali)</label>
-          <input type="text" id="itemNameBn" placeholder="e.g., চিকেন বার্গার">
+          <input type="text" id="itemNameBn" placeholder="e.g., মার্গারিটা পিজা">
         </div>
         <div class="form-group">
           <label>Description</label>
           <textarea id="itemDesc" placeholder="Item description..."></textarea>
-        </div>
-        <div class="form-group">
-          <label>Stock Quantity</label>
-          <input type="number" id="itemStock" min="0" value="0">
         </div>
         <div class="form-group">
           <label>Variants</label>
@@ -304,34 +272,6 @@
       <div class="modal-footer">
         <button class="btn cancel-btn">Cancel</button>
         <button id="saveMenuItemBtn" class="btn primary-btn">Save Item</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="addAdminModal" class="modal">
-    <div class="modal-content small-modal">
-      <div class="modal-header">
-        <h3>Add New Admin</h3>
-        <span class="close-modal">&times;</span>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Admin Email</label>
-          <input type="email" id="newAdminEmail" placeholder="admin@example.com">
-        </div>
-        <div class="form-group">
-          <label>Role</label>
-          <select id="adminRole">
-            <option value="super">Super Admin</option>
-            <option value="manager">Manager</option>
-            <option value="kitchen">Kitchen Staff</option>
-            <option value="delivery">Delivery Staff</option>
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn cancel-btn">Cancel</button>
-        <button id="confirmAddAdminBtn" class="btn primary-btn">Add Admin</button>
       </div>
     </div>
   </div>
@@ -353,10 +293,11 @@
               <strong>Phone:</strong> <span id="customerPhone"></span>
             </div>
             <div>
-              <strong>Email:</strong> <span id="customerEmail"></span>
+              <strong>Order Type:</strong> <span id="orderType"></span>
             </div>
-            <div>
+            <div id="deliveryInfo" style="display: none;">
               <strong>Address:</strong> <span id="customerAddress"></span>
+              <strong>Distance:</strong> <span id="deliveryDistance"></span>
             </div>
           </div>
         </div>
@@ -383,20 +324,11 @@
             <div>
               <strong>Subtotal:</strong> <span id="orderSubtotal"></span>
             </div>
-            <div>
+            <div id="deliveryChargeRow">
               <strong>Delivery Fee:</strong> <span id="orderDeliveryFee"></span>
             </div>
             <div>
-              <strong>Discount:</strong> <span id="orderDiscount"></span>
-            </div>
-            <div>
               <strong>Total:</strong> <span id="orderTotal"></span>
-            </div>
-            <div>
-              <strong>Payment Method:</strong> <span id="orderPaymentMethod"></span>
-            </div>
-            <div>
-              <strong>Payment Status:</strong> <span id="orderPaymentStatus"></span>
             </div>
           </div>
         </div>
@@ -413,11 +345,13 @@
             </select>
             <button id="updateStatusBtn" class="btn primary-btn">Update Status</button>
           </div>
+          <div id="statusHistoryContainer" style="margin-top: 15px;"></div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn cancel-btn">Close</button>
         <button id="printOrderBtn" class="btn secondary-btn"><i class="fas fa-print"></i> Print</button>
+        <button id="whatsappCustomerBtn" class="btn whatsapp-btn"><i class="fab fa-whatsapp"></i> Contact Customer</button>
       </div>
     </div>
   </div>
@@ -439,5 +373,19 @@
   </div>
 
   <script src="admin-script.js"></script>
+  <script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/admin-sw.js')
+          .then(function(registration) {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          })
+          .catch(function(err) {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+      });
+    }
+  </script>
 </body>
 </html>

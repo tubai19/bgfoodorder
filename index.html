@@ -370,14 +370,28 @@
   <!-- Register Service Worker -->
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      window.addEventListener('load', function() {
         navigator.serviceWorker.register('/sw.js')
-          .then(registration => {
-            console.log('ServiceWorker registration successful');
-          })
-          .catch(err => {
-            console.log('ServiceWorker registration failed: ', err);
+          .then(function(registration) {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            
+            // Check for updates periodically
+            setInterval(function() {
+              registration.update().then(function() {
+                console.log('ServiceWorker update check completed');
+              }).catch(function(error) {
+                console.log('ServiceWorker update check failed: ', error);
+              });
+            }, 60 * 60 * 1000); // Check every hour
+            
+          }).catch(function(error) {
+            console.log('ServiceWorker registration failed: ', error);
           });
+      });
+      
+      // Listen for controller changes (when a new service worker takes control)
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        window.location.reload();
       });
     }
   </script>
