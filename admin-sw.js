@@ -1,92 +1,54 @@
-// admin-sw.js - Optimized for Admin Dashboard (Notification Focused)
-const ADMIN_CACHE = 'admin-cache-v1';
-const ADMIN_ASSETS = [
+const CACHE_NAME = 'bake-and-grill-admin-v1';
+const urlsToCache = [
+  '/',
   '/admin.html',
   '/admin-styles.css',
   '/admin-script.js',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+  'https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js',
+  'https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js'
 ];
 
-// Install - Cache essential admin assets with error handling
-self.addEventListener('install', (event) => {
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(ADMIN_CACHE)
+    caches.open(CACHE_NAME)
       .then(cache => {
-        return cache.addAll(ADMIN_ASSETS)
-          .then(() => self.skipWaiting())
-          .catch(err => {
-            console.log('Failed to cache some assets:', err);
-            return self.skipWaiting();
-          });
+        return cache.addAll(urlsToCache);
+      })
+      .catch(err => {
+        console.log('Cache addAll failed:', err);
       })
   );
 });
 
-// Activate - Clean old caches and claim clients
-self.addEventListener('activate', (event) => {
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // Cache hit - return response
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
+      }
+    )
+  );
+});
+
+self.addEventListener('activate', event => {
+  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== ADMIN_CACHE) {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim())
-  );
-});
-
-// Push Notifications - Robust handling for order updates
-self.addEventListener('push', (event) => {
-  const payload = event.data?.json() || {};
-  const title = payload.title || 'Order Update';
-  const options = {
-    body: payload.body || 'Order status changed',
-    icon: payload.icon || '/icons/icon-192x192.png',
-    badge: payload.badge || '/icons/badge.png',
-    data: payload.data || { url: '/admin/orders' }
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
-});
-
-// Notification Click - Smart client handling
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then(clientList => {
-      // Focus existing admin tab if open
-      const adminClient = clientList.find(c => c.url.includes('/admin'));
-      if (adminClient) {
-        return adminClient.focus();
-      }
-      // Otherwise open new admin page
-      return clients.openWindow(event.notification.data?.url || '/admin');
     })
-  );
-});
-
-// Fetch - Network-first strategy for admin
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        // Cache successful responses for API calls
-        if (event.request.url.includes('/api/') && response.ok) {
-          const clone = response.clone();
-          caches.open(ADMIN_CACHE).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request))
   );
 });

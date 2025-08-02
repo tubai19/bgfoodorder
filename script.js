@@ -12,28 +12,51 @@ const firebaseConfig = {
 // Initialize Firebase
 const firebaseApp = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 const messaging = firebase.messaging();
 
 // Request notification permission
 function requestNotificationPermission() {
-  Notification.requestPermission().then(permission => {
+  return Notification.requestPermission().then(permission => {
     if (permission === 'granted') {
       console.log('Notification permission granted.');
-      // Get FCM token
-      messaging.getToken({ vapidKey: 'YOUR_VAPID_KEY' }).then((currentToken) => {
-        if (currentToken) {
-          console.log('FCM Token:', currentToken);
-          // Send the token to your server for notifications
-        } else {
-          console.log('No registration token available.');
-        }
-      }).catch((err) => {
-        console.log('An error occurred while retrieving token. ', err);
-      });
-    } else {
-      console.log('Unable to get permission to notify.');
+      return getFCMToken();
     }
+    console.log('Notification permission not granted.');
+    return null;
   });
+}
+
+// Get FCM token
+async function getFCMToken() {
+  try {
+    const currentToken = await messaging.getToken({ vapidKey: 'YOUR_VAPID_KEY' });
+    if (currentToken) {
+      console.log('FCM Token:', currentToken);
+      await saveTokenToServer(currentToken);
+      return currentToken;
+    }
+    console.log('No registration token available.');
+    return null;
+  } catch (err) {
+    console.error('An error occurred while retrieving token:', err);
+    return null;
+  }
+}
+
+// Save token to server
+async function saveTokenToServer(token) {
+  try {
+    const userId = auth.currentUser?.uid || 'anonymous';
+    await db.collection('fcmTokens').doc(userId).set({
+      token: token,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      platform: navigator.platform,
+      userAgent: navigator.userAgent
+    }, { merge: true });
+  } catch (error) {
+    console.error('Error saving token:', error);
+  }
 }
 
 // Dynamic menu data loaded from Firestore
@@ -101,6 +124,9 @@ let deferredPrompt;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function() {
+  // Register service worker
+  registerServiceWorker();
+  
   // Set up passive event listeners for better scrolling performance
   document.body.addEventListener('touchstart', function() {}, { passive: true });
   
@@ -123,6 +149,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   
   // Set up messaging
   setupMessaging();
+  
+  // Check for deferred prompt
+  checkDeferredPrompt();
 });
 
 // Set up Firebase messaging
@@ -130,7 +159,71 @@ function setupMessaging() {
   messaging.onMessage((payload) => {
     console.log('Message received. ', payload);
     showNotification(payload.notification.body);
+    
+    // Update UI if needed
+    if (payload.data?.orderId && document.getElementById('ordersList')) {
+      updateOrderStatusUI(payload.data.orderId, payload.data.status);
+    }
   });
+}
+
+// Register Service Worker
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        console.log('ServiceWorker registration successful with scope:', registration.scope);
+
+        // Check for updates every hour
+        setInterval(async () => {
+          try {
+            await registration.update();
+            console.log('ServiceWorker update check completed');
+          } catch (updateError) {
+            console.log('ServiceWorker update check failed:', updateError);
+          }
+        }, 60 * 60 * 1000);
+
+        // Handle controller change (new SW takes control)
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+
+        // Check if there's a waiting service worker
+        if (registration.waiting) {
+          showUpdatePrompt(registration);
+        }
+
+        // Listen for updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdatePrompt(registration);
+            }
+          });
+        });
+
+      } catch (error) {
+        console.error('ServiceWorker registration failed:', error);
+      }
+    });
+  }
+}
+
+// Show update prompt to user
+function showUpdatePrompt(registration) {
+  if (confirm('A new version is available. Refresh to update?')) {
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    window.location.reload();
+  }
 }
 
 // Set up install prompt
@@ -138,25 +231,55 @@ function setupInstallPrompt() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    installPrompt.style.display = 'block';
+    showInstallPromotion();
   });
-  
-  installConfirmBtn.addEventListener('click', () => {
-    installPrompt.style.display = 'none';
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('User accepted the install prompt');
-      } else {
-        console.log('User dismissed the install prompt');
-      }
+
+  window.addEventListener('appinstalled', () => {
+    console.log('PWA was installed');
+    deferredPrompt = null;
+    hideInstallPromotion();
+  });
+
+  installConfirmBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to the install prompt: ${outcome}`);
       deferredPrompt = null;
-    });
+    }
+    hideInstallPromotion();
   });
-  
-  installCancelBtn.addEventListener('click', () => {
-    installPrompt.style.display = 'none';
-  });
+
+  installCancelBtn.addEventListener('click', hideInstallPromotion);
+}
+
+function showInstallPromotion() {
+  if (!isRunningAsPWA() && !localStorage.getItem('installPromptDismissed')) {
+    installPrompt.style.display = 'block';
+  }
+}
+
+function hideInstallPromotion() {
+  installPrompt.style.display = 'none';
+  localStorage.setItem('installPromptDismissed', 'true');
+  setTimeout(() => {
+    localStorage.removeItem('installPromptDismissed');
+  }, 7 * 24 * 60 * 60 * 1000);
+}
+
+function isRunningAsPWA() {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         window.navigator.standalone ||
+         document.referrer.includes('android-app://');
+}
+
+// Check for deferred prompt on page load
+function checkDeferredPrompt() {
+  if (isRunningAsPWA()) {
+    document.body.classList.add('pwa-mode');
+  } else if (deferredPrompt) {
+    showInstallPromotion();
+  }
 }
 
 // Check shop status
@@ -491,7 +614,7 @@ function setupMobileEventListeners() {
     document.querySelector('.mobile-footer').classList.remove('with-form');
   });
   
-  // Mobile clear cart - FIXED
+  // Mobile clear cart
   mobileClearCartBtn.addEventListener('click', function() {
     if (selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
       selectedItems.length = 0;
@@ -610,7 +733,7 @@ function setupMobileEventListeners() {
     }
   });
 
-  // Place Order Button - Fixed version
+  // Place Order Button
   placeOrderBtn.addEventListener('click', async function(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -1705,21 +1828,3 @@ function generateWhatsAppMessage(orderData) {
   
   return message;
 }
-
-// Check if running as PWA
-function isRunningAsPWA() {
-  return window.matchMedia('(display-mode: standalone)').matches || 
-         window.navigator.standalone ||
-         document.referrer.includes('android-app://');
-}
-
-// Show PWA-specific UI adjustments
-function adjustUIForPWA() {
-  if (isRunningAsPWA()) {
-    document.body.classList.add('pwa-mode');
-    // Add any PWA-specific UI adjustments here
-  }
-}
-
-// Initialize PWA adjustments
-adjustUIForPWA();
