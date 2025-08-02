@@ -8,12 +8,23 @@ const ADMIN_ASSETS = [
   '/icons/icon-512x512.png'
 ];
 
-// Install - Cache essential admin assets
+// Install - Cache essential admin assets with error handling
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(ADMIN_CACHE)
-      .then(cache => cache.addAll(ADMIN_ASSETS))
+      .then(cache => {
+        return Promise.all(
+          ADMIN_ASSETS.map(asset => {
+            return cache.add(asset).catch(err => {
+              console.log(`Failed to cache ${asset}:`, err);
+            });
+          })
+        );
+      })
       .then(() => self.skipWaiting())
+      .catch(err => {
+        console.log('Service worker installation failed:', err);
+      })
   );
 });
 

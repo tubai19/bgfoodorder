@@ -12,12 +12,23 @@ const CORE_ASSETS = [
   '/fallback.html'
 ];
 
-// Install - Cache core assets
+// Install - Cache core assets with error handling
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CUSTOMER_CACHE)
-      .then(cache => cache.addAll(CORE_ASSETS))
+      .then(cache => {
+        return Promise.all(
+          CORE_ASSETS.map(asset => {
+            return cache.add(asset).catch(err => {
+              console.log(`Failed to cache ${asset}:`, err);
+            });
+          })
+        );
+      })
       .then(() => self.skipWaiting())
+      .catch(err => {
+        console.log('Service worker installation failed:', err);
+      })
   );
 });
 
