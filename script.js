@@ -1,26 +1,4 @@
-// Firebase imports
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  onSnapshot,
-  serverTimestamp,
-  GeoPoint
-} from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
-import { 
-  getAuth 
-} from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
-import { 
-  getMessaging, 
-  getToken,
-  onMessage,
-  isSupported
-} from "https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging.js";
-
-// Firebase configuration
+// Firebase configuration and initialization
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
   authDomain: "bakeandgrill-44c25.firebaseapp.com",
@@ -32,20 +10,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-let messaging = null;
+const firebaseApp = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-(async () => {
-  if (await isSupported()) {
-    messaging = getMessaging(app);
-  }
-})();
-
-// Global variables
+// Dynamic menu data loaded from Firestore
 let fullMenu = {};
-let selectedItems = JSON.parse(localStorage.getItem('cartItems')) || [];
+
+// Category icons mapping
 const categoryIcons = {
   "Veg Pizzas": "🍕",
   "Paneer Specials": "🧀",
@@ -56,187 +27,136 @@ const categoryIcons = {
   "Dips": "🥫",
   "Combos": "🎁"
 };
-const RESTAURANT_LOCATION = { lat: 22.3908, lng: 88.2189 };
-const MAX_DELIVERY_DISTANCE = 8;
+
+// Restaurant location and delivery settings
+const RESTAURANT_LOCATION = {
+  lat: 22.3908,
+  lng: 88.2189
+};
+const MAX_DELIVERY_DISTANCE = 8; // 8km maximum delivery distance
 const MIN_DELIVERY_ORDER = 200;
+
+// DOM elements
+const selectedItems = [];
+const tabsDiv = document.getElementById("tabs");
+const container = document.getElementById("menuContainer");
+const totalBill = document.getElementById("mobileLiveTotal");
+const cartList = document.getElementById("cartItems");
+const searchInput = document.getElementById("searchInput");
+const deliveryChargeDisplay = document.getElementById("deliveryChargeDisplay");
+const deliveryRestriction = document.getElementById("deliveryRestriction");
+const notification = document.getElementById("notification");
+const notificationText = document.getElementById("notificationText");
+const mobileCartBtn = document.getElementById("mobileCartBtn");
+const mobileCartDrawer = document.getElementById("mobileCartDrawer");
+const placeOrderBtn = document.getElementById("placeOrderBtn");
+const viewOrderHistoryBtn = document.getElementById("viewOrderHistoryBtn");
+const mobileClearCartBtn = document.getElementById("mobileClearCartBtn");
+const mobileCheckoutBtn = document.getElementById("mobileCheckoutBtn");
+const closeCartBtn = document.getElementById("closeCartBtn");
+const statusBanner = document.getElementById("statusBanner");
+const shopStatusBanner = document.getElementById("shopStatusBanner");
+const deliveryStatusBanner = document.getElementById("deliveryStatusBanner");
+const shopStatusText = document.getElementById("shopStatusText");
+const deliveryStatusText = document.getElementById("deliveryStatusText");
+const distanceText = document.getElementById("distanceText");
+const deliveryDistanceDisplay = document.getElementById("deliveryDistanceDisplay");
+
+// Location variables
+let map;
+let marker;
 let locationObj = null;
-let deliveryDistance = null;
 let usingManualLoc = false;
-let map = null;
-let marker = null;
+let deliveryDistance = null;
+let currentRating = 0;
 let modalRating = 0;
 
-// Common functions
-function updateCartBadge() {
-  const itemCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-  document.querySelectorAll('.cart-badge').forEach(el => {
-    el.textContent = itemCount;
-  });
-}
-
-function showNotification(message) {
-  const notification = document.getElementById('notification');
-  const notificationText = document.getElementById('notificationText');
+// Initialize the application
+document.addEventListener('DOMContentLoaded', async function() {
+  document.body.addEventListener('touchstart', function() {}, { passive: true });
   
-  if (notification && notificationText) {
-    notificationText.textContent = message;
-    notification.classList.add('show');
-    
-    setTimeout(() => {
-      notification.classList.remove('show');
-    }, 3000);
-  }
-}
-
-// Request notification permission
-async function requestNotificationPermission() {
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      console.log('Notification permission granted.');
-      return await getFCMToken();
-    }
-    console.log('Notification permission not granted.');
-    return null;
-  } catch (error) {
-    console.error('Error requesting notification permission:', error);
-    return null;
-  }
-}
-
-// Get FCM token
-async function getFCMToken() {
-  if (!messaging) {
-    console.log('Messaging not supported');
-    return null;
-  }
-
-  try {
-    const currentToken = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' });
-    if (currentToken) {
-      console.log('FCM Token:', currentToken);
-      await saveTokenToServer(currentToken);
-      return currentToken;
-    }
-    console.log('No registration token available.');
-    return null;
-  } catch (err) {
-    console.error('An error occurred while retrieving token:', err);
-    return null;
-  }
-}
-
-// Save token to server
-async function saveTokenToServer(token) {
-  try {
-    const userId = auth.currentUser?.uid || 'anonymous';
-    await setDoc(doc(db, 'fcmTokens', userId), {
-      token: token,
-      createdAt: serverTimestamp(),
-      platform: navigator.platform,
-      userAgent: navigator.userAgent
-    }, { merge: true });
-  } catch (error) {
-    console.error('Error saving token:', error);
-  }
-}
-
-// Setup messaging
-function setupMessaging() {
-  if (!messaging) return;
+  await loadMenuFromFirestore();
+  setupMobileEventListeners();
+  updateCart();
+  setupRatingSystem();
+  setupDeliveryAccordion();
   
-  onMessage(messaging, (payload) => {
-    console.log('Message received. ', payload);
-    showNotification(payload.notification.body);
-    
-    // Update UI if needed
-    if (payload.data?.orderId && document.getElementById('ordersList')) {
-      updateOrderStatusUI(payload.data.orderId, payload.data.status);
-    }
-  });
-}
+  // Check status on initial load
+  await updateStatusDisplay();
+  setupStatusListener();
+});
 
 // Check shop status
-async function checkShopStatus() {
-  try {
-    const docSnap = await getDoc(doc(db, 'publicStatus', 'current'));
-    if (docSnap.exists()) {
-      const status = docSnap.data();
-      return status.isShopOpen !== false;
-    }
-    return true;
-  } catch (error) {
-    console.error("Error checking shop status:", error);
-    return true;
-  }
+function checkShopStatus() {
+  return db.collection('publicStatus').doc('current').get()
+    .then(doc => {
+      if (doc.exists) {
+        const status = doc.data();
+        return status.isShopOpen !== false;
+      }
+      return true;
+    })
+    .catch(error => {
+      console.error("Error checking shop status:", error);
+      return true;
+    });
 }
 
 // Check delivery status
-async function checkDeliveryStatus() {
-  try {
-    const docSnap = await getDoc(doc(db, 'publicStatus', 'current'));
-    if (docSnap.exists()) {
-      const status = docSnap.data();
-      return status.isDeliveryAvailable !== false;
-    }
-    return true;
-  } catch (error) {
-    console.error("Error checking delivery status:", error);
-    return true;
-  }
+function checkDeliveryStatus() {
+  return db.collection('publicStatus').doc('current').get()
+    .then(doc => {
+      if (doc.exists) {
+        const status = doc.data();
+        return status.isDeliveryAvailable !== false;
+      }
+      return true;
+    })
+    .catch(error => {
+      console.error("Error checking delivery status:", error);
+      return true;
+    });
 }
 
 // Update status display
 async function updateStatusDisplay() {
   try {
-    const docSnap = await getDoc(doc(db, 'publicStatus', 'current'));
+    const doc = await db.collection('publicStatus').doc('current').get();
     
-    if (!docSnap.exists()) {
+    if (!doc.exists) {
       console.log("No status document found");
       return;
     }
 
-    const status = docSnap.data();
+    const status = doc.data();
     const isShopOpen = status.isShopOpen !== false;
     const isDeliveryAvailable = status.isDeliveryAvailable !== false;
 
-    const shopStatusText = document.getElementById('shopStatusText');
-    const deliveryStatusText = document.getElementById('deliveryStatusText');
-    const shopStatusBanner = document.getElementById('shopStatusBanner');
-    const deliveryStatusBanner = document.getElementById('deliveryStatusBanner');
-    const statusBanner = document.getElementById('statusBanner');
+    shopStatusText.textContent = isShopOpen ? 'Shop: Open' : 'Shop: Closed';
+    deliveryStatusText.textContent = isDeliveryAvailable ? 'Delivery: Available' : 'Delivery: Unavailable';
 
-    if (shopStatusText) shopStatusText.textContent = isShopOpen ? 'Shop: Open' : 'Shop: Closed';
-    if (deliveryStatusText) deliveryStatusText.textContent = isDeliveryAvailable ? 'Delivery: Available' : 'Delivery: Unavailable';
+    shopStatusBanner.className = isShopOpen ? 'status-item open' : 'status-item closed';
+    deliveryStatusBanner.className = isDeliveryAvailable ? 'status-item open' : 'status-item closed';
 
-    if (shopStatusBanner) shopStatusBanner.className = isShopOpen ? 'status-item open' : 'status-item closed';
-    if (deliveryStatusBanner) deliveryStatusBanner.className = isDeliveryAvailable ? 'status-item open' : 'status-item closed';
-
-    if (statusBanner) {
-      if (!isShopOpen) {
-        document.querySelectorAll('input[name="orderType"]').forEach(radio => {
-          radio.disabled = true;
-        });
-        statusBanner.classList.add('shop-closed');
-      } else {
-        document.querySelectorAll('input[name="orderType"]').forEach(radio => {
-          radio.disabled = false;
-        });
-        statusBanner.classList.remove('shop-closed');
-        
-        if (!isDeliveryAvailable) {
-          const deliveryRadio = document.querySelector('input[name="orderType"][value="Delivery"]');
-          if (deliveryRadio) {
-            deliveryRadio.disabled = true;
-            if (deliveryRadio.checked) {
-              document.querySelector('input[name="orderType"][value="Pickup"]').checked = true;
-              showOrHideLocationBlock();
-            }
-          }
-        } else {
-          const deliveryRadio = document.querySelector('input[name="orderType"][value="Delivery"]');
-          if (deliveryRadio) deliveryRadio.disabled = false;
+    if (!isShopOpen) {
+      document.querySelectorAll('input[name="orderType"]').forEach(radio => {
+        radio.disabled = true;
+      });
+      statusBanner.classList.add('shop-closed');
+    } else {
+      document.querySelectorAll('input[name="orderType"]').forEach(radio => {
+        radio.disabled = false;
+      });
+      statusBanner.classList.remove('shop-closed');
+      
+      if (!isDeliveryAvailable) {
+        document.querySelector('input[name="orderType"][value="Delivery"]').disabled = true;
+        if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
+          document.querySelector('input[name="orderType"][value="Pickup"]').checked = true;
+          showOrHideLocationBlock();
         }
+      } else {
+        document.querySelector('input[name="orderType"][value="Delivery"]').disabled = false;
       }
     }
   } catch (error) {
@@ -246,8 +166,8 @@ async function updateStatusDisplay() {
 
 // Set up real-time listener for status changes
 function setupStatusListener() {
-  onSnapshot(doc(db, 'publicStatus', 'current'), (doc) => {
-    if (doc.exists()) {
+  db.collection('publicStatus').doc('current').onSnapshot(doc => {
+    if (doc.exists) {
       updateStatusDisplay();
     }
   });
@@ -256,9 +176,9 @@ function setupStatusListener() {
 // Load menu from Firestore
 async function loadMenuFromFirestore() {
   try {
-    const querySnapshot = await getDocs(collection(db, "menu"));
+    const snapshot = await db.collection("menu").get();
     fullMenu = {};
-    querySnapshot.forEach(doc => {
+    snapshot.forEach(doc => {
       fullMenu[doc.id] = doc.data().items;
     });
     console.log("✅ Menu loaded:", fullMenu);
@@ -271,9 +191,6 @@ async function loadMenuFromFirestore() {
 
 // Initialize category tabs
 function initializeTabs() {
-  const tabsDiv = document.getElementById("tabs");
-  if (!tabsDiv) return;
-  
   tabsDiv.innerHTML = '';
   
   for (const category in fullMenu) {
@@ -281,8 +198,7 @@ function initializeTabs() {
     tabBtn.textContent = `${categoryIcons[category] || "🍽"} ${category}`;
     tabBtn.dataset.category = category;
     tabBtn.addEventListener('click', () => {
-      const searchInput = document.getElementById('searchInput');
-      if (searchInput) searchInput.value = '';
+      searchInput.value = '';
       renderCategory(category);
       document.getElementById("menuContainer").scrollIntoView({ behavior: 'smooth' });
       
@@ -303,20 +219,12 @@ function initializeTabs() {
 
 // Render menu items
 function renderCategory(category, searchTerm = '') {
-  const container = document.getElementById("menuContainer");
-  if (!container) return;
-  
   container.innerHTML = "";
   
   const section = document.createElement("div");
   section.className = "menu-category";
   section.innerHTML = `<h3>${categoryIcons[category] || "🍽"} ${category}</h3>`;
   container.appendChild(section);
-
-  if (!fullMenu[category]) {
-    container.innerHTML = '<div class="no-results">No items found in this category.</div>';
-    return;
-  }
 
   const filteredItems = fullMenu[category].filter(item => {
     if (!searchTerm) return true;
@@ -338,7 +246,7 @@ function renderCategory(category, searchTerm = '') {
     const itemDiv = document.createElement("div");
     itemDiv.className = "menu-item";
     
-    if (category === "Combos" && document.querySelector('input[name="orderType"]:checked')?.value === "Delivery") {
+    if (category === "Combos" && document.querySelector('input[name="orderType"]:checked').value === "Delivery") {
       itemDiv.classList.add("disabled-item");
       const overlay = document.createElement("div");
       overlay.className = "disabled-overlay";
@@ -347,7 +255,7 @@ function renderCategory(category, searchTerm = '') {
     }
 
     // Add distance display if location is available
-    const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+    const orderType = document.querySelector('input[name="orderType"]:checked').value;
     if (locationObj && orderType === "Delivery") {
       const distanceDisplay = document.createElement("div");
       distanceDisplay.className = "distance-display";
@@ -483,343 +391,220 @@ function renderCategory(category, searchTerm = '') {
   });
 }
 
-// Add item to order
-function addToOrder(name, variant, price, quantity = 1) {
-  const existingItemIndex = selectedItems.findIndex(
-    item => item.name === name && item.variant === variant
-  );
+// Setup mobile event listeners
+function setupMobileEventListeners() {
+  // Mobile cart toggle
+  mobileCartBtn.addEventListener('click', toggleMobileCart);
+  closeCartBtn.addEventListener('click', toggleMobileCart);
   
-  if (existingItemIndex !== -1) {
-    selectedItems[existingItemIndex].quantity += quantity;
-  } else {
-    selectedItems.push({ 
-      name, 
-      variant, 
-      price, 
-      quantity 
-    });
-  }
+  // Close form section
+  document.getElementById('closeFormBtn').addEventListener('click', function() {
+    document.querySelector('.mobile-form-section').classList.remove('visible');
+    document.querySelector('.mobile-footer').classList.remove('with-form');
+  });
   
-  // Save to localStorage
-  localStorage.setItem('cartItems', JSON.stringify(selectedItems));
-  
-  updateCartBadge();
-  showNotification(`${quantity > 1 ? quantity + 'x ' : ''}${name} (${variant}) added to cart!`);
-  
-  if ('vibrate' in navigator) navigator.vibrate(30);
-}
-
-// Update cart display
-function updateCartDisplay() {
-  const cartList = document.getElementById("cartItems");
-  const totalBill = document.getElementById("mobileLiveTotal");
-  const cartTotal = document.getElementById("cartTotal");
-  
-  if (!cartList && !totalBill && !cartTotal) return;
-  
-  if (cartList) cartList.innerHTML = "";
-  const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  let deliveryDetails = null;
-  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
-  
-  if (orderType === 'Delivery' && locationObj) {
-    const distance = deliveryDistance || 0;
-    
-    deliveryDetails = {
-      distance: distance,
-      isAvailable: distance <= MAX_DELIVERY_DISTANCE,
-      charge: calculateDeliveryChargeByDistance(distance),
-      timeEstimate: calculateDeliveryTime(distance)
-    };
-    
-    if (deliveryDetails) {
-      let deliveryMessage = "";
-      
-      if (deliveryDetails.isAvailable) {
-        const finalCharge = subtotal >= 500 ? 0 : deliveryDetails.charge;
-        
-        deliveryMessage = finalCharge === 0 ? 
-          "🎉 Free delivery" : 
-          `Delivery charge: ₹${finalCharge} (${deliveryDetails.distance.toFixed(1)}km)`;
-          
-        deliveryMessage += ` | ⏳ Est. Delivery: ${deliveryDetails.timeEstimate}`;
-        
-        if (document.getElementById('deliveryChargeDisplay')) {
-          document.getElementById('deliveryChargeDisplay').textContent = deliveryMessage;
-          document.getElementById('deliveryChargeDisplay').style.color = 'var(--success-color)';
-        }
-      } else {
-        deliveryMessage = `⚠️ Delivery not available (${deliveryDetails.distance.toFixed(1)}km beyond 8km limit)`;
-        if (document.getElementById('deliveryChargeDisplay')) {
-          document.getElementById('deliveryChargeDisplay').textContent = deliveryMessage;
-          document.getElementById('deliveryChargeDisplay').style.color = 'var(--error-color)';
-        }
-      }
-      
-      if (document.getElementById('deliveryChargeDisplay')) {
-        document.getElementById('deliveryChargeDisplay').style.display = 'block';
-      }
+  // Mobile clear cart
+  mobileClearCartBtn.addEventListener('click', function() {
+    if (selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
+      selectedItems.length = 0;
+      updateCart();
+      showNotification('Cart cleared');
+      if ('vibrate' in navigator) navigator.vibrate(50);
     }
-  }
-
-  const deliveryCharge = deliveryDetails?.isAvailable ? 
-    (subtotal >= 500 ? 0 : deliveryDetails.charge) : 
-    0;
-    
-  const total = subtotal + (deliveryCharge || 0);
+  });
   
-  if (cartList) {
-    selectedItems.forEach((item, index) => {
-      const li = document.createElement("li");
-      li.className = "cart-item";
-      
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "cart-item-name";
-      nameSpan.textContent = `${item.name} (${item.variant}) x ${item.quantity}`;
-      
-      const priceSpan = document.createElement("span");
-      priceSpan.className = "cart-item-price";
-      priceSpan.textContent = `₹${item.price * item.quantity}`;
-      
-      const controlsDiv = document.createElement("div");
-      controlsDiv.className = "cart-item-controls";
-      
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "cart-item-remove";
-      removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
-      removeBtn.addEventListener('click', () => {
-        selectedItems.splice(index, 1);
-        localStorage.setItem('cartItems', JSON.stringify(selectedItems));
-        updateCartDisplay();
-        updateCartBadge();
-        showNotification("Item removed from cart");
-      });
-      
-      controlsDiv.appendChild(removeBtn);
-      li.appendChild(nameSpan);
-      li.appendChild(priceSpan);
-      li.appendChild(controlsDiv);
-      cartList.appendChild(li);
-    });
-  }
-
-  let cartTotalText = `Subtotal: ₹${subtotal}`;
-  if (deliveryCharge > 0) {
-    cartTotalText += ` + Delivery: ₹${deliveryCharge}`;
-  } else if (orderType === 'Delivery' && deliveryCharge === 0) {
-    cartTotalText += ` + Delivery: Free`;
-  }
-  cartTotalText += ` = Total: ₹${total}`;
+  // Mobile checkout
+  mobileCheckoutBtn.addEventListener('click', function() {
+    if (selectedItems.length === 0) {
+      showNotification('Your cart is empty');
+      return;
+    }
+    toggleMobileCart();
+    document.querySelector('.mobile-form-section').classList.add('visible');
+    document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
+  });
   
-  if (orderType === 'Delivery' && deliveryCharge === null) {
-    cartTotalText += " (Delivery not available)";
-  }
+  // Overlay click to close cart
+  document.querySelector('.overlay')?.addEventListener('click', toggleMobileCart);
   
-  if (cartTotal) cartTotal.textContent = cartTotalText;
-  if (totalBill) totalBill.innerHTML = cartTotalText;
-  
-  updateCartBadge();
-}
-
-// Calculate delivery charge by distance
-function calculateDeliveryChargeByDistance(distance) {
-  if (!distance || distance > MAX_DELIVERY_DISTANCE) return null;
-  
-  if (distance <= 4) return 0;
-  if (distance <= 6) return 20;
-  if (distance <= 8) return 30;
-  return null;
-}
-
-// Calculate delivery time
-function calculateDeliveryTime(distanceKm) {
-  if (!distanceKm) return "Unknown";
-  const preparationTime = 20;
-  const travelTimePerKm = 8;
-  const travelTime = Math.round(distanceKm * travelTimePerKm);
-  return `${preparationTime + travelTime} min (${preparationTime} min prep + ${travelTime} min travel)`;
-}
-
-// Setup cart event listeners
-function setupCartEventListeners() {
-  const mobileClearCartBtn = document.getElementById('mobileClearCartBtn');
-  const mobileCheckoutBtn = document.getElementById('mobileCheckoutBtn');
-  
-  if (mobileClearCartBtn) {
-    mobileClearCartBtn.addEventListener('click', function() {
-      if (selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
-        selectedItems.length = 0;
-        localStorage.removeItem('cartItems');
-        updateCartDisplay();
-        updateCartBadge();
-        showNotification('Cart cleared');
-        if ('vibrate' in navigator) navigator.vibrate(50);
-      }
-    });
-  }
-  
-  if (mobileCheckoutBtn) {
-    mobileCheckoutBtn.addEventListener('click', function() {
-      if (selectedItems.length === 0) {
-        showNotification('Your cart is empty');
-        return;
-      }
-      window.location.href = 'checkout.html';
-    });
-  }
-}
-
-// Setup checkout event listeners
-function setupCheckoutEventListeners() {
-  const placeOrderBtn = document.getElementById('placeOrderBtn');
+  // For mandatory location on delivery
   const orderTypeRadios = document.querySelectorAll('input[name="orderType"]');
+  const locationChoiceBlock = document.getElementById('locationChoiceBlock');
   const deliveryShareLocationBtn = document.getElementById('deliveryShareLocationBtn');
   const deliveryShowManualLocBtn = document.getElementById('deliveryShowManualLocBtn');
-  
-  if (placeOrderBtn) {
-    placeOrderBtn.addEventListener('click', async function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Visual feedback
-      this.classList.add('active');
-      if ('vibrate' in navigator) navigator.vibrate(20);
-      
-      try {
-        await confirmOrder();
-      } catch (error) {
-        console.error('Order error:', error);
-        showNotification('Error processing order. Please try again.');
-      } finally {
-        this.classList.remove('active');
-      }
-    });
-  }
-  
-  if (orderTypeRadios) {
-    orderTypeRadios.forEach(radio => {
-      radio.addEventListener('change', showOrHideLocationBlock);
-    });
-  }
-  
-  if (deliveryShareLocationBtn) {
-    deliveryShareLocationBtn.onclick = function () {
-      const currentLocStatusMsg = document.getElementById('currentLocStatusMsg');
-      const distanceText = document.getElementById('distanceText');
-      const deliveryDistanceDisplay = document.getElementById('deliveryDistanceDisplay');
-      
-      currentLocStatusMsg.style.color = "#333";
-      currentLocStatusMsg.textContent = "Detecting your current location...";
-      distanceText.textContent = "Distance: Calculating...";
-      deliveryDistanceDisplay.style.display = 'block';
-      
-      if (!navigator.geolocation) {
-        currentLocStatusMsg.style.color = "#e63946";
-        currentLocStatusMsg.textContent = "Geolocation is not supported by your browser.";
-        deliveryShowManualLocBtn.style.display = 'block';
-        return;
-      }
-      
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          locationObj = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          currentLocStatusMsg.style.color = "#2a9d8f";
-          currentLocStatusMsg.textContent = `Location received!`;
-          deliveryShowManualLocBtn.style.display = 'none';
-          document.getElementById('manualLocationFields').style.display = 'none';
-          usingManualLoc = false;
-          
-          // Calculate distance
-          calculateRoadDistance(pos.coords.latitude, pos.coords.longitude, RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng)
-            .then(distance => {
-              deliveryDistance = distance;
-              distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
-              updateCartDisplay();
-            });
-        },
-        (err) => {
-          currentLocStatusMsg.style.color = "#e63946";
-          currentLocStatusMsg.textContent = "Unable to get your location. Please allow location access or enter manually.";
-          deliveryShowManualLocBtn.style.display = 'block';
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    };
-  }
-  
-  if (deliveryShowManualLocBtn) {
-    deliveryShowManualLocBtn.onclick = function () {
-      usingManualLoc = true;
-      document.getElementById('manualLocationFields').style.display = 'block';
-      document.getElementById('currentLocStatusMsg').textContent = '';
-      document.getElementById('distanceText').textContent = "Distance: Calculating...";
-      document.getElementById('deliveryDistanceDisplay').style.display = 'block';
-      
-      // Initialize map if not already done
-      if (!map) {
-        initMap();
-      } else {
-        // Reset map view
-        map.setView([RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng], 14);
-        marker.setLatLng([RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng]);
-      }
-      
-      // Focus on address field
-      document.getElementById('manualDeliveryAddress').focus();
-    };
-  }
-  
-  // Search input
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      const activeTab = document.querySelector('#tabs button.active');
-      if (activeTab) {
-        renderCategory(activeTab.dataset.category, e.target.value);
-      }
-    });
-  }
-}
-
-// Show or hide location block based on order type
-function showOrHideLocationBlock() {
-  const locationChoiceBlock = document.getElementById('locationChoiceBlock');
-  const deliveryDistanceDisplay = document.getElementById('deliveryDistanceDisplay');
-  
-  if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
-    resetLocationChoiceBlock();
-    locationChoiceBlock.style.display = 'block';
-    deliveryDistanceDisplay.style.display = deliveryDistance ? 'block' : 'none';
-  } else {
-    locationChoiceBlock.style.display = 'none';
-    deliveryDistanceDisplay.style.display = 'none';
-    locationObj = null;
-    usingManualLoc = false;
-  }
-  updateCartDisplay();
-}
-
-// Reset location choice block
-function resetLocationChoiceBlock() {
-  const locationChoiceBlock = document.getElementById('locationChoiceBlock');
   const currentLocStatusMsg = document.getElementById('currentLocStatusMsg');
-  const deliveryShowManualLocBtn = document.getElementById('deliveryShowManualLocBtn');
   const manualLocationFields = document.getElementById('manualLocationFields');
   const manualDeliveryAddress = document.getElementById('manualDeliveryAddress');
-  const deliveryDistanceDisplay = document.getElementById('deliveryDistanceDisplay');
+
+  function resetLocationChoiceBlock() {
+    locationChoiceBlock.style.display = 'block';
+    currentLocStatusMsg.textContent = '';
+    deliveryShowManualLocBtn.style.display = 'none';
+    manualLocationFields.style.display = 'none';
+    manualDeliveryAddress.value = '';
+    locationObj = null;
+    usingManualLoc = false;
+    deliveryDistanceDisplay.style.display = 'none';
+  }
+
+  function showOrHideLocationBlock() {
+    if (document.querySelector('input[name="orderType"]:checked').value === 'Delivery') {
+      resetLocationChoiceBlock();
+      locationChoiceBlock.style.display = 'block';
+      deliveryDistanceDisplay.style.display = deliveryDistance ? 'block' : 'none';
+    } else {
+      locationChoiceBlock.style.display = 'none';
+      deliveryDistanceDisplay.style.display = 'none';
+      locationObj = null;
+      usingManualLoc = false;
+    }
+    updateCart();
+  }
+
+  orderTypeRadios.forEach(radio => {
+    radio.addEventListener('change', showOrHideLocationBlock);
+  });
+
+  // On initial load
+  showOrHideLocationBlock();
+
+  deliveryShareLocationBtn.onclick = function () {
+    currentLocStatusMsg.style.color = "#333";
+    currentLocStatusMsg.textContent = "Detecting your current location...";
+    distanceText.textContent = "Distance: Calculating...";
+    deliveryDistanceDisplay.style.display = 'block';
+    
+    if (!navigator.geolocation) {
+      currentLocStatusMsg.style.color = "#e63946";
+      currentLocStatusMsg.textContent = "Geolocation is not supported by your browser.";
+      deliveryShowManualLocBtn.style.display = 'block';
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        locationObj = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        currentLocStatusMsg.style.color = "#2a9d8f";
+        currentLocStatusMsg.textContent = `Location received!`;
+        deliveryShowManualLocBtn.style.display = 'none';
+        manualLocationFields.style.display = 'none';
+        usingManualLoc = false;
+        
+        // Calculate distance
+        calculateRoadDistance(pos.coords.latitude, pos.coords.longitude, RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng)
+          .then(distance => {
+            deliveryDistance = distance;
+            distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+            updateCart();
+            checkDeliveryRestriction();
+          });
+      },
+      (err) => {
+        currentLocStatusMsg.style.color = "#e63946";
+        currentLocStatusMsg.textContent = "Unable to get your location. Please allow location access or enter manually.";
+        deliveryShowManualLocBtn.style.display = 'block';
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  deliveryShowManualLocBtn.onclick = function () {
+    usingManualLoc = true;
+    manualLocationFields.style.display = 'block';
+    currentLocStatusMsg.textContent = '';
+    distanceText.textContent = "Distance: Calculating...";
+    deliveryDistanceDisplay.style.display = 'block';
+    
+    // Initialize map if not already done
+    if (!map) {
+      initMap();
+    } else {
+      // Reset map view
+      map.setView([RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng], 14);
+      marker.setLatLng([RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng]);
+    }
+    
+    // Focus on address field
+    document.getElementById('manualDeliveryAddress').focus();
+  };
+
+  searchInput.addEventListener('input', (e) => {
+    const activeTab = document.querySelector('#tabs button.active');
+    if (activeTab) {
+      renderCategory(activeTab.dataset.category, e.target.value);
+    }
+  });
+
+  // Place Order Button - Fixed version
+  placeOrderBtn.addEventListener('click', async function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Visual feedback
+    this.classList.add('active');
+    if ('vibrate' in navigator) navigator.vibrate(20);
+    
+    try {
+      await confirmOrder();
+    } catch (error) {
+      console.error('Order error:', error);
+      showNotification('Error processing order. Please try again.');
+    } finally {
+      this.classList.remove('active');
+    }
+  });
+
+  // Touch support for mobile
+  placeOrderBtn.addEventListener('touchstart', function(e) {
+    this.classList.add('active');
+  }, { passive: true });
+
+  placeOrderBtn.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    this.classList.remove('active');
+    confirmOrder().catch(error => {
+      console.error('Order error:', error);
+    });
+  }, { passive: true });
   
-  locationChoiceBlock.style.display = 'block';
-  currentLocStatusMsg.textContent = '';
-  deliveryShowManualLocBtn.style.display = 'none';
-  manualLocationFields.style.display = 'none';
-  manualDeliveryAddress.value = '';
-  locationObj = null;
-  usingManualLoc = false;
-  deliveryDistanceDisplay.style.display = 'none';
+  viewOrderHistoryBtn.addEventListener('click', showOrderHistory);
+  
+  document.getElementById('closeHistoryBtn').addEventListener('click', function() {
+    document.getElementById('orderHistoryModal').style.display = 'none';
+  });
+  
+  document.getElementById('clearHistoryBtn').addEventListener('click', clearOrderHistory);
+  
+  window.addEventListener('click', function(event) {
+    if (event.target.classList.contains('mobile-modal')) {
+      event.target.style.display = 'none';
+    }
+  });
 }
 
-// Initialize map
+// Toggle mobile cart drawer
+function toggleMobileCart() {
+  mobileCartDrawer.classList.toggle('active');
+  document.body.style.overflow = mobileCartDrawer.classList.contains('active') ? 'hidden' : '';
+  
+  if (mobileCartDrawer.classList.contains('active')) {
+    document.querySelector('.mobile-form-section').classList.add('visible');
+    document.querySelector('.mobile-footer').classList.add('with-form');
+    document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
+  } else {
+    document.querySelector('.mobile-footer').classList.remove('with-form');
+  }
+  
+  let overlay = document.querySelector('.overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.toggle('active');
+}
+
+// Initialize OpenStreetMap with enhanced search functionality
 function initMap() {
   map = L.map('addressMap').setView([RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng], 14);
 
@@ -936,7 +721,7 @@ function initMap() {
     map.setView([RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng], 14);
     marker.setLatLng([RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng]);
     locationObj = null;
-    document.getElementById('deliveryDistanceDisplay').style.display = 'none';
+    deliveryDistanceDisplay.style.display = 'none';
   });
   
   addressInput.parentNode.insertBefore(clearSearchBtn, addressInput.nextSibling);
@@ -1047,8 +832,8 @@ function updateLocationFromMarker() {
   const position = marker.getLatLng();
   locationObj = { lat: position.lat, lng: position.lng };
   
-  document.getElementById("distanceText").textContent = "Distance: Calculating...";
-  document.getElementById("deliveryDistanceDisplay").style.display = 'block';
+  distanceText.textContent = "Distance: Calculating...";
+  deliveryDistanceDisplay.style.display = 'block';
   document.getElementById('geocodingLoading').style.display = 'block';
 
   // Get address from coordinates with more detailed response
@@ -1087,15 +872,17 @@ function updateLocationFromMarker() {
   calculateRoadDistance(position.lat, position.lng, RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng)
     .then(distance => {
       deliveryDistance = distance;
-      document.getElementById("distanceText").textContent = `Distance: ${distance.toFixed(1)} km`;
-      updateCartDisplay();
+      distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+      updateCart();
+      checkDeliveryRestriction();
     })
     .catch(error => {
       console.error("Error calculating distance:", error);
       // Fallback to straight-line distance if road distance fails
       deliveryDistance = calculateHaversineDistance(position.lat, position.lng, RESTAURANT_LOCATION.lat, RESTAURANT_LOCATION.lng);
-      document.getElementById("distanceText").textContent = `Distance: ${deliveryDistance.toFixed(1)} km (straight line)`;
-      updateCartDisplay();
+      distanceText.textContent = `Distance: ${deliveryDistance.toFixed(1)} km (straight line)`;
+      updateCart();
+      checkDeliveryRestriction();
     });
 }
 
@@ -1130,6 +917,272 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
     Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
+}
+
+// Calculate delivery charge by distance
+function calculateDeliveryChargeByDistance(distance) {
+  if (!distance || distance > MAX_DELIVERY_DISTANCE) return null;
+  
+  if (distance <= 4) return 0;
+  if (distance <= 6) return 20;
+  if (distance <= 8) return 30;
+  return null;
+}
+
+// Calculate delivery time
+function calculateDeliveryTime(distanceKm) {
+  if (!distanceKm) return "Unknown";
+  const preparationTime = 20;
+  const travelTimePerKm = 8;
+  const travelTime = Math.round(distanceKm * travelTimePerKm);
+  return `${preparationTime + travelTime} min (${preparationTime} min prep + ${travelTime} min travel)`;
+}
+
+// Check delivery restriction
+async function checkDeliveryRestriction() {
+  if (!locationObj) {
+    deliveryRestriction.style.display = 'none';
+    return;
+  }
+  
+  const distance = await calculateRoadDistance(
+    locationObj.lat, 
+    locationObj.lng,
+    RESTAURANT_LOCATION.lat,
+    RESTAURANT_LOCATION.lng
+  );
+  
+  deliveryRestriction.style.display = distance > MAX_DELIVERY_DISTANCE ? 'block' : 'none';
+}
+
+// Setup rating system
+function setupRatingSystem() {
+  // Main widget rating
+  const stars = document.querySelectorAll('.mobile-rating-widget .rating-stars i');
+  const ratingFeedback = document.querySelector('.mobile-rating-widget .rating-feedback');
+  const submitBtn = document.querySelector('.mobile-rating-widget .submit-rating');
+  
+  stars.forEach(star => {
+    star.addEventListener('click', function() {
+      currentRating = parseInt(this.dataset.rating);
+      
+      stars.forEach((s, index) => {
+        s.classList.toggle('active', index < currentRating);
+      });
+      
+      if (currentRating < 4) {
+        ratingFeedback.style.display = 'block';
+      } else {
+        ratingFeedback.style.display = 'none';
+        saveRating(currentRating);
+      }
+    });
+  });
+  
+  submitBtn.addEventListener('click', function() {
+    const comment = document.querySelector('.mobile-rating-widget .rating-comment').value;
+    saveRating(currentRating, comment);
+    document.querySelector('.mobile-rating-widget .rating-comment').value = '';
+    ratingFeedback.style.display = 'none';
+    showNotification('Thank you for your feedback!');
+  });
+
+  // Modal rating
+  const modalStars = document.querySelectorAll('#orderConfirmationModal .rating-stars i');
+  const modalFeedback = document.querySelector('#orderConfirmationModal .rating-feedback');
+  
+  modalStars.forEach(star => {
+    star.addEventListener('click', function() {
+      modalRating = parseInt(this.dataset.rating);
+      
+      modalStars.forEach((s, index) => {
+        s.classList.toggle('active', index < modalRating);
+      });
+      
+      if (modalRating < 4) {
+        modalFeedback.style.display = 'block';
+      } else {
+        modalFeedback.style.display = 'none';
+      }
+    });
+  });
+}
+
+// Save rating to Firestore
+function saveRating(rating, comment = '') {
+  if (!rating) return;
+  
+  const ratingData = {
+    rating,
+    comment,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    page: window.location.href,
+    userAgent: navigator.userAgent
+  };
+  
+  db.collection('ratings').add(ratingData)
+    .then(() => console.log('Rating saved'))
+    .catch(err => console.error('Error saving rating:', err));
+}
+
+// Setup delivery info accordion
+function setupDeliveryAccordion() {
+  const deliveryHeader = document.querySelector('.delivery-header');
+  if (deliveryHeader) {
+    deliveryHeader.addEventListener('click', function() {
+      const content = this.nextElementSibling;
+      content.classList.toggle('active');
+      const icon = this.querySelector('i');
+      icon.classList.toggle('fa-chevron-down');
+      icon.classList.toggle('fa-chevron-up');
+    });
+  }
+}
+
+// Show notification
+function showNotification(message) {
+  notificationText.textContent = message;
+  notification.classList.add('show');
+  
+  setTimeout(() => {
+    notification.classList.remove('show');
+  }, 3000);
+}
+
+// Add item to order
+function addToOrder(name, variant, price, quantity = 1) {
+  const existingItemIndex = selectedItems.findIndex(
+    item => item.name === name && item.variant === variant
+  );
+  
+  if (existingItemIndex !== -1) {
+    selectedItems[existingItemIndex].quantity += quantity;
+  } else {
+    selectedItems.push({ 
+      name, 
+      variant, 
+      price, 
+      quantity 
+    });
+  }
+  
+  updateCart();
+  showNotification(`${quantity > 1 ? quantity + 'x ' : ''}${name} (${variant}) added to cart!`);
+  
+  if ('vibrate' in navigator) navigator.vibrate(30);
+}
+
+// Update cart display
+async function updateCart() {
+  cartList.innerHTML = "";
+  const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  let deliveryDetails = null;
+  const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  
+  if (orderType === 'Delivery' && locationObj) {
+    const distance = await calculateRoadDistance(
+      locationObj.lat, 
+      locationObj.lng,
+      RESTAURANT_LOCATION.lat,
+      RESTAURANT_LOCATION.lng
+    );
+    
+    deliveryDetails = {
+      distance: distance,
+      isAvailable: distance <= MAX_DELIVERY_DISTANCE,
+      charge: calculateDeliveryChargeByDistance(distance),
+      timeEstimate: calculateDeliveryTime(distance)
+    };
+    
+    if (deliveryDetails) {
+      let deliveryMessage = "";
+      
+      if (deliveryDetails.isAvailable) {
+        const finalCharge = subtotal >= 500 ? 0 : deliveryDetails.charge;
+        
+        deliveryMessage = finalCharge === 0 ? 
+          "🎉 Free delivery" : 
+          `Delivery charge: ₹${finalCharge} (${deliveryDetails.distance.toFixed(1)}km)`;
+          
+        deliveryMessage += ` | ⏳ Est. Delivery: ${deliveryDetails.timeEstimate}`;
+        
+        deliveryChargeDisplay.textContent = deliveryMessage;
+        deliveryChargeDisplay.style.color = 'var(--success-color)';
+      } else {
+        deliveryMessage = `⚠️ Delivery not available (${deliveryDetails.distance.toFixed(1)}km beyond 8km limit)`;
+        deliveryChargeDisplay.textContent = deliveryMessage;
+        deliveryChargeDisplay.style.color = 'var(--error-color)';
+      }
+      
+      deliveryChargeDisplay.style.display = 'block';
+    }
+  }
+
+  const deliveryCharge = deliveryDetails?.isAvailable ? 
+    (subtotal >= 500 ? 0 : deliveryDetails.charge) : 
+    0;
+    
+  const total = subtotal + (deliveryCharge || 0);
+  
+  selectedItems.forEach((item, index) => {
+    const li = document.createElement("li");
+    li.className = "cart-item";
+    
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "cart-item-name";
+    nameSpan.textContent = `${item.name} (${item.variant}) x ${item.quantity}`;
+    
+    const priceSpan = document.createElement("span");
+    priceSpan.className = "cart-item-price";
+    priceSpan.textContent = `₹${item.price * item.quantity}`;
+    
+    const controlsDiv = document.createElement("div");
+    controlsDiv.className = "cart-item-controls";
+    
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "cart-item-remove";
+    removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
+    removeBtn.addEventListener('click', () => {
+      selectedItems.splice(index, 1);
+      updateCart();
+      showNotification("Item removed from cart");
+    });
+    
+    controlsDiv.appendChild(removeBtn);
+    li.appendChild(nameSpan);
+    li.appendChild(priceSpan);
+    li.appendChild(controlsDiv);
+    cartList.appendChild(li);
+  });
+
+  let cartTotalText = `Subtotal: ₹${subtotal}`;
+  if (deliveryCharge > 0) {
+    cartTotalText += ` + Delivery: ₹${deliveryCharge}`;
+  } else if (orderType === 'Delivery' && deliveryCharge === 0) {
+    cartTotalText += ` + Delivery: Free`;
+  }
+  cartTotalText += ` = Total: ₹${total}`;
+  
+  if (orderType === 'Delivery' && deliveryCharge === null) {
+    cartTotalText += " (Delivery not available)";
+  }
+  
+  document.getElementById('cartTotal').textContent = cartTotalText;
+  totalBill.innerHTML = cartTotalText;
+  
+  const itemCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  document.querySelectorAll('.cart-count, .cart-badge').forEach(el => {
+    el.textContent = itemCount;
+  });
+
+  if (itemCount > 0) {
+    mobileClearCartBtn.disabled = false;
+    mobileCheckoutBtn.disabled = false;
+  } else {
+    mobileClearCartBtn.disabled = true;
+    mobileCheckoutBtn.disabled = true;
+  }
 }
 
 // Confirm order
@@ -1229,17 +1282,17 @@ async function confirmOrder() {
       deliveryCharge: deliveryCharge,
       total: total,
       status: "Pending",
-      timestamp: serverTimestamp()
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
     };
 
     if (orderType === 'Delivery') {
       if (usingManualLoc) {
         orderData.deliveryAddress = document.getElementById('manualDeliveryAddress').value;
         if (locationObj) {
-          orderData.deliveryLocation = new GeoPoint(locationObj.lat, locationObj.lng);
+          orderData.deliveryLocation = new firebase.firestore.GeoPoint(locationObj.lat, locationObj.lng);
         }
       } else if (locationObj) {
-        orderData.deliveryLocation = new GeoPoint(locationObj.lat, locationObj.lng);
+        orderData.deliveryLocation = new firebase.firestore.GeoPoint(locationObj.lat, locationObj.lng);
       }
       orderData.deliveryDistance = deliveryDistance;
     }
@@ -1322,51 +1375,21 @@ function showOrderConfirmationModal(orderData) {
   
   orderSummary.innerHTML = summaryHTML;
   
-  // Setup rating stars
-  document.querySelectorAll('.rating-stars i').forEach(star => {
-    star.addEventListener('click', function() {
-      const rating = parseInt(this.dataset.rating);
-      modalRating = rating;
-      
-      // Update stars display
-      document.querySelectorAll('.rating-stars i').forEach((s, i) => {
-        if (i < rating) {
-          s.classList.add('active');
-        } else {
-          s.classList.remove('active');
-        }
-      });
-      
-      // Show feedback textarea for lower ratings
-      const feedbackDiv = document.querySelector('.rating-feedback');
-      if (rating < 4) {
-        feedbackDiv.style.display = 'block';
-      } else {
-        feedbackDiv.style.display = 'none';
-      }
-    });
-  });
-  
   document.getElementById('confirmOrderBtn').onclick = function() {
-    addDoc(collection(db, 'orders'), orderData)
+    db.collection('orders').add(orderData)
       .then(docRef => {
         orderData.id = docRef.id;
         saveOrderToHistory(orderData);
         sendWhatsAppOrder(orderData);
         
         selectedItems.length = 0;
-        localStorage.removeItem('cartItems');
-        updateCartDisplay();
-        updateCartBadge();
+        updateCart();
         
         document.getElementById('orderConfirmationModal').style.display = 'none';
+        document.querySelector('.mobile-form-section').classList.remove('visible');
+        document.querySelector('.mobile-footer').classList.remove('with-form');
         
         showNotification('Order placed successfully!');
-        
-        // Redirect to order history after a delay
-        setTimeout(() => {
-          window.location.href = 'order-history.html';
-        }, 2000);
       })
       .catch(error => {
         console.error("Error saving order:", error);
@@ -1394,9 +1417,8 @@ function saveOrderToHistory(orderData) {
 
 // Show order history
 function showOrderHistory() {
+  const orderHistoryModal = document.getElementById('orderHistoryModal');
   const orderHistoryList = document.getElementById('orderHistoryList');
-  if (!orderHistoryList) return;
-  
   const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
   
   if (orders.length === 0) {
@@ -1447,20 +1469,16 @@ function showOrderHistory() {
       });
     });
   }
+  
+  orderHistoryModal.style.display = 'block';
 }
 
-// Setup order history event listeners
-function setupOrderHistoryEventListeners() {
-  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
-  
-  if (clearHistoryBtn) {
-    clearHistoryBtn.addEventListener('click', function() {
-      if (confirm('Are you sure you want to clear your entire order history?')) {
-        localStorage.removeItem('bakeAndGrillOrders');
-        showOrderHistory();
-        showNotification('Order history cleared');
-      }
-    });
+// Clear order history
+function clearOrderHistory() {
+  if (confirm('Are you sure you want to clear your entire order history?')) {
+    localStorage.removeItem('bakeAndGrillOrders');
+    showOrderHistory();
+    showNotification('Order history cleared');
   }
 }
 
@@ -1479,9 +1497,14 @@ function reorderFromHistory(orderIndex) {
       });
     });
     
-    localStorage.setItem('cartItems', JSON.stringify(selectedItems));
-    updateCartBadge();
-    window.location.href = 'checkout.html';
+    document.getElementById('customerName').value = order.customerName;
+    document.getElementById('phoneNumber').value = order.phoneNumber;
+    document.querySelector(`input[name="orderType"][value="${order.orderType}"]`).checked = true;
+    
+    updateCart();
+    document.getElementById('orderHistoryModal').style.display = 'none';
+    document.querySelector('.mobile-form-section').classList.add('visible');
+    document.querySelector('.mobile-form-section').scrollIntoView({ behavior: 'smooth' });
     showNotification('Order loaded from history');
   }
 }
@@ -1605,64 +1628,3 @@ function generateWhatsAppMessage(orderData) {
   
   return message;
 }
-
-// Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
-  // Register service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('ServiceWorker registration successful with scope:', registration.scope);
-        
-        // Check for updates every hour
-        setInterval(() => {
-          registration.update().catch(err => {
-            console.log('ServiceWorker update check failed:', err);
-          });
-        }, 60 * 60 * 1000);
-      })
-      .catch(error => {
-        console.error('ServiceWorker registration failed:', error);
-      });
-  }
-  
-  // Set up passive event listeners for better scrolling performance
-  document.body.addEventListener('touchstart', function() {}, { passive: true });
-  
-  // Update cart display
-  updateCartBadge();
-  
-  // Check status on initial load
-  updateStatusDisplay();
-  setupStatusListener();
-  
-  // Request notification permission
-  requestNotificationPermission();
-  
-  // Set up messaging
-  setupMessaging();
-  
-  // Page-specific initializations
-  if (document.getElementById('menuContainer')) {
-    // Menu page
-    loadMenuFromFirestore();
-  }
-  
-  if (document.getElementById('cartItems')) {
-    // Cart page
-    updateCartDisplay();
-    setupCartEventListeners();
-  }
-  
-  if (document.getElementById('orderHistoryList')) {
-    // Order history page
-    showOrderHistory();
-    setupOrderHistoryEventListeners();
-  }
-  
-  if (document.getElementById('placeOrderBtn')) {
-    // Checkout page
-    updateCartDisplay();
-    setupCheckoutEventListeners();
-  }
-});
