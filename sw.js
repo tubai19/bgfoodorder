@@ -5,6 +5,7 @@ const CORE_ASSETS = [
   '/index.html',
   '/styles.css',
   '/script.js',
+  '/firebase-init.js',
   '/manifest.webmanifest',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
@@ -26,6 +27,10 @@ self.addEventListener('install', (event) => {
         return self.skipWaiting();
       })
       .catch(err => {
+        console.error('Cache addAll failed:', err);
+      })
+  );
+}); .catch(err => {
         console.error('Cache addAll failed:', err);
       })
   );

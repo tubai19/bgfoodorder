@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Checkout - Bake & Grill</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#9d4edf">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.webmanifest">
+  
+  <!-- CSS and JavaScript Libraries -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="mobile-view">
+  <!-- Header Section -->
+  <header class="mobile-header">
+    <div class="logo-container">
+      <a href="cart.html" class="back-button"><i class="fas fa-arrow-left"></i></a>
+      <div class="logo">Checkout</div>
+      <div class="mobile-cart-icon">
+        <i class="fas fa-shopping-cart"></i>
+        <span class="cart-badge">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <div class="mobile-container">
+    <div id="mobileLiveTotal" class="mobile-total-display">💰 Total Bill: ₹0</div>
+    
+    <div class="mobile-form-input">
+      <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
+      <input type="text" id="customerName" placeholder="Enter your name" required class="mobile-form-field">
+    </div>
+    
+    <div class="mobile-form-input">
+      <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
+      <input type="tel" id="phoneNumber" placeholder="Enter 10-digit phone number" required class="mobile-form-field" pattern="[0-9]{10}">
+    </div>
+
+    <div class="mobile-form-input" id="locationChoiceBlock">
+      <label><i class="fas fa-map-marked-alt"></i> Delivery Location</label>
+      <button id="deliveryShareLocationBtn" class="mobile-location-btn">
+        <i class="fas fa-location-arrow"></i> Share Current Location
+      </button>
+      <div id="currentLocStatusMsg" class="mobile-location-status"></div>
+      <button id="deliveryShowManualLocBtn" style="display:none;" class="mobile-alt-location-btn">
+        <i class="fas fa-map-marker-alt"></i> Enter Location Manually
+      </button>
+      <div id="manualLocationFields" style="display:none;">
+        <input type="text" id="manualDeliveryAddress" placeholder="Search for your location (street, area, landmark)" class="mobile-search">
+        <div id="geocodingLoading" class="geocoding-loading" style="display:none;">
+          <i class="fas fa-spinner fa-spin"></i> Searching location...
+        </div>
+        <small class="map-instructions">Search above or click on the map to set your exact location</small>
+        <div id="addressMap" style="height: 200px; width: 100%; margin-top: 10px; border-radius: var(--border-radius);"></div>
+      </div>
+      <div id="deliveryDistanceDisplay" class="mobile-delivery-distance" style="display:none;">
+        <i class="fas fa-map-marker-alt"></i> 
+        <span id="distanceText">Distance: Calculating...</span>
+      </div>
+    </div>
+    
+    <div class="mobile-form-input">
+      <label><i class="fas fa-truck"></i> Order Type</label>
+      <div class="mobile-order-type">
+        <label class="mobile-order-option">
+          <input type="radio" name="orderType" value="Delivery" checked>
+          <span><i class="fas fa-home"></i> Delivery</span>
+        </label>
+        <label class="mobile-order-option">
+          <input type="radio" name="orderType" value="Pickup">
+          <span><i class="fas fa-walking"></i> Pickup</span>
+        </label>
+      </div>
+    </div>
+    
+    <div id="deliveryChargeDisplay" class="mobile-delivery-charge"></div>
+    
+    <div class="mobile-form-input">
+      <label for="orderNotes"><i class="fas fa-sticky-note"></i> Special Instructions</label>
+      <textarea id="orderNotes" placeholder="Any special requests or delivery instructions..." class="mobile-form-field" rows="2"></textarea>
+    </div>
+    
+    <div class="mobile-form-input full-width-btn-container">
+      <button id="placeOrderBtn" class="mobile-order-btn">
+        <span class="btn-content">
+          <i class="fas fa-paper-plane"></i>
+          <span class="btn-text">Place Order</span>
+          <i class="fas fa-arrow-right"></i>
+        </span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div id="orderConfirmationModal" class="mobile-modal">
+    <div class="mobile-modal-content">
+      <div class="mobile-modal-header">
+        <h2>Confirm Your Order</h2>
+        <span class="close-modal" aria-label="Close modal">&times;</span>
+      </div>
+      <div class="mobile-order-summary" id="orderConfirmationSummary"></div>
+      <div class="order-rating" style="padding: 0 15px 15px;">
+        <h4>How was your experience?</h4>
+        <div class="rating-stars">
+          <i class="fas fa-star" data-rating="1"></i>
+          <i class="fas fa-star" data-rating="2"></i>
+          <i class="fas fa-star" data-rating="3"></i>
+          <i class="fas fa-star" data-rating="4"></i>
+          <i class="fas fa-star" data-rating="5"></i>
+        </div>
+        <div class="rating-feedback" style="display:none; margin-top:10px;">
+          <textarea placeholder="What could we improve?" class="rating-comment" style="width:100%; min-height:60px; padding:8px;"></textarea>
+        </div>
+      </div>
+      <div class="mobile-modal-buttons">
+        <button class="mobile-modal-btn cancel-btn" id="cancelOrderBtn"><i class="fas fa-times"></i> Cancel</button>
+        <button class="mobile-modal-btn confirm-btn" id="confirmOrderBtn"><i class="fab fa-whatsapp"></i> Confirm via WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="mobile-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3><i class="fas fa-phone"></i> Contact Us</h3>
+        <p><a href="tel:+918240266267">+91 8240266267</a></p>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 Bake & Grill. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JavaScript Libraries -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  
+  <!-- Main Script -->
+  <script src="script.js"></script>
+  
+  <script>
+    // Initialize checkout page specific functionality
+    document.addEventListener('DOMContentLoaded', function() {
+      // Update cart display
+      if (typeof updateCartDisplay === 'function') {
+        updateCartDisplay();
+      }
+      
+      // Setup checkout event listeners
+      if (typeof setupCheckoutEventListeners === 'function') {
+        setupCheckoutEventListeners();
+      }
+      
+      // Update cart badge
+      if (typeof updateCartBadge === 'function') {
+        updateCartBadge();
+      }
+      
+      // Initialize map if needed
+      if (typeof initMap === 'function' && document.getElementById('addressMap')) {
+        initMap();
+      }
+    });
+  </script>
+</body>
+</html>

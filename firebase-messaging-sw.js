@@ -25,7 +25,7 @@ messaging.onBackgroundMessage((payload) => {
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge.png',
     data: {
-      url: '/orders',
+      url: '/order-history.html',
       orderId: payload.data?.orderId
     },
     vibrate: [200, 100, 200]

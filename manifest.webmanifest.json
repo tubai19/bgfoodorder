@@ -71,13 +71,13 @@
       "name": "Order Food",
       "short_name": "Order",
       "description": "Place a new food order",
-      "url": "/#menuContainer"
+      "url": "/menu.html"
     },
     {
       "name": "Order History",
       "short_name": "History",
       "description": "View your past orders",
-      "url": "/?view=history"
+      "url": "/order-history.html"
     }
   ],
   "related_applications": [
