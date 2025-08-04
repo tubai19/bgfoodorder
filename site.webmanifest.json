@@ -1,12 +1,12 @@
 {
-  "name": "Bake & Grill – Fresh Pizza, Burgers & Sandwiches",
-  "short_name": "Bake&Grill",
+  "name": "Bake & Grill",
+  "short_name": "BG EATS",
   "description": "Order delicious pizzas, burgers, sandwiches in Sanjua, Bakhrahat. Fast delivery within 8km.",
   "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a1a2e",
+  "background_color": "#ffffff",
   "theme_color": "#9d4edf",
   "icons": [
     {
