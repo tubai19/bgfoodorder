@@ -68,6 +68,7 @@
           <ul>
             <li class="active" data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</li>
             <li data-section="menu"><i class="fas fa-edit"></i> Menu Management</li>
+            <li data-section="coupons"><i class="fas fa-tag"></i> Coupons</li>
             <li data-section="analytics"><i class="fas fa-chart-bar"></i> Analytics</li>
             <li data-section="settings"><i class="fas fa-cog"></i> Settings</li>
           </ul>
@@ -104,6 +105,17 @@
           </div>
           <div class="menu-categories" id="menuCategoriesContainer">
             <div class="loading">Loading menu...</div>
+          </div>
+        </section>
+
+        <!-- Coupons Section -->
+        <section id="couponsSection" class="content-section" style="display: none;">
+          <div class="section-header">
+            <h2><i class="fas fa-tag"></i> Coupon Management</h2>
+            <button id="addCouponBtn" class="btn primary-btn"><i class="fas fa-plus"></i> Add Coupon</button>
+          </div>
+          <div class="coupons-list" id="couponsListContainer">
+            <div class="loading">Loading coupons...</div>
           </div>
         </section>
 
@@ -285,6 +297,61 @@
       <div class="modal-footer">
         <button class="btn cancel-btn">Cancel</button>
         <button id="saveMenuItemBtn" class="btn primary-btn">Save Item</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="couponModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="couponModalTitle">Add Coupon</h3>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="currentCouponId">
+        <div class="form-group">
+          <label>Coupon Code</label>
+          <input type="text" id="couponCode" placeholder="e.g., WELCOME10" class="uppercase-input">
+        </div>
+        <div class="form-group">
+          <label>Coupon Type</label>
+          <select id="couponType">
+            <option value="percentage">Percentage Discount</option>
+            <option value="fixed">Fixed Amount Discount</option>
+            <option value="free_delivery">Free Delivery</option>
+          </select>
+        </div>
+        <div class="form-group" id="couponValueGroup">
+          <label>Discount Value</label>
+          <input type="number" id="couponValue" placeholder="e.g., 10 for 10% or ₹10">
+        </div>
+        <div class="form-group">
+          <label>Minimum Order Amount (₹)</label>
+          <input type="number" id="couponMinOrder" placeholder="0 for no minimum" min="0">
+        </div>
+        <div class="form-group">
+          <label>Valid From</label>
+          <input type="datetime-local" id="couponStartDate">
+        </div>
+        <div class="form-group">
+          <label>Valid Until</label>
+          <input type="datetime-local" id="couponEndDate">
+        </div>
+        <div class="form-group">
+          <label>Max Uses</label>
+          <input type="number" id="couponMaxUses" placeholder="Leave empty for unlimited">
+        </div>
+        <div class="form-group">
+          <label>Active</label>
+          <label class="switch">
+            <input type="checkbox" id="couponActive" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn cancel-btn">Cancel</button>
+        <button id="saveCouponBtn" class="btn primary-btn">Save Coupon</button>
       </div>
     </div>
   </div>
