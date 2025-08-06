@@ -5,21 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Checkout - Bake & Grill</title>
   
-  <!-- Content Security Policy -->
+  <!-- Updated Content Security Policy -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' https://bakeandgrillorder.shop https://firestore.googleapis.com https://www.google.com https://maps.googleapis.com;
+    script-src 'self' 
+      https://bakeandgrillorder.shop 
+      https://firestore.googleapis.com 
+      https://www.google.com 
+      https://maps.googleapis.com 
+      https://unpkg.com 
+      https://cdnjs.cloudflare.com 
+      https://www.gstatic.com;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' data: https://*.tile.openstreetmap.org;
     font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' https://bakeandgrillorder.shop https://firestore.googleapis.com https://router.project-osrm.org;
+    connect-src 'self' 
+      https://bakeandgrillorder.shop 
+      https://firestore.googleapis.com 
+      https://router.project-osrm.org 
+      https://maps.googleapis.com;
     worker-src 'self';
+    frame-src https://www.google.com;
   ">
+  
+  <!-- Preconnect to improve performance -->
+  <link rel="preconnect" href="https://firestore.googleapis.com">
+  <link rel="preconnect" href="https://www.google.com">
+  <link rel="preconnect" href="https://maps.googleapis.com">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com">
   
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="/css/leaflet.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -57,7 +77,7 @@
           </button>
         </div>
         <ul id="checkoutItemsList" class="checkout-items-list">
-          <!-- Items will be added here dynamically -->
+          <li class="empty-cart">Your cart is empty</li>
         </ul>
       </div>
       
@@ -68,7 +88,7 @@
       
       <div class="mobile-form-input">
         <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
-        <input type="tel" id="phoneNumber" placeholder="Enter 10-digit phone number" required class="mobile-form-field" pattern="[0-9]{10}">
+        <input type="tel" id="phoneNumber" placeholder="Enter 10-digit phone number" required class="mobile-form-field" pattern="[0-9]{10}" maxlength="10">
       </div>
 
       <div class="mobile-form-input">
@@ -106,11 +126,11 @@
       
       <div class="mobile-form-input">
         <label for="orderNotes"><i class="fas fa-sticky-note"></i> Order Notes</label>
-        <textarea id="orderNotes" placeholder="Any special instructions..." class="mobile-form-field"></textarea>
+        <textarea id="orderNotes" placeholder="Any special instructions..." class="mobile-form-field" rows="3"></textarea>
       </div>
       
       <div class="mobile-form-input full-width-btn-container">
-        <button id="placeOrderBtn" class="mobile-order-btn">
+        <button id="placeOrderBtn" class="mobile-order-btn" disabled>
           <i class="fas fa-paper-plane"></i> Place Order
         </button>
       </div>
@@ -118,7 +138,7 @@
   </div>
 
   <!-- Order Confirmation Modal -->
-  <div id="orderConfirmationModal" class="mobile-modal" aria-hidden="true">
+  <div id="orderConfirmationModal" class="mobile-modal" aria-hidden="true" style="display: none;">
     <div class="mobile-modal-content">
       <div class="mobile-modal-header">
         <h2>Confirm Your Order</h2>
@@ -151,9 +171,9 @@
     </div>
   </footer>
 
-  <div class="mobile-notification" id="notification">
+  <div class="mobile-notification" id="notification" style="display: none;">
     <i class="fas fa-check-circle"></i>
-    <span id="notificationText">Order placed successfully!</span>
+    <span id="notificationText"></span>
   </div>
 
   <!-- Scripts -->
@@ -161,7 +181,24 @@
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <!-- Google Maps API (only loaded when needed) -->
+  <script id="google-maps-script" src="" async defer></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+  
   <script type="module" src="/js/main.js"></script>
   <script type="module" src="/js/checkout.js"></script>
+  
+  <script>
+    // Load Google Maps API only when needed
+    function loadGoogleMapsAPI() {
+      const script = document.getElementById('google-maps-script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap`;
+    }
+    
+    // Check if manual location is needed
+    document.getElementById('deliveryShowManualLocBtn')?.addEventListener('click', loadGoogleMapsAPI);
+  </script>
 </body>
 </html>
