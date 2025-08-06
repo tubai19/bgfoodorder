@@ -27,7 +27,15 @@ const CONFIG = {
   RESTAURANT_LOCATION: {
     lat: 22.3908,
     lng: 88.2189
-  }
+  },
+  DELIVERY_CHARGES: [
+    { min: 0, max: 4, charge: 0 },
+    { min: 4, max: 6, charge: 20 },
+    { min: 6, max: 8, charge: 30 }
+  ],
+  MAX_DELIVERY_DISTANCE: 8,
+  MIN_DELIVERY_ORDER: 200,
+  FREE_DELIVERY_THRESHOLD: 500
 };
 
 // Checkout page variables
@@ -156,6 +164,25 @@ async function calculateDeliveryDetails() {
     showLoading(false);
     showNotification('Error calculating distance. Please try again.');
   }
+}
+
+// Calculate delivery charge based on distance
+function calculateDeliveryChargeByDistance(distance) {
+  // Free delivery for orders over ₹500
+  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  if (subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD) {
+    return 0;
+  }
+
+  // Check distance ranges
+  for (const range of CONFIG.DELIVERY_CHARGES) {
+    if (distance >= range.min && distance < range.max) {
+      return range.charge;
+    }
+  }
+
+  // If distance exceeds maximum delivery range
+  return null;
 }
 
 function setupEventListeners() {
@@ -448,8 +475,19 @@ function updateCheckoutDisplay() {
   const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
   let deliveryCharge = 0;
-  if (document.querySelector('input[name="orderType"]:checked')?.value === 'Delivery' && deliveryDistance) {
-    deliveryCharge = subtotal >= 500 ? 0 : calculateDeliveryChargeByDistance(deliveryDistance);
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+  
+  if (orderType === 'Delivery' && deliveryDistance) {
+    // Check if distance is within delivery range
+    if (deliveryDistance > CONFIG.MAX_DELIVERY_DISTANCE) {
+      deliveryChargeDisplay.textContent = `Delivery not available beyond ${CONFIG.MAX_DELIVERY_DISTANCE}km`;
+      distanceText.textContent = `${deliveryDistance.toFixed(1)} km (out of range)`;
+      placeOrderBtn.disabled = true;
+      return;
+    }
+    
+    // Calculate delivery charge
+    deliveryCharge = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD ? 0 : calculateDeliveryChargeByDistance(deliveryDistance);
   }
   
   const total = subtotal + deliveryCharge;
@@ -459,13 +497,17 @@ function updateCheckoutDisplay() {
   totalAmountDisplay.textContent = `Total: ₹${total}`;
   
   // Enable/disable place order button based on conditions
-  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
   placeOrderBtn.disabled = !(
     AppState.selectedItems.length > 0 &&
     customerName.value.trim() &&
     phoneNumber.value.trim() && 
     (/^\d{10}$/.test(phoneNumber.value)) &&
-    (orderType !== 'Delivery' || (locationObj && deliveryDistance))
+    (orderType !== 'Delivery' || (
+      locationObj && 
+      deliveryDistance && 
+      deliveryDistance <= CONFIG.MAX_DELIVERY_DISTANCE &&
+      subtotal >= CONFIG.MIN_DELIVERY_ORDER
+    ))
   );
   
   // Update mobile live total
@@ -502,8 +544,8 @@ async function prepareOrderData() {
     return null;
   }
 
-  if (orderType === 'Delivery' && subtotal < AppState.MIN_DELIVERY_ORDER) {
-    alert(`Minimum order for delivery is ₹${AppState.MIN_DELIVERY_ORDER}. Please add more items or choose pickup.`);
+  if (orderType === 'Delivery' && subtotal < CONFIG.MIN_DELIVERY_ORDER) {
+    alert(`Minimum order for delivery is ₹${CONFIG.MIN_DELIVERY_ORDER}. Please add more items or choose pickup.`);
     return null;
   }
 
@@ -537,15 +579,15 @@ async function prepareOrderData() {
       return null;
     }
     
-    if (deliveryDistance > AppState.MAX_DELIVERY_DISTANCE) {
-      alert(`Your location is ${deliveryDistance.toFixed(1)}km away (beyond our ${AppState.MAX_DELIVERY_DISTANCE}km delivery range). Please choose pickup or visit our restaurant.`);
+    if (deliveryDistance > CONFIG.MAX_DELIVERY_DISTANCE) {
+      alert(`Your location is ${deliveryDistance.toFixed(1)}km away (beyond our ${CONFIG.MAX_DELIVERY_DISTANCE}km delivery range). Please choose pickup or visit our restaurant.`);
       return null;
     }
   }
 
   let deliveryCharge = 0;
   if (orderType === 'Delivery') {
-    deliveryCharge = subtotal >= 500 ? 0 : calculateDeliveryChargeByDistance(deliveryDistance);
+    deliveryCharge = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD ? 0 : calculateDeliveryChargeByDistance(deliveryDistance);
   }
   const total = subtotal + deliveryCharge;
 
