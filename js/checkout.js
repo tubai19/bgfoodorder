@@ -58,7 +58,6 @@ const totalItemsDisplay = document.getElementById('totalItems');
 const totalAmountDisplay = document.getElementById('totalAmount');
 const checkoutItemsList = document.getElementById('checkoutItemsList');
 const clearCartBtn = document.getElementById('clearCartBtn');
-const orderHistoryList = document.getElementById('orderHistoryList');
 const loadingIndicator = document.getElementById('loadingIndicator');
 
 // Initialize the checkout page
@@ -132,11 +131,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial state
     handleOrderTypeChange();
     
-    // Load order history if available
-    if (orderHistoryList) {
-      showOrderHistory();
-    }
-    
     // Set up online/offline detection
     window.addEventListener('online', handleOnlineStatusChange);
     window.addEventListener('offline', handleOnlineStatusChange);
@@ -204,9 +198,9 @@ function showLoading(show, message = '') {
   if (!loadingIndicator) return;
   
   if (show) {
-    loadingIndicator.style.display = 'block';
+    loadingIndicator.style.display = 'flex';
     if (message) {
-      loadingIndicator.textContent = message;
+      document.getElementById('loadingMessage').textContent = message;
     }
   } else {
     loadingIndicator.style.display = 'none';
@@ -233,7 +227,9 @@ function handleOrderTypeChange() {
       navigator.geolocation.clearWatch(watchPositionId);
       watchPositionId = null;
     }
-    currentLocStatusMsg.textContent = '';
+    if (currentLocStatusMsg) {
+      currentLocStatusMsg.textContent = '';
+    }
   }
 }
 
@@ -350,10 +346,14 @@ function showOrHideLocationBlock() {
   const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
   if (orderType === 'Delivery') {
     locationChoiceBlock.style.display = 'block';
-    deliveryDistanceDisplay.style.display = deliveryDistance ? 'block' : 'none';
+    if (deliveryDistanceDisplay) {
+      deliveryDistanceDisplay.style.display = deliveryDistance ? 'block' : 'none';
+    }
   } else {
     locationChoiceBlock.style.display = 'none';
-    deliveryDistanceDisplay.style.display = 'none';
+    if (deliveryDistanceDisplay) {
+      deliveryDistanceDisplay.style.display = 'none';
+    }
   }
   updateCheckoutDisplay();
 }
@@ -367,21 +367,27 @@ function startWatchingPosition() {
       // Only update if we're not using manual location
       if (!usingManualLoc) {
         locationObj = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        currentLocStatusMsg.style.color = "#2a9d8f";
-        currentLocStatusMsg.textContent = `Live location tracking active`;
+        if (currentLocStatusMsg) {
+          currentLocStatusMsg.style.color = "#2a9d8f";
+          currentLocStatusMsg.textContent = `Live location tracking active`;
+        }
         
         calculateRoadDistance(pos.coords.latitude, pos.coords.longitude, 
           AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng)
           .then(distance => {
             deliveryDistance = distance;
-            distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+            if (distanceText) {
+              distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+            }
             updateCheckoutDisplay();
           });
       }
     },
     (err) => {
-      currentLocStatusMsg.style.color = "#e63946";
-      currentLocStatusMsg.textContent = "Live location paused. Please ensure location access is enabled.";
+      if (currentLocStatusMsg) {
+        currentLocStatusMsg.style.color = "#e63946";
+        currentLocStatusMsg.textContent = "Live location paused. Please ensure location access is enabled.";
+      }
     },
     { 
       enableHighAccuracy: true,
@@ -394,36 +400,54 @@ function startWatchingPosition() {
 // Handle location sharing
 function handleLocationSharing() {
   if (!navigator.geolocation) {
-    currentLocStatusMsg.style.color = "#e63946";
-    currentLocStatusMsg.textContent = "Geolocation is not supported by your browser. Please enter address manually.";
-    deliveryShowManualLocBtn.style.display = 'block';
+    if (currentLocStatusMsg) {
+      currentLocStatusMsg.style.color = "#e63946";
+      currentLocStatusMsg.textContent = "Geolocation is not supported by your browser. Please enter address manually.";
+    }
+    if (deliveryShowManualLocBtn) {
+      deliveryShowManualLocBtn.style.display = 'block';
+    }
     showManualLocationFields();
     return;
   }
   
   // Hide manual location if it was shown
   usingManualLoc = false;
-  manualLocationFields.style.display = 'none';
+  if (manualLocationFields) {
+    manualLocationFields.style.display = 'none';
+  }
   
-  currentLocStatusMsg.style.color = "#333";
-  currentLocStatusMsg.textContent = "Detecting your current location...";
-  distanceText.textContent = "Distance: Calculating...";
-  deliveryDistanceDisplay.style.display = 'block';
+  if (currentLocStatusMsg) {
+    currentLocStatusMsg.style.color = "#333";
+    currentLocStatusMsg.textContent = "Detecting your current location...";
+  }
+  if (distanceText) {
+    distanceText.textContent = "Distance: Calculating...";
+  }
+  if (deliveryDistanceDisplay) {
+    deliveryDistanceDisplay.style.display = 'block';
+  }
   
   // Get immediate position first
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       locationObj = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      currentLocStatusMsg.style.color = "#2a9d8f";
-      currentLocStatusMsg.textContent = `Live location tracking active`;
-      deliveryShowManualLocBtn.style.display = 'block';
+      if (currentLocStatusMsg) {
+        currentLocStatusMsg.style.color = "#2a9d8f";
+        currentLocStatusMsg.textContent = `Live location tracking active`;
+      }
+      if (deliveryShowManualLocBtn) {
+        deliveryShowManualLocBtn.style.display = 'block';
+      }
       
       // Calculate distance
       calculateRoadDistance(pos.coords.latitude, pos.coords.longitude, 
         AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng)
         .then(distance => {
           deliveryDistance = distance;
-          distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+          if (distanceText) {
+            distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+          }
           updateCheckoutDisplay();
         });
       
@@ -433,9 +457,13 @@ function handleLocationSharing() {
       }
     },
     (err) => {
-      currentLocStatusMsg.style.color = "#e63946";
-      currentLocStatusMsg.textContent = "Unable to get your location. Please allow location access or enter manually.";
-      deliveryShowManualLocBtn.style.display = 'block';
+      if (currentLocStatusMsg) {
+        currentLocStatusMsg.style.color = "#e63946";
+        currentLocStatusMsg.textContent = "Unable to get your location. Please allow location access or enter manually.";
+      }
+      if (deliveryShowManualLocBtn) {
+        deliveryShowManualLocBtn.style.display = 'block';
+      }
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
@@ -444,11 +472,19 @@ function handleLocationSharing() {
 // Show manual location fields with enhanced UI
 function showManualLocationFields() {
   usingManualLoc = true;
-  manualLocationFields.style.display = 'block';
-  currentLocStatusMsg.textContent = 'Using manual location entry';
-  currentLocStatusMsg.style.color = '#333';
-  distanceText.textContent = "Distance: Calculating...";
-  deliveryDistanceDisplay.style.display = 'block';
+  if (manualLocationFields) {
+    manualLocationFields.style.display = 'block';
+  }
+  if (currentLocStatusMsg) {
+    currentLocStatusMsg.textContent = 'Using manual location entry';
+    currentLocStatusMsg.style.color = '#333';
+  }
+  if (distanceText) {
+    distanceText.textContent = "Distance: Calculating...";
+  }
+  if (deliveryDistanceDisplay) {
+    deliveryDistanceDisplay.style.display = 'block';
+  }
   
   // Stop live location tracking
   if (watchPositionId) {
@@ -556,8 +592,12 @@ function initMap() {
     });
   } catch (error) {
     console.error('Error initializing map:', error);
-    manualLocationFields.style.display = 'block';
-    document.getElementById('addressMap').style.display = 'none';
+    if (manualLocationFields) {
+      manualLocationFields.style.display = 'block';
+    }
+    if (document.getElementById('addressMap')) {
+      document.getElementById('addressMap').style.display = 'none';
+    }
     showNotification('Map initialization failed. Please enter address manually.');
   }
 }
@@ -567,19 +607,27 @@ function updateLocationFromMarker() {
   const position = marker.getLatLng();
   locationObj = { lat: position.lat, lng: position.lng };
   
-  distanceText.textContent = "Distance: Calculating...";
-  deliveryDistanceDisplay.style.display = 'block';
+  if (distanceText) {
+    distanceText.textContent = "Distance: Calculating...";
+  }
+  if (deliveryDistanceDisplay) {
+    deliveryDistanceDisplay.style.display = 'block';
+  }
   
   calculateRoadDistance(position.lat, position.lng, AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng)
     .then(distance => {
       deliveryDistance = distance;
-      distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+      if (distanceText) {
+        distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
+      }
       updateCheckoutDisplay();
     })
     .catch(error => {
       console.error("Error calculating distance:", error);
       deliveryDistance = calculateHaversineDistance(position.lat, position.lng, AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng);
-      distanceText.textContent = `Distance: ${deliveryDistance.toFixed(1)} km (straight line)`;
+      if (distanceText) {
+        distanceText.textContent = `Distance: ${deliveryDistance.toFixed(1)} km (straight line)`;
+      }
       updateCheckoutDisplay();
     });
 }
@@ -600,7 +648,7 @@ async function calculateRoadDistance(originLat, originLng, destLat, destLng) {
       new Promise((_, reject) => setTimeout(
         () => reject(new Error('Distance calculation timeout')),
         CONFIG.FALLBACK_DISTANCE_CALCULATION_TIMEOUT
-      )
+      ))
     ]);
     
     // Cache the result
@@ -725,7 +773,6 @@ async function prepareOrderData() {
     total: total,
     status: "Pending",
     timestamp: serverTimestamp(),
-    notes: sanitizeInput(orderNotes.value.trim()),
     isOffline: !navigator.onLine
   };
 
@@ -739,12 +786,6 @@ async function prepareOrderData() {
       orderData.deliveryLocation = new GeoPoint(locationObj.lat, locationObj.lng);
     }
     orderData.deliveryDistance = deliveryDistance;
-  }
-
-  if (modalRating > 0) {
-    const comment = document.querySelector('#orderConfirmationModal .rating-comment')?.value;
-    orderData.rating = modalRating;
-    if (comment) orderData.ratingComment = sanitizeInput(comment);
   }
 
   return orderData;
@@ -821,7 +862,6 @@ function showOrderConfirmationModal(orderData) {
         ${orderData.deliveryAddress ? `<p><strong>Delivery Address:</strong> ${orderData.deliveryAddress}</p>` : ''}
         ${orderData.deliveryLocation ? `<p><strong>Location:</strong> <a href="https://www.google.com/maps?q=${orderData.deliveryLocation.latitude},${orderData.deliveryLocation.longitude}" target="_blank">View on Map</a></p>` : ''}
       ` : ''}
-      ${orderData.notes ? `<p><strong>Notes:</strong> ${orderData.notes}</p>` : ''}
     </div>
     
     <div class="order-summary-section">
@@ -878,7 +918,6 @@ function showOrderConfirmationModal(orderData) {
       // Reset form
       customerName.value = '';
       phoneNumber.value = '';
-      orderNotes.value = '';
       locationObj = null;
       deliveryDistance = null;
       updateCheckoutDisplay();
@@ -928,204 +967,6 @@ function saveOrderToHistory(orderData) {
     localStorage.setItem('bakeAndGrillOrders', JSON.stringify(orders));
   } catch (error) {
     console.error('Error saving order to history:', error);
-  }
-}
-
-// Show order history
-function showOrderHistory() {
-  try {
-    const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
-    
-    if (orderHistoryList) {
-      if (orders.length === 0) {
-        orderHistoryList.innerHTML = '<div class="no-orders">No orders found in your history.</div>';
-      } else {
-        orderHistoryList.innerHTML = '';
-        
-        orders.forEach((order, index) => {
-          const orderElement = document.createElement('div');
-          orderElement.className = 'order-history-item';
-          
-          orderElement.innerHTML = `
-            <div class="order-history-header">
-              <span class="order-number">Order #${index + 1}</span>
-              <span class="order-date">${new Date(order.timestamp).toLocaleString()}</span>
-              <span class="order-total">₹${order.total}</span>
-            </div>
-            <div class="order-history-details">
-              <div><strong>Name:</strong> ${sanitizeInput(order.customerName)}</div>
-              <div><strong>Phone:</strong> ${sanitizeInput(order.phoneNumber)}</div>
-              <div><strong>Type:</strong> ${order.orderType}</div>
-              ${order.orderType === 'Delivery' ? `<div><strong>Distance:</strong> ${order.deliveryDistance ? order.deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>` : ''}
-              <div class="order-items">
-                <strong>Items:</strong>
-                <ul>
-                  ${order.items.map(item => `<li>${sanitizeInput(item.name)} (${sanitizeInput(item.variant)}) x ${item.quantity} - ₹${item.price * item.quantity}</li>`).join('')}
-                </ul>
-              </div>
-            </div>
-            <div class="order-history-actions">
-              <button class="reorder-btn" data-index="${index}" aria-label="Reorder this order"><i class="fas fa-redo"></i> Reorder</button>
-              <button class="download-btn" data-index="${index}" aria-label="Download order as PDF"><i class="fas fa-file-pdf"></i> Download</button>
-            </div>
-          `;
-          
-          orderHistoryList.appendChild(orderElement);
-        });
-        
-        document.querySelectorAll('.reorder-btn').forEach(btn => {
-          btn.addEventListener('click', function() {
-            reorderFromHistory(parseInt(this.dataset.index));
-          });
-        });
-        
-        document.querySelectorAll('.download-btn').forEach(btn => {
-          btn.addEventListener('click', function() {
-            downloadOrderFromHistory(parseInt(this.dataset.index));
-          });
-        });
-      }
-    }
-  } catch (error) {
-    console.error('Error showing order history:', error);
-    if (orderHistoryList) {
-      orderHistoryList.innerHTML = '<div class="no-orders">Error loading order history.</div>';
-    }
-  }
-}
-
-// Reorder from history
-function reorderFromHistory(orderIndex) {
-  try {
-    const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
-    if (orderIndex >= 0 && orderIndex < orders.length) {
-      const order = orders[orderIndex];
-      AppState.selectedItems.length = 0;
-      order.items.forEach(item => {
-        AppState.selectedItems.push({
-          name: item.name,
-          variant: item.variant,
-          price: item.price,
-          quantity: item.quantity
-        });
-      });
-      
-      customerName.value = order.customerName;
-      phoneNumber.value = order.phoneNumber;
-      
-      const orderTypeRadio = document.querySelector(`input[name="orderType"][value="${order.orderType}"]`);
-      if (orderTypeRadio) {
-        orderTypeRadio.checked = true;
-        handleOrderTypeChange();
-      }
-      
-      saveCartToStorage();
-      updateCheckoutDisplay();
-      showNotification('Order loaded from history');
-    }
-  } catch (error) {
-    console.error('Error reordering from history:', error);
-    showNotification('Failed to load order from history');
-  }
-}
-
-// Download PDF for order
-function downloadOrderFromHistory(orderIndex) {
-  try {
-    const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
-    if (orderIndex >= 0 && orderIndex < orders.length) {
-      generatePDFBill(orders[orderIndex]);
-    }
-  } catch (error) {
-    console.error('Error downloading order:', error);
-    showNotification('Failed to generate PDF');
-  }
-}
-
-// Generate PDF bill
-function generatePDFBill(orderDetails) {
-  try {
-    if (typeof jsPDF === 'undefined') {
-      throw new Error('jsPDF not available');
-    }
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(20);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Bake & Grill', 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text('Delicious food delivered to your doorstep', 105, 28, { align: 'center' });
-    
-    // Title
-    doc.setFontSize(16);
-    doc.setTextColor(157, 78, 223);
-    doc.text('ORDER RECEIPT', 105, 40, { align: 'center' });
-    
-    // Order info
-    doc.setFontSize(12);
-    doc.setTextColor(40, 40, 40);
-    doc.text(`Order #: ${orderDetails.id || Math.floor(100000 + Math.random() * 900000)}`, 15, 50);
-    doc.text(`Date: ${new Date(orderDetails.timestamp).toLocaleString()}`, 15, 58);
-    doc.text(`Customer: ${orderDetails.customerName}`, 15, 66);
-    doc.text(`Phone: ${orderDetails.phoneNumber}`, 15, 74);
-    doc.text(`Order Type: ${orderDetails.orderType}`, 15, 82);
-    
-    if (orderDetails.orderType === 'Delivery') {
-      if (orderDetails.deliveryLocation) {
-        doc.text(`Location: ${orderDetails.deliveryLocation.latitude}, ${orderDetails.deliveryLocation.longitude}`, 15, 90);
-        doc.text(`Map: https://www.google.com/maps?q=${orderDetails.deliveryLocation.latitude},${orderDetails.deliveryLocation.longitude}`, 15, 98);
-      } else if (orderDetails.deliveryAddress) {
-        doc.text(`Address: ${orderDetails.deliveryAddress}`, 15, 90);
-      }
-      doc.text(`Distance: ${orderDetails.deliveryDistance ? orderDetails.deliveryDistance.toFixed(1)+'km' : 'Unknown'}`, 15, 106);
-    }
-    
-    // Items table
-    doc.autoTable({
-      startY: 120,
-      head: [['#', 'Item', 'Variant', 'Qty', 'Price (₹)']],
-      body: orderDetails.items.map((item, index) => [
-        index + 1,
-        item.name,
-        item.variant,
-        item.quantity,
-        item.price * item.quantity
-      ]),
-      theme: 'grid',
-      headStyles: {
-        fillColor: [157, 78, 223],
-        textColor: [255, 255, 255]
-      }
-    });
-    
-    // Totals
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.text(`Subtotal: ₹${orderDetails.subtotal}`, 140, finalY);
-    
-    if (orderDetails.deliveryCharge > 0) {
-      doc.text(`Delivery Charge: ₹${orderDetails.deliveryCharge}`, 140, finalY + 8);
-    } else if (orderDetails.orderType === 'Delivery') {
-      doc.text(`Delivery Charge: Free`, 140, finalY + 8);
-    }
-    
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Total Amount: ₹${orderDetails.total}`, 140, finalY + 20);
-    
-    // Footer
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Thank you for your order!', 105, 280, { align: 'center' });
-    doc.text('For any queries, contact: +91 8240266267', 105, 285, { align: 'center' });
-    
-    // Save PDF
-    doc.save(`BakeAndGrill_Order_${orderDetails.customerName}.pdf`);
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    alert('Failed to generate PDF. Please try again.');
   }
 }
 
