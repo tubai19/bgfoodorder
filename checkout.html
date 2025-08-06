@@ -5,9 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Checkout - Bake & Grill</title>
   
+  <!-- Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://bakeandgrillorder.shop https://firestore.googleapis.com https://www.google.com https://maps.googleapis.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' data: https://*.tile.openstreetmap.org;
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' https://bakeandgrillorder.shop https://firestore.googleapis.com https://router.project-osrm.org;
+    worker-src 'self';
+  ">
+  
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/leaflet.css">
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -72,6 +84,26 @@
           </label>
         </div>
       </div>
+
+      <!-- Location Section -->
+      <div id="locationChoiceBlock" class="location-choice-block" style="display: none;">
+        <div id="currentLocStatusMsg" class="location-status-message"></div>
+        <button id="deliveryShareLocationBtn" class="mobile-location-btn">
+          <i class="fas fa-location-arrow"></i> Share Location
+        </button>
+        <button id="deliveryShowManualLocBtn" class="mobile-alt-location-btn">
+          <i class="fas fa-map-marked-alt"></i> Enter Address Manually
+        </button>
+        <div id="manualLocationFields" class="manual-location-fields" style="display: none;">
+          <label for="manualDeliveryAddress"><i class="fas fa-map-marker-alt"></i> Delivery Address</label>
+          <input type="text" id="manualDeliveryAddress" placeholder="Enter your full address" class="mobile-form-field">
+          <div id="addressMap" class="address-map"></div>
+        </div>
+      </div>
+
+      <div id="deliveryChargeDisplay" class="delivery-charge-display"></div>
+      <div id="distanceText" class="distance-text"></div>
+      <div id="deliveryDistanceDisplay" class="delivery-distance-display"></div>
       
       <div class="mobile-form-input full-width-btn-container">
         <button id="placeOrderBtn" class="mobile-order-btn">
@@ -79,6 +111,29 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div id="orderConfirmationModal" class="mobile-modal" aria-hidden="true">
+    <div class="mobile-modal-content">
+      <div class="mobile-modal-header">
+        <h2>Confirm Your Order</h2>
+        <button class="close-modal" id="cancelOrderBtn">&times;</button>
+      </div>
+      <div class="mobile-order-summary">
+        <div id="orderConfirmationSummary"></div>
+      </div>
+      <div class="mobile-modal-buttons">
+        <button class="mobile-modal-btn cancel-btn" id="cancelOrderBtn">Cancel</button>
+        <button class="mobile-modal-btn confirm-btn" id="confirmOrderBtn">Confirm Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Indicator -->
+  <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+    <div class="loading-spinner"></div>
+    <span id="loadingMessage"></span>
   </div>
 
   <footer class="mobile-footer">
@@ -97,6 +152,11 @@
     <span id="notificationText">Order placed successfully!</span>
   </div>
 
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <script type="module" src="/js/main.js"></script>
   <script type="module" src="/js/checkout.js"></script>
 </body>
