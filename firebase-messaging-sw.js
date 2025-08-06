@@ -15,29 +15,52 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
+  console.log('[firebase-messaging-sw.js] Received background message:', payload);
   
-  const notificationTitle = payload.notification?.title || 'Order Update';
+  // Determine if this is for admin or customer
+  const isAdminNotification = payload.data?.url?.includes('/admin.html');
+  
+  const notificationTitle = payload.notification?.title || 
+    (isAdminNotification ? 'New Order Update' : 'Your Order Update');
+  
   const notificationOptions = {
-    body: payload.notification?.body || 'Your order status has changed',
-    icon: '/android-chrome-192x192.png',
-    badge: '/android-chrome-192x192.png',
-    data: {
-      url: payload.data?.url || '/checkout.html'
-    }
+    body: payload.notification?.body || 
+      (isAdminNotification ? 'Order status has changed' : 'Your order status has been updated'),
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    data: payload.data || {},
+    vibrate: [200, 100, 200]
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  
+  const urlToOpen = event.notification.data.url || 
+    (event.notification.data.orderId ? `/order-status.html?orderId=${event.notification.data.orderId}` : '/');
+  
   event.waitUntil(
-    clients.matchAll({ type: 'window' }).then((clientList) => {
-      if (clientList.length > 0) {
-        return clientList[0].focus();
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then((clientList) => {
+      // Check if there's already a tab open with this URL
+      for (const client of clientList) {
+        if (client.url.includes(urlToOpen) && 'focus' in client) {
+          return client.focus();
+        }
       }
-      return clients.openWindow(event.notification.data.url);
+      
+      // Otherwise open a new tab
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
     })
   );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });
