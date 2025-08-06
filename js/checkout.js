@@ -15,6 +15,16 @@ import {
   getDoc
 } from './main.js';
 
+// Configuration constants
+const CONFIG = {
+  WHATSAPP_NUMBER: '918240266267',
+  OSRM_ENDPOINT: 'https://router.project-osrm.org/route/v1/driving',
+  MAX_ORDER_HISTORY: 50,
+  MAP_TILE_PROVIDER: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  MAP_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  FALLBACK_DISTANCE_CALCULATION_TIMEOUT: 3000
+};
+
 // Checkout page variables
 let map;
 let marker;
@@ -24,6 +34,9 @@ let deliveryDistance = null;
 let modalRating = 0;
 let watchPositionId = null;
 let addressAutocomplete = null;
+let distanceCalculationCache = {};
+let offlineOrderQueue = [];
+let isProcessingOfflineQueue = false;
 
 // DOM elements
 const placeOrderBtn = document.getElementById('placeOrderBtn');
@@ -46,6 +59,7 @@ const totalAmountDisplay = document.getElementById('totalAmount');
 const checkoutItemsList = document.getElementById('checkoutItemsList');
 const clearCartBtn = document.getElementById('clearCartBtn');
 const orderHistoryList = document.getElementById('orderHistoryList');
+const loadingIndicator = document.getElementById('loadingIndicator');
 
 // Initialize the checkout page
 document.addEventListener('DOMContentLoaded', function() {
@@ -55,6 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load cart from storage
     updateCheckoutDisplay();
+    
+    // Load any queued offline orders
+    loadOfflineOrdersQueue();
     
     // Set up order type toggle
     orderTypeRadios.forEach(radio => {
@@ -80,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (phoneNumber) {
       phoneNumber.addEventListener('change', function() {
         if (this.value && this.value.length === 10) {
-          localStorage.setItem('userPhone', this.value);
+          localStorage.setItem('userPhone', sanitizeInput(this.value));
           requestNotificationPermission();
         }
       });
@@ -107,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
           AppState.selectedItems.splice(index, 1);
           saveCartToStorage();
           updateCheckoutDisplay();
-          showNotification(`${item.name} removed from cart`);
+          showNotification(`${sanitizeInput(item.name)} removed from cart`);
         }
       });
     }
@@ -119,8 +136,82 @@ document.addEventListener('DOMContentLoaded', function() {
     if (orderHistoryList) {
       showOrderHistory();
     }
+    
+    // Set up online/offline detection
+    window.addEventListener('online', handleOnlineStatusChange);
+    window.addEventListener('offline', handleOnlineStatusChange);
   }
 });
+
+// Handle online/offline status changes
+function handleOnlineStatusChange() {
+  if (navigator.onLine) {
+    processOfflineOrdersQueue();
+  }
+  updateCheckoutDisplay();
+}
+
+// Sanitize input to prevent XSS
+function sanitizeInput(input) {
+  if (typeof input !== 'string') return input;
+  return input.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Load offline orders queue from localStorage
+function loadOfflineOrdersQueue() {
+  try {
+    const queue = JSON.parse(localStorage.getItem('offlineOrdersQueue') || '[]');
+    offlineOrderQueue = Array.isArray(queue) ? queue : [];
+  } catch (error) {
+    console.error('Error loading offline orders queue:', error);
+    offlineOrderQueue = [];
+  }
+}
+
+// Process any queued offline orders
+async function processOfflineOrdersQueue() {
+  if (isProcessingOfflineQueue || offlineOrderQueue.length === 0) return;
+  
+  isProcessingOfflineQueue = true;
+  showLoading(true, 'Submitting queued orders...');
+  
+  try {
+    while (offlineOrderQueue.length > 0) {
+      const orderData = offlineOrderQueue[0];
+      try {
+        const docRef = await addDoc(collection(db, 'orders'), orderData);
+        orderData.id = docRef.id;
+        saveOrderToHistory(orderData);
+        offlineOrderQueue.shift();
+        
+        // Update localStorage
+        localStorage.setItem('offlineOrdersQueue', JSON.stringify(offlineOrderQueue));
+        
+        showNotification(`Queued order submitted successfully!`);
+      } catch (error) {
+        console.error('Error submitting queued order:', error);
+        break; // Stop processing if we hit an error
+      }
+    }
+  } finally {
+    isProcessingOfflineQueue = false;
+    showLoading(false);
+  }
+}
+
+// Show/hide loading indicator
+function showLoading(show, message = '') {
+  if (!loadingIndicator) return;
+  
+  if (show) {
+    loadingIndicator.style.display = 'block';
+    if (message) {
+      loadingIndicator.textContent = message;
+    }
+  } else {
+    loadingIndicator.style.display = 'none';
+  }
+}
 
 // Handle order type change
 function handleOrderTypeChange() {
@@ -211,11 +302,11 @@ function updateCheckoutDisplay() {
         const li = document.createElement('li');
         li.className = 'checkout-item';
         li.innerHTML = `
-          <span class="checkout-item-name">${item.name} (${item.variant})</span>
+          <span class="checkout-item-name">${sanitizeInput(item.name)} (${sanitizeInput(item.variant)})</span>
           <div class="checkout-item-details">
             <span class="checkout-item-quantity">x${item.quantity}</span>
             <span class="checkout-item-price">₹${item.price * item.quantity}</span>
-            <button class="checkout-item-remove" data-index="${index}">
+            <button class="checkout-item-remove" data-index="${index}" aria-label="Remove item">
               <i class="fas fa-times"></i>
             </button>
           </div>
@@ -244,6 +335,11 @@ function updateCheckoutDisplay() {
     } else {
       deliveryChargeDisplay.style.display = 'none';
     }
+  }
+  
+  // Disable place order button if cart is empty
+  if (placeOrderBtn) {
+    placeOrderBtn.disabled = AppState.selectedItems.length === 0;
   }
 }
 
@@ -374,6 +470,8 @@ function showManualLocationFields() {
   // Initialize address autocomplete if Google Maps API is available
   if (window.google && window.google.maps) {
     initAddressAutocomplete();
+  } else {
+    console.warn('Google Maps API not loaded. Address autocomplete will not work.');
   }
   
   // Focus on address field
@@ -417,40 +515,51 @@ function initAddressAutocomplete() {
 
 // Initialize map
 function initMap() {
-  map = L.map('addressMap').setView([AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng], 14);
+  try {
+    if (!L) {
+      throw new Error('Leaflet not loaded');
+    }
+    
+    map = L.map('addressMap').setView([AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng], 14);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
+    L.tileLayer(CONFIG.MAP_TILE_PROVIDER, {
+      attribution: CONFIG.MAP_ATTRIBUTION
+    }).addTo(map);
 
-  // Restaurant marker
-  L.marker([AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng], {
-    icon: L.divIcon({
-      html: '<i class="fas fa-store" style="color: #e63946; font-size: 24px;"></i>',
-      className: 'restaurant-marker'
-    })
-  }).addTo(map).bindPopup("Bake & Grill");
+    // Restaurant marker
+    L.marker([AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng], {
+      icon: L.divIcon({
+        html: '<i class="fas fa-store" style="color: #e63946; font-size: 24px;"></i>',
+        className: 'restaurant-marker'
+      })
+    }).addTo(map).bindPopup("Bake & Grill");
 
-  // Customer marker
-  marker = L.marker([AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng], {
-    draggable: true,
-    autoPan: true,
-    icon: L.divIcon({
-      html: '<i class="fas fa-map-marker-alt" style="color: #9d4edf; font-size: 32px;"></i>',
-      className: 'customer-marker'
-    })
-  }).addTo(map);
+    // Customer marker
+    marker = L.marker([AppState.RESTAURANT_LOCATION.lat, AppState.RESTAURANT_LOCATION.lng], {
+      draggable: true,
+      autoPan: true,
+      icon: L.divIcon({
+        html: '<i class="fas fa-map-marker-alt" style="color: #9d4edf; font-size: 32px;"></i>',
+        className: 'customer-marker'
+      })
+    }).addTo(map);
 
-  // Update location when marker is moved
-  marker.on('dragend', function() {
-    updateLocationFromMarker();
-  });
+    // Update location when marker is moved
+    marker.on('dragend', function() {
+      updateLocationFromMarker();
+    });
 
-  // Update location when map is clicked
-  map.on('click', function(e) {
-    marker.setLatLng(e.latlng);
-    updateLocationFromMarker();
-  });
+    // Update location when map is clicked
+    map.on('click', function(e) {
+      marker.setLatLng(e.latlng);
+      updateLocationFromMarker();
+    });
+  } catch (error) {
+    console.error('Error initializing map:', error);
+    manualLocationFields.style.display = 'block';
+    document.getElementById('addressMap').style.display = 'none';
+    showNotification('Map initialization failed. Please enter address manually.');
+  }
 }
 
 // Update location from marker
@@ -475,49 +584,91 @@ function updateLocationFromMarker() {
     });
 }
 
-// Calculate road distance using OSRM API
+// Calculate road distance using OSRM API with caching and fallback
 async function calculateRoadDistance(originLat, originLng, destLat, destLng) {
+  const cacheKey = `${originLat},${originLng},${destLat},${destLng}`;
+  
+  // Check cache first
+  if (distanceCalculationCache[cacheKey]) {
+    return distanceCalculationCache[cacheKey];
+  }
+  
+  // Use Promise.race to implement timeout
+  try {
+    const distance = await Promise.race([
+      calculateRoadDistanceFromAPI(originLat, originLng, destLat, destLng),
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('Distance calculation timeout')),
+        CONFIG.FALLBACK_DISTANCE_CALCULATION_TIMEOUT
+      )
+    ]);
+    
+    // Cache the result
+    distanceCalculationCache[cacheKey] = distance;
+    return distance;
+  } catch (error) {
+    console.error("Error calculating road distance:", error);
+    // Fallback to haversine distance
+    return calculateHaversineDistance(originLat, originLng, destLat, destLng);
+  }
+}
+
+// Actual API call to OSRM
+async function calculateRoadDistanceFromAPI(originLat, originLng, destLat, destLng) {
   try {
     const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${originLng},${originLat};${destLng},${destLat}?overview=false`
+      `${CONFIG.OSRM_ENDPOINT}/${originLng},${originLat};${destLng},${destLat}?overview=false`
     );
+    
+    if (!response.ok) {
+      throw new Error(`OSRM API responded with status ${response.status}`);
+    }
+    
     const data = await response.json();
     
     if (data.routes && data.routes.length > 0) {
       return data.routes[0].distance / 1000;
     } else {
-      return calculateHaversineDistance(originLat, originLng, destLat, destLng);
+      throw new Error('No routes found in OSRM response');
     }
   } catch (error) {
-    console.error("Error calculating road distance:", error);
-    return calculateHaversineDistance(originLat, originLng, destLat, destLng);
+    console.error("Error in OSRM API call:", error);
+    throw error; // Re-throw to be caught by the calling function
   }
 }
 
-// Save order to localStorage for offline use
-async function saveOrderForLater(orderData) {
+// Save order to offline queue
+async function saveOrderToOfflineQueue(orderData) {
   try {
-    // Use localStorage as fallback
-    const offlineOrders = JSON.parse(localStorage.getItem('offlineOrders') || '[]');
-    offlineOrders.push({
+    // Add to in-memory queue
+    offlineOrderQueue.push({
       ...orderData,
+      isOffline: true,
       timestamp: new Date().getTime()
     });
-    localStorage.setItem('offlineOrders', JSON.stringify(offlineOrders));
+    
+    // Save to localStorage
+    localStorage.setItem('offlineOrdersQueue', JSON.stringify(offlineOrderQueue));
+    
     return true;
   } catch (error) {
-    console.error('Error saving offline order:', error);
+    console.error('Error saving to offline queue:', error);
     return false;
   }
 }
 
 // Prepare order data for submission
 async function prepareOrderData() {
-  const name = customerName.value.trim();
-  const phone = phoneNumber.value.trim();
-  const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  const name = sanitizeInput(customerName.value.trim());
+  const phone = sanitizeInput(phoneNumber.value.trim());
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
   const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
+  if (!orderType) {
+    alert("Please select an order type (Delivery or Pickup).");
+    return null;
+  }
+
   if (orderType === 'Delivery' && subtotal < AppState.MIN_DELIVERY_ORDER) {
     alert(`Minimum order for delivery is ₹${AppState.MIN_DELIVERY_ORDER}. Please add more items or choose pickup.`);
     return null;
@@ -574,13 +725,13 @@ async function prepareOrderData() {
     total: total,
     status: "Pending",
     timestamp: serverTimestamp(),
-    notes: orderNotes.value.trim(),
+    notes: sanitizeInput(orderNotes.value.trim()),
     isOffline: !navigator.onLine
   };
 
   if (orderType === 'Delivery') {
     if (usingManualLoc) {
-      orderData.deliveryAddress = manualDeliveryAddress.value;
+      orderData.deliveryAddress = sanitizeInput(manualDeliveryAddress.value);
       if (locationObj) {
         orderData.deliveryLocation = new GeoPoint(locationObj.lat, locationObj.lng);
       }
@@ -593,7 +744,7 @@ async function prepareOrderData() {
   if (modalRating > 0) {
     const comment = document.querySelector('#orderConfirmationModal .rating-comment')?.value;
     orderData.rating = modalRating;
-    if (comment) orderData.ratingComment = comment;
+    if (comment) orderData.ratingComment = sanitizeInput(comment);
   }
 
   return orderData;
@@ -602,14 +753,35 @@ async function prepareOrderData() {
 // Confirm order
 async function confirmOrder() {
   try {
-    if ('vibrate' in navigator) navigator.vibrate(50);
+    // Add haptic feedback if available
+    if ('vibrate' in navigator) {
+      try {
+        navigator.vibrate(50);
+      } catch (vibrationError) {
+        console.warn('Vibration API error:', vibrationError);
+      }
+    }
+    
+    showLoading(true, 'Processing your order...');
+    
+    const isShopOpen = await checkShopStatus();
+    if (!isShopOpen) {
+      showLoading(false);
+      alert("Sorry, the shop is currently closed. Please try again later.");
+      return;
+    }
+    
+    const orderData = await prepareOrderData();
+    if (!orderData) {
+      showLoading(false);
+      return;
+    }
     
     // Check if offline
     if (!navigator.onLine) {
-      const orderData = await prepareOrderData();
-      if (!orderData) return;
+      const saved = await saveOrderToOfflineQueue(orderData);
+      showLoading(false);
       
-      const saved = await saveOrderForLater(orderData);
       if (saved) {
         showNotification('Order saved offline. Will submit when back online.');
         // Clear cart only if save was successful
@@ -622,17 +794,10 @@ async function confirmOrder() {
       return;
     }
     
-    const isShopOpen = await checkShopStatus();
-    if (!isShopOpen) {
-      alert("Sorry, the shop is currently closed. Please try again later.");
-      return;
-    }
-    
-    const orderData = await prepareOrderData();
-    if (!orderData) return;
-    
     showOrderConfirmationModal(orderData);
+    showLoading(false);
   } catch (error) {
+    showLoading(false);
     console.error("Error confirming order:", error);
     showNotification("There was an error processing your order. Please try again.");
   }
@@ -667,7 +832,7 @@ function showOrderConfirmationModal(orderData) {
   orderData.items.forEach(item => {
     summaryHTML += `
       <li>
-        <span class="item-name">${item.name} (${item.variant})</span>
+        <span class="item-name">${sanitizeInput(item.name)} (${sanitizeInput(item.variant)})</span>
         <span class="item-quantity">x ${item.quantity}</span>
         <span class="item-price">₹${item.price * item.quantity}</span>
       </li>
@@ -688,8 +853,15 @@ function showOrderConfirmationModal(orderData) {
   
   orderSummary.innerHTML = summaryHTML;
   
+  // Set focus on modal for accessibility
+  modal.style.display = 'block';
+  modal.setAttribute('aria-hidden', 'false');
+  document.getElementById('confirmOrderBtn').focus();
+  
+  // Set up event listeners
   document.getElementById('confirmOrderBtn').onclick = async function() {
     try {
+      showLoading(true, 'Placing your order...');
       const docRef = await addDoc(collection(db, 'orders'), orderData);
       orderData.id = docRef.id;
       saveOrderToHistory(orderData);
@@ -699,6 +871,8 @@ function showOrderConfirmationModal(orderData) {
       saveCartToStorage();
       
       modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+      showLoading(false);
       showNotification('Order placed successfully!');
       
       // Reset form
@@ -709,6 +883,7 @@ function showOrderConfirmationModal(orderData) {
       deliveryDistance = null;
       updateCheckoutDisplay();
     } catch (error) {
+      showLoading(false);
       console.error("Error saving order:", error);
       alert("There was an error processing your order. Please try again.");
     }
@@ -716,190 +891,257 @@ function showOrderConfirmationModal(orderData) {
   
   document.getElementById('cancelOrderBtn').onclick = function() {
     modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
   };
   
-  modal.style.display = 'block';
+  // Close modal when clicking outside
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  });
+  
+  // Close modal with ESC key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && modal.style.display === 'block') {
+      modal.style.display = 'none';
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  });
 }
 
 // Save order to history
 function saveOrderToHistory(orderData) {
-  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
-  orders.unshift({
-    ...orderData,
-    timestamp: orderData.timestamp?.toDate?.()?.toISOString?.() || new Date().toISOString()
-  });
-  if (orders.length > 50) orders.pop();
-  localStorage.setItem('bakeAndGrillOrders', JSON.stringify(orders));
+  try {
+    const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+    orders.unshift({
+      ...orderData,
+      timestamp: orderData.timestamp?.toDate?.()?.toISOString?.() || new Date().toISOString()
+    });
+    
+    // Limit history size
+    if (orders.length > CONFIG.MAX_ORDER_HISTORY) {
+      orders.length = CONFIG.MAX_ORDER_HISTORY;
+    }
+    
+    localStorage.setItem('bakeAndGrillOrders', JSON.stringify(orders));
+  } catch (error) {
+    console.error('Error saving order to history:', error);
+  }
 }
 
 // Show order history
 function showOrderHistory() {
-  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
-  
-  if (orderHistoryList) {
-    if (orders.length === 0) {
-      orderHistoryList.innerHTML = '<div class="no-orders">No orders found in your history.</div>';
-    } else {
-      orderHistoryList.innerHTML = '';
-      
-      orders.forEach((order, index) => {
-        const orderElement = document.createElement('div');
-        orderElement.className = 'order-history-item';
+  try {
+    const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+    
+    if (orderHistoryList) {
+      if (orders.length === 0) {
+        orderHistoryList.innerHTML = '<div class="no-orders">No orders found in your history.</div>';
+      } else {
+        orderHistoryList.innerHTML = '';
         
-        orderElement.innerHTML = `
-          <div class="order-history-header">
-            <span class="order-number">Order #${index + 1}</span>
-            <span class="order-date">${new Date(order.timestamp).toLocaleString()}</span>
-            <span class="order-total">₹${order.total}</span>
-          </div>
-          <div class="order-history-details">
-            <div><strong>Name:</strong> ${order.customerName}</div>
-            <div><strong>Phone:</strong> ${order.phoneNumber}</div>
-            <div><strong>Type:</strong> ${order.orderType}</div>
-            ${order.orderType === 'Delivery' ? `<div><strong>Distance:</strong> ${order.deliveryDistance ? order.deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>` : ''}
-            <div class="order-items">
-              <strong>Items:</strong>
-              <ul>
-                ${order.items.map(item => `<li>${item.name} (${item.variant}) x ${item.quantity} - ₹${item.price * item.quantity}</li>`).join('')}
-              </ul>
+        orders.forEach((order, index) => {
+          const orderElement = document.createElement('div');
+          orderElement.className = 'order-history-item';
+          
+          orderElement.innerHTML = `
+            <div class="order-history-header">
+              <span class="order-number">Order #${index + 1}</span>
+              <span class="order-date">${new Date(order.timestamp).toLocaleString()}</span>
+              <span class="order-total">₹${order.total}</span>
             </div>
-          </div>
-          <div class="order-history-actions">
-            <button class="reorder-btn" data-index="${index}"><i class="fas fa-redo"></i> Reorder</button>
-            <button class="download-btn" data-index="${index}"><i class="fas fa-file-pdf"></i> Download</button>
-          </div>
-        `;
+            <div class="order-history-details">
+              <div><strong>Name:</strong> ${sanitizeInput(order.customerName)}</div>
+              <div><strong>Phone:</strong> ${sanitizeInput(order.phoneNumber)}</div>
+              <div><strong>Type:</strong> ${order.orderType}</div>
+              ${order.orderType === 'Delivery' ? `<div><strong>Distance:</strong> ${order.deliveryDistance ? order.deliveryDistance.toFixed(1)+'km' : 'Unknown'}</div>` : ''}
+              <div class="order-items">
+                <strong>Items:</strong>
+                <ul>
+                  ${order.items.map(item => `<li>${sanitizeInput(item.name)} (${sanitizeInput(item.variant)}) x ${item.quantity} - ₹${item.price * item.quantity}</li>`).join('')}
+                </ul>
+              </div>
+            </div>
+            <div class="order-history-actions">
+              <button class="reorder-btn" data-index="${index}" aria-label="Reorder this order"><i class="fas fa-redo"></i> Reorder</button>
+              <button class="download-btn" data-index="${index}" aria-label="Download order as PDF"><i class="fas fa-file-pdf"></i> Download</button>
+            </div>
+          `;
+          
+          orderHistoryList.appendChild(orderElement);
+        });
         
-        orderHistoryList.appendChild(orderElement);
-      });
-      
-      document.querySelectorAll('.reorder-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-          reorderFromHistory(parseInt(this.dataset.index));
+        document.querySelectorAll('.reorder-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            reorderFromHistory(parseInt(this.dataset.index));
+          });
         });
-      });
-      
-      document.querySelectorAll('.download-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-          downloadOrderFromHistory(parseInt(this.dataset.index));
+        
+        document.querySelectorAll('.download-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            downloadOrderFromHistory(parseInt(this.dataset.index));
+          });
         });
-      });
+      }
+    }
+  } catch (error) {
+    console.error('Error showing order history:', error);
+    if (orderHistoryList) {
+      orderHistoryList.innerHTML = '<div class="no-orders">Error loading order history.</div>';
     }
   }
 }
 
 // Reorder from history
 function reorderFromHistory(orderIndex) {
-  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
-  if (orderIndex >= 0 && orderIndex < orders.length) {
-    const order = orders[orderIndex];
-    AppState.selectedItems.length = 0;
-    order.items.forEach(item => {
-      AppState.selectedItems.push({
-        name: item.name,
-        variant: item.variant,
-        price: item.price,
-        quantity: item.quantity
+  try {
+    const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+    if (orderIndex >= 0 && orderIndex < orders.length) {
+      const order = orders[orderIndex];
+      AppState.selectedItems.length = 0;
+      order.items.forEach(item => {
+        AppState.selectedItems.push({
+          name: item.name,
+          variant: item.variant,
+          price: item.price,
+          quantity: item.quantity
+        });
       });
-    });
-    
-    customerName.value = order.customerName;
-    phoneNumber.value = order.phoneNumber;
-    document.querySelector(`input[name="orderType"][value="${order.orderType}"]`).checked = true;
-    
-    saveCartToStorage();
-    updateCheckoutDisplay();
-    showNotification('Order loaded from history');
+      
+      customerName.value = order.customerName;
+      phoneNumber.value = order.phoneNumber;
+      
+      const orderTypeRadio = document.querySelector(`input[name="orderType"][value="${order.orderType}"]`);
+      if (orderTypeRadio) {
+        orderTypeRadio.checked = true;
+        handleOrderTypeChange();
+      }
+      
+      saveCartToStorage();
+      updateCheckoutDisplay();
+      showNotification('Order loaded from history');
+    }
+  } catch (error) {
+    console.error('Error reordering from history:', error);
+    showNotification('Failed to load order from history');
   }
 }
 
 // Download PDF for order
 function downloadOrderFromHistory(orderIndex) {
-  const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
-  if (orderIndex >= 0 && orderIndex < orders.length) {
-    generatePDFBill(orders[orderIndex]);
+  try {
+    const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
+    if (orderIndex >= 0 && orderIndex < orders.length) {
+      generatePDFBill(orders[orderIndex]);
+    }
+  } catch (error) {
+    console.error('Error downloading order:', error);
+    showNotification('Failed to generate PDF');
   }
 }
 
 // Generate PDF bill
 function generatePDFBill(orderDetails) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  
-  doc.setFontSize(20);
-  doc.setTextColor(40, 40, 40);
-  doc.text('Bake & Grill', 105, 20, { align: 'center' });
-  doc.setFontSize(12);
-  doc.text('Delicious food delivered to your doorstep', 105, 28, { align: 'center' });
-  
-  doc.setFontSize(16);
-  doc.setTextColor(157, 78, 223);
-  doc.text('ORDER RECEIPT', 105, 40, { align: 'center' });
-  
-  doc.setFontSize(12);
-  doc.setTextColor(40, 40, 40);
-  doc.text(`Order #: ${orderDetails.id || Math.floor(100000 + Math.random() * 900000)}`, 15, 50);
-  doc.text(`Date: ${new Date(orderDetails.timestamp).toLocaleString()}`, 15, 58);
-  doc.text(`Customer: ${orderDetails.customerName}`, 15, 66);
-  doc.text(`Phone: ${orderDetails.phoneNumber}`, 15, 74);
-  doc.text(`Order Type: ${orderDetails.orderType}`, 15, 82);
-  
-  if (orderDetails.orderType === 'Delivery') {
-    if (orderDetails.deliveryLocation) {
-      doc.text(`Location: ${orderDetails.deliveryLocation.latitude}, ${orderDetails.deliveryLocation.longitude}`, 15, 90);
-      doc.text(`Map: https://www.google.com/maps?q=${orderDetails.deliveryLocation.latitude},${orderDetails.deliveryLocation.longitude}`, 15, 98);
-    } else if (orderDetails.deliveryAddress) {
-      doc.text(`Address: ${orderDetails.deliveryAddress}`, 15, 90);
+  try {
+    if (typeof jsPDF === 'undefined') {
+      throw new Error('jsPDF not available');
     }
-    doc.text(`Distance: ${orderDetails.deliveryDistance ? orderDetails.deliveryDistance.toFixed(1)+'km' : 'Unknown'}`, 15, 106);
-  }
-  
-  doc.autoTable({
-    startY: 120,
-    head: [['#', 'Item', 'Variant', 'Qty', 'Price (₹)']],
-    body: orderDetails.items.map((item, index) => [
-      index + 1,
-      item.name,
-      item.variant,
-      item.quantity,
-      item.price * item.quantity
-    ]),
-    theme: 'grid',
-    headStyles: {
-      fillColor: [157, 78, 223],
-      textColor: [255, 255, 255]
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(40, 40, 40);
+    doc.text('Bake & Grill', 105, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text('Delicious food delivered to your doorstep', 105, 28, { align: 'center' });
+    
+    // Title
+    doc.setFontSize(16);
+    doc.setTextColor(157, 78, 223);
+    doc.text('ORDER RECEIPT', 105, 40, { align: 'center' });
+    
+    // Order info
+    doc.setFontSize(12);
+    doc.setTextColor(40, 40, 40);
+    doc.text(`Order #: ${orderDetails.id || Math.floor(100000 + Math.random() * 900000)}`, 15, 50);
+    doc.text(`Date: ${new Date(orderDetails.timestamp).toLocaleString()}`, 15, 58);
+    doc.text(`Customer: ${orderDetails.customerName}`, 15, 66);
+    doc.text(`Phone: ${orderDetails.phoneNumber}`, 15, 74);
+    doc.text(`Order Type: ${orderDetails.orderType}`, 15, 82);
+    
+    if (orderDetails.orderType === 'Delivery') {
+      if (orderDetails.deliveryLocation) {
+        doc.text(`Location: ${orderDetails.deliveryLocation.latitude}, ${orderDetails.deliveryLocation.longitude}`, 15, 90);
+        doc.text(`Map: https://www.google.com/maps?q=${orderDetails.deliveryLocation.latitude},${orderDetails.deliveryLocation.longitude}`, 15, 98);
+      } else if (orderDetails.deliveryAddress) {
+        doc.text(`Address: ${orderDetails.deliveryAddress}`, 15, 90);
+      }
+      doc.text(`Distance: ${orderDetails.deliveryDistance ? orderDetails.deliveryDistance.toFixed(1)+'km' : 'Unknown'}`, 15, 106);
     }
-  });
-  
-  const finalY = doc.lastAutoTable.finalY + 10;
-  doc.text(`Subtotal: ₹${orderDetails.subtotal}`, 140, finalY);
-  
-  if (orderDetails.deliveryCharge > 0) {
-    doc.text(`Delivery Charge: ₹${orderDetails.deliveryCharge}`, 140, finalY + 8);
-  } else if (orderDetails.orderType === 'Delivery') {
-    doc.text(`Delivery Charge: Free`, 140, finalY + 8);
+    
+    // Items table
+    doc.autoTable({
+      startY: 120,
+      head: [['#', 'Item', 'Variant', 'Qty', 'Price (₹)']],
+      body: orderDetails.items.map((item, index) => [
+        index + 1,
+        item.name,
+        item.variant,
+        item.quantity,
+        item.price * item.quantity
+      ]),
+      theme: 'grid',
+      headStyles: {
+        fillColor: [157, 78, 223],
+        textColor: [255, 255, 255]
+      }
+    });
+    
+    // Totals
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.text(`Subtotal: ₹${orderDetails.subtotal}`, 140, finalY);
+    
+    if (orderDetails.deliveryCharge > 0) {
+      doc.text(`Delivery Charge: ₹${orderDetails.deliveryCharge}`, 140, finalY + 8);
+    } else if (orderDetails.orderType === 'Delivery') {
+      doc.text(`Delivery Charge: Free`, 140, finalY + 8);
+    }
+    
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Total Amount: ₹${orderDetails.total}`, 140, finalY + 20);
+    
+    // Footer
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Thank you for your order!', 105, 280, { align: 'center' });
+    doc.text('For any queries, contact: +91 8240266267', 105, 285, { align: 'center' });
+    
+    // Save PDF
+    doc.save(`BakeAndGrill_Order_${orderDetails.customerName}.pdf`);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Failed to generate PDF. Please try again.');
   }
-  
-  doc.setFontSize(14);
-  doc.setFont(undefined, 'bold');
-  doc.text(`Total Amount: ₹${orderDetails.total}`, 140, finalY + 20);
-  
-  doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
-  doc.text('Thank you for your order!', 105, 280, { align: 'center' });
-  doc.text('For any queries, contact: +91 8240266267', 105, 285, { align: 'center' });
-  
-  doc.save(`BakeAndGrill_Order_${orderDetails.customerName}.pdf`);
 }
 
 // Send order via WhatsApp
 function sendWhatsAppOrder(orderData) {
-  const message = generateWhatsAppMessage(orderData);
-  
-  if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-    window.location.href = `whatsapp://send?phone=918240266267&text=${encodeURIComponent(message)}`;
-  } else {
-    window.open(`https://wa.me/918240266267?text=${encodeURIComponent(message)}`, '_blank');
+  try {
+    const message = generateWhatsAppMessage(orderData);
+    const encodedMessage = encodeURIComponent(message);
+    
+    if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      window.location.href = `whatsapp://send?phone=${CONFIG.WHATSAPP_NUMBER}&text=${encodedMessage}`;
+    } else {
+      window.open(`https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodedMessage}`, '_blank');
+    }
+  } catch (error) {
+    console.error('Error sending WhatsApp message:', error);
   }
 }
 
@@ -949,6 +1191,20 @@ async function checkShopStatus() {
     return docSnap.exists() ? docSnap.data().isShopOpen !== false : true;
   } catch (error) {
     console.error("Error checking shop status:", error);
-    return true;
+    return true; // Default to open if there's an error
   }
 }
+
+// Cleanup event listeners when page unloads
+window.addEventListener('beforeunload', function() {
+  if (watchPositionId) {
+    navigator.geolocation.clearWatch(watchPositionId);
+  }
+  
+  if (addressAutocomplete) {
+    google.maps.event.clearInstanceListeners(manualDeliveryAddress);
+  }
+  
+  window.removeEventListener('online', handleOnlineStatusChange);
+  window.removeEventListener('offline', handleOnlineStatusChange);
+});
