@@ -36,12 +36,15 @@ const AppState = {
   MAX_DELIVERY_DISTANCE: 8,
   MIN_DELIVERY_ORDER: 200,
   MENU_CATEGORIES: {
-    "Veg Pizzas": { icon: "🍕", availableForDelivery: true },
-    "Paneer Specials": { icon: "🧀", availableForDelivery: true },
-    "Non-Veg Pizzas": { icon: "🍗", availableForDelivery: true },
-    "Burgers": { icon: "🍔", availableForDelivery: true },
-    "Sandwiches": { icon: "🥪", availableForDelivery: true }
-  },
+  "Veg Pizzas": { icon: "🍕", availableForDelivery: true },
+  "Paneer Specials": { icon: "🧀", availableForDelivery: true },
+  "Non-Veg Pizzas": { icon: "🍗", availableForDelivery: true },
+  "Burgers": { icon: "🍔", availableForDelivery: true },
+  "Sandwiches": { icon: "🥪", availableForDelivery: true },
+  "Quick Bites": { icon: "🍟", availableForDelivery: true },
+  "Dips": { icon: "🥫", availableForDelivery: true },
+  "Combos": { icon: "🎁", availableForDelivery: false }
+},
   domElements: {},
   currentStatus: {...DEFAULT_STATUS}
 };
