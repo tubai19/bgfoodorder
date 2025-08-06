@@ -149,7 +149,7 @@ async function initializeMessaging() {
 async function getAdminFCMToken() {
   try {
     const currentToken = await messaging.getToken({
-      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY' // Replace with your VAPID key
+      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY'
     });
     
     if (currentToken) {
@@ -622,116 +622,98 @@ async function updateOrderStatus(data) {
 // Enhanced notification sending function
 async function sendOrderNotification(orderId, newStatus, phoneNumber) {
   try {
-    // Status text mapping
-    const statusText = {
-      pending: "is pending",
-      preparing: "is being prepared",
-      delivering: "is out for delivery",
-      completed: "has been completed",
-      cancelled: "has been cancelled"
-    }[newStatus] || "status has been updated";
-
-    // 1. Try to send to customer via FCM
-    let customerNotified = false;
-    if (phoneNumber) {
-      try {
-        const tokenDoc = await db.collection('fcmTokens')
-          .where('phoneNumber', '==', phoneNumber)
-          .orderBy('createdAt', 'desc')
-          .limit(1)
-          .get();
-
-        if (!tokenDoc.empty) {
-          const tokenData = tokenDoc.docs[0].data();
-          const message = {
-            notification: {
-              title: `Order #${orderId.substring(0, 6)} Update`,
-              body: `Your order ${statusText}. Tap for details.`
-            },
-            data: {
-              orderId,
-              status: newStatus,
-              click_action: 'FLUTTER_NOTIFICATION_CLICK',
-              url: `/order-status.html?orderId=${orderId}`
-            },
-            token: tokenData.token
-          };
-
-          await messaging.send(message);
-          customerNotified = true;
-          await logNotificationAttempt(orderId, phoneNumber, 'fcm', true);
-        }
-      } catch (fcmError) {
-        console.error("FCM send error:", fcmError);
-        await logNotificationAttempt(orderId, phoneNumber, 'fcm', false, fcmError);
-      }
+    if (!phoneNumber) {
+      console.log("No phone number, skipping notification");
+      return;
     }
 
-    // 2. Fallback to WhatsApp if FCM failed
-    if (!customerNotified && phoneNumber) {
-      try {
-        await sendWhatsAppNotification(phoneNumber, orderId, newStatus);
-        await logNotificationAttempt(orderId, phoneNumber, 'whatsapp', true);
-      } catch (whatsappError) {
-        console.error("WhatsApp send error:", whatsappError);
-        await logNotificationAttempt(orderId, phoneNumber, 'whatsapp', false, whatsappError);
-      }
-    }
+    // 1. Create notification document in Firestore
+    await db.collection('notifications').add({
+      orderId,
+      status: newStatus,
+      phoneNumber,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      read: false
+    });
 
-    // 3. Send to all admin devices
+    // 2. Try to send push notification
     try {
-      const adminTokensSnapshot = await db.collection('adminTokens').get();
-      if (!adminTokensSnapshot.empty) {
-        const batch = db.batch();
-        const tokens = [];
+      const token = await getCustomerToken(phoneNumber);
+      if (token) {
+        const statusText = getStatusText(newStatus);
         
-        adminTokensSnapshot.forEach(doc => {
-          const tokenData = doc.data();
-          tokens.push(tokenData.token);
-          // Update lastActive timestamp
-          batch.update(doc.ref, {
-            lastActive: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        });
-
-        await batch.commit();
-        
-        const adminMessage = {
+        const message = {
           notification: {
             title: `Order #${orderId.substring(0, 6)} Update`,
-            body: `Status changed to ${newStatus}`
+            body: `Your order ${statusText}. Tap for details.`,
+            icon: '/android-chrome-192x192.png'
           },
           data: {
             orderId,
             status: newStatus,
             click_action: 'FLUTTER_NOTIFICATION_CLICK',
-            url: `/admin.html`
-          }
+            url: `/checkout.html?orderId=${orderId}`
+          },
+          token: token
         };
 
-        // Send to each admin device
-        for (const token of tokens) {
-          try {
-            await messaging.send({ ...adminMessage, token });
-          } catch (tokenError) {
-            console.error(`Error sending to admin token ${token.substring(0, 10)}...:`, tokenError);
-            if (tokenError.code === 'messaging/invalid-registration-token' || 
-                tokenError.code === 'messaging/registration-token-not-registered') {
-              await removeInvalidToken(token);
-            }
-          }
-        }
+        // Send using Firebase Messaging
+        const response = await messaging.send(message);
+        console.log("Notification sent successfully:", response);
+        return;
       }
-    } catch (adminNotifyError) {
-      console.error("Error sending admin notifications:", adminNotifyError);
+    } catch (fcmError) {
+      console.error("FCM send error:", fcmError);
     }
-
+    
+    // 3. Fallback to WhatsApp if FCM fails
+    await sendWhatsAppNotification(phoneNumber, orderId, newStatus);
+    
   } catch (error) {
-    console.error("Error in notification flow:", error);
+    console.error("Error sending notification:", error);
     // Final fallback - try WhatsApp if everything else fails
     if (phoneNumber) {
       await sendWhatsAppNotification(phoneNumber, orderId, newStatus);
     }
+  }
+}
+
+function getStatusText(status) {
+  const statusMap = {
+    pending: "is pending",
+    preparing: "is being prepared",
+    delivering: "is out for delivery",
+    completed: "has been completed",
+    cancelled: "has been cancelled"
+  };
+  return statusMap[status] || "status has been updated";
+}
+
+async function getCustomerToken(phoneNumber) {
+  try {
+    // Normalize phone number format
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    if (!normalizedPhone) return null;
+
+    // Check cache first
+    if (localStorage.getItem(`fcmToken-${normalizedPhone}`)) {
+      return localStorage.getItem(`fcmToken-${normalizedPhone}`);
+    }
+
+    // Query Firestore
+    const tokensRef = db.collection('fcmTokens').where('phoneNumber', '==', normalizedPhone);
+    const snapshot = await tokensRef.get();
+    
+    if (!snapshot.empty) {
+      const token = snapshot.docs[0].data().token;
+      // Cache the token
+      localStorage.setItem(`fcmToken-${normalizedPhone}`, token);
+      return token;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting customer token:", error);
+    return null;
   }
 }
 
@@ -743,13 +725,7 @@ async function sendWhatsAppNotification(phoneNumber, orderId, status) {
     const formattedPhone = phoneNumber.startsWith('+') ? cleanPhone : `91${cleanPhone}`;
 
     // Status text mapping
-    const statusText = {
-      pending: "is pending",
-      preparing: "is being prepared",
-      delivering: "is out for delivery",
-      completed: "has been completed",
-      cancelled: "has been cancelled"
-    }[status] || "status has been updated";
+    const statusText = getStatusText(status);
 
     // Create message with order details
     const message = `Your order #${orderId.substring(0, 6)} ${statusText}.\n\n` +
