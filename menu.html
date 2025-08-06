@@ -4,30 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Menu - Bake & Grill</title>
-  <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
+  <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites.">
   
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://bakeandgrill.com/menu.html">
-  <meta property="og:title" content="Menu - Bake & Grill">
-  <meta property="og:description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
-  <meta property="og:image" content="https://bakeandgrill.com/images/menu-share.jpg">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://bakeandgrill.com/menu.html">
-  <meta property="twitter:title" content="Menu - Bake & Grill">
-  <meta property="twitter:description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
-  <meta property="twitter:image" content="https://bakeandgrill.com/images/menu-share.jpg">
-
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body class="mobile-view">
-  
   <header class="mobile-header">
     <div class="logo-container">
       <a href="index.html" class="back-button"><i class="fas fa-arrow-left"></i></a>
@@ -51,15 +34,11 @@
   <div class="mobile-container">
     <div id="mobileSearchContainer">
       <i class="fas fa-search"></i>
-      <input type="text" id="searchInput" placeholder="Search pizzas, burgers, sandwiches..." class="mobile-search">
+      <input type="text" id="searchInput" placeholder="Search menu items..." class="mobile-search">
     </div>
     
     <div id="tabs" class="mobile-category-nav"></div>
     
-    <div id="deliveryRestriction" class="mobile-delivery-restriction" style="display:none;">
-      <i class="fas fa-exclamation-triangle"></i> Delivery not available to your location (beyond 8km). Please choose pickup.
-    </div>
-
     <div id="menuContainer" class="mobile-menu-container"></div>
   </div>
 
@@ -122,7 +101,7 @@
     <span id="notificationText">Item added to cart!</span>
   </div>
 
-  <script src="/js/main.js"></script>
-  <script src="/js/menu.js"></script>
+  <script type="module" src="/js/main.js"></script>
+  <script type="module" src="/js/menu.js"></script>
 </body>
 </html>
