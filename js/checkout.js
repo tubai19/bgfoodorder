@@ -18,389 +18,17 @@ import {
 // Configuration constants
 const CONFIG = {
   WHATSAPP_NUMBER: '918240266267',
-  OPENROUTE_SERVICE_API_KEY: 'your_openrouteservice_api_key', // Replace with your actual key
+  OPENROUTE_SERVICE_API_KEY: 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijg5OWE3ZmRmYzhkODRmYmE5MmEzOGU5MDEzMTEyYjIzIiwiaCI6Im11cm11cjY0In0', // Your OpenRouteService API key
   NOMINATIM_ENDPOINT: 'https://nominatim.openstreetmap.org/search',
   OPENROUTE_SERVICE_ENDPOINT: 'https://api.openrouteservice.org/v2/directions/driving-car',
   MAX_ORDER_HISTORY: 50,
   MAP_TILE_PROVIDER: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   MAP_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  FALLBACK_DISTANCE_CALCULATION_TIMEOUT: 3000
-};
-
-// [Previous variable declarations remain the same until calculateRoadDistanceFromAPI]
-
-// Actual API call to OpenRouteService
-async function calculateRoadDistanceFromAPI(originLat, originLng, destLat, destLng) {
-  try {
-    const response = await fetch(
-      `${CONFIG.OPENROUTE_SERVICE_ENDPOINT}?api_key=${CONFIG.OPENROUTE_SERVICE_API_KEY}&start=${originLng},${originLat}&end=${destLng},${destLat}`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`OpenRouteService API responded with status ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.routes && data.routes.length > 0) {
-      return data.routes[0].summary.distance / 1000; // Convert meters to kilometers
-    } else {
-      throw new Error('No routes found in OpenRouteService response');
-    }
-  } catch (error) {
-    console.error("Error in OpenRouteService API call:", error);
-    throw error;
+  FALLBACK_DISTANCE_CALCULATION_TIMEOUT: 3000,
+  RESTAURANT_LOCATION: {
+    lat: 22.3908, // Replace with your restaurant's latitude
+    lng: 88.2189  // Replace with your restaurant's longitude
   }
-}
-
-// Initialize address autocomplete using Nominatim
-function initAddressAutocomplete() {
-  if (!manualDeliveryAddress) return;
-  
-  // Clear previous event listeners
-  manualDeliveryAddress.removeEventListener('input', handleAddressInput);
-  manualDeliveryAddress.addEventListener('input', debounce(handleAddressInput, 500));
-}
-
-// Debounce function for address input
-function debounce(func, wait) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
-}
-
-// Handle address input with Nominatim
-async function handleAddressInput() {
-  const query = manualDeliveryAddress.value.trim();
-  if (query.length < 3) return;
-
-  try {
-    const response = await fetch(
-      `${CONFIG.NOMINATIM_ENDPOINT}?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Nominatim API responded with status ${response.status}`);
-    }
-    
-    const results = await response.json();
-    if (results.length === 0) return;
-    
-    // For simplicity, we'll take the first result
-    const firstResult = results[0];
-    const location = {
-      lat: parseFloat(firstResult.lat),
-      lng: parseFloat(firstResult.lon)
-    };
-    
-    map.setView([location.lat, location.lng], 17);
-    if (marker) {
-      marker.setLatLng([location.lat, location.lng]);
-    }
-    
-    locationObj = { lat: location.lat, lng: location.lng };
-    updateLocationFromMarker();
-    
-    // Update address field with full formatted address if available
-    if (firstResult.display_name) {
-      manualDeliveryAddress.value = firstResult.display_name;
-    }
-    
-    showNotification('Location found!');
-  } catch (error) {
-    console.error("Error in Nominatim API call:", error);
-    showNotification('Error finding location. Please try again.');
-  }
-}
-
-// [Rest of the code remains exactly the same]
-Key changes made:
-
-Removed Google Maps API dependencies:
-
-Removed the Google Maps script loader
-
-Removed Google Maps autocomplete initialization
-
-Updated routing service:
-
-Replaced OSRM with OpenRouteService for more accurate routing
-
-Added API key configuration for OpenRouteService
-
-Implemented Nominatim for geocoding:
-
-Added Nominatim endpoint for address search
-
-Created a debounced input handler for address search
-
-Implemented proper address lookup and map positioning
-
-Updated CSP headers:
-
-Added OpenRouteService and Nominatim domains to connect-src
-
-Improved error handling:
-
-Better error messages for API failures
-
-Maintained fallback to haversine distance calculation
-
-To use this implementation:
-
-Sign up for a free API key at OpenRouteService
-
-Replace your_openrouteservice_api_key with your actual key
-
-The Nominatim service is free to use but has usage limits (1 request per second)
-
-This implementation provides:
-
-Full address search using Nominatim
-
-Accurate routing using OpenRouteService
-
-Completely free (with OpenRouteService's free tier)
-
-No Google Maps dependencies
-
-Maintains all existing functionality
-
-The code maintains all the original features like:
-
-Offline order queuing
-
-Order confirmation
-
-WhatsApp integration
-
-Delivery distance calculation
-
-Cart management
-
-Note that OpenRouteService has rate limits on their free tier, so for high-traffic applications, you might need to consider their paid plans or implement additional caching.
-
-eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijg5OWE3ZmRmYzhkODRmYmE5MmEzOGU5MDEzMTEyYjIzIiwiaCI6Im11cm11cjY0In0= besic key now give me full complete files ready to use
-I'll provide you with complete, ready-to-use files for your checkout system using Leaflet with OpenRouteService and Nominatim. Here are the full files with all necessary implementations:
-
-1. checkout.html
-html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Checkout - Bake & Grill</title>
-  
-  <!-- Content Security Policy -->
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 
-      https://bakeandgrillorder.shop 
-      https://firestore.googleapis.com 
-      https://unpkg.com 
-      https://cdnjs.cloudflare.com 
-      https://www.gstatic.com;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' data: https://*.tile.openstreetmap.org;
-    font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' 
-      https://bakeandgrillorder.shop 
-      https://firestore.googleapis.com 
-      https://api.openrouteservice.org 
-      https://nominatim.openstreetmap.org;
-    worker-src 'self';
-  ">
-  
-  <!-- Preconnect to improve performance -->
-  <link rel="preconnect" href="https://firestore.googleapis.com">
-  <link rel="preconnect" href="https://api.openrouteservice.org">
-  <link rel="preconnect" href="https://nominatim.openstreetmap.org">
-  
-  <!-- CSS -->
-  <link rel="stylesheet" href="/css/fontawesome.min.css">
-  <link rel="stylesheet" href="/css/styles.css">
-  <link rel="stylesheet" href="/css/leaflet.css">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-</head>
-<body class="mobile-view">
-  <header class="mobile-header">
-    <div class="logo-container">
-      <a href="menu.html" class="back-button"><i class="fas fa-arrow-left"></i></a>
-      <div class="logo">Checkout</div>
-      <div class="mobile-cart-icon" id="mobileCartBtn">
-        <i class="fas fa-shopping-cart"></i>
-        <span class="cart-badge">0</span>
-      </div>
-    </div>
-  </header>
-
-  <div id="statusBanner" class="status-banner">
-    <div id="shopStatusBanner" class="status-item">
-      <i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span>
-    </div>
-    <div id="deliveryStatusBanner" class="status-item">
-      <i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span>
-    </div>
-  </div>
-
-  <div class="mobile-container">
-    <div id="orderForm" class="mobile-order-form">
-      <div id="mobileLiveTotal" class="mobile-total-display">
-        <span class="total-items" id="totalItems">0 items</span>
-        <span class="total-amount" id="totalAmount">Total: ₹0</span>
-      </div>
-      
-      <div class="checkout-items-container">
-        <div class="checkout-items-header">
-          <h3>Your Items</h3>
-          <button id="clearCartBtn" class="clear-cart-btn">
-            <i class="fas fa-trash"></i> Clear All
-          </button>
-        </div>
-        <ul id="checkoutItemsList" class="checkout-items-list">
-          <li class="empty-cart">Your cart is empty</li>
-        </ul>
-      </div>
-      
-      <div class="mobile-form-input">
-        <label for="customerName"><i class="fas fa-user"></i> Your Name</label>
-        <input type="text" id="customerName" placeholder="Enter your name" required class="mobile-form-field">
-      </div>
-      
-      <div class="mobile-form-input">
-        <label for="phoneNumber"><i class="fas fa-phone"></i> Phone Number</label>
-        <input type="tel" id="phoneNumber" placeholder="Enter 10-digit phone number" required class="mobile-form-field" pattern="[0-9]{10}" maxlength="10">
-      </div>
-
-      <div class="mobile-form-input">
-        <label><i class="fas fa-truck"></i> Order Type</label>
-        <div class="mobile-order-type">
-          <label class="mobile-order-option">
-            <input type="radio" name="orderType" value="Delivery" checked>
-            <span><i class="fas fa-home"></i> Delivery</span>
-          </label>
-          <label class="mobile-order-option">
-            <input type="radio" name="orderType" value="Pickup">
-            <span><i class="fas fa-walking"></i> Pickup</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Location Section -->
-      <div id="locationChoiceBlock" class="location-choice-block" style="display: none;">
-        <div id="currentLocStatusMsg" class="location-status-message"></div>
-        <button id="deliveryShareLocationBtn" class="mobile-location-btn">
-          <i class="fas fa-location-arrow"></i> Share Location
-        </button>
-        <button id="deliveryShowManualLocBtn" class="mobile-alt-location-btn">
-          <i class="fas fa-map-marked-alt"></i> Enter Address Manually
-        </button>
-        <div id="manualLocationFields" class="manual-location-fields" style="display: none;">
-          <label for="manualDeliveryAddress"><i class="fas fa-map-marker-alt"></i> Delivery Address</label>
-          <input type="text" id="manualDeliveryAddress" placeholder="Enter your full address" class="mobile-form-field">
-          <div id="addressMap" class="address-map"></div>
-        </div>
-      </div>
-
-      <div id="deliveryChargeDisplay" class="delivery-charge-display"></div>
-      <div id="distanceText" class="distance-text"></div>
-      
-      <div class="mobile-form-input">
-        <label for="orderNotes"><i class="fas fa-sticky-note"></i> Order Notes</label>
-        <textarea id="orderNotes" placeholder="Any special instructions..." class="mobile-form-field" rows="3"></textarea>
-      </div>
-      
-      <div class="mobile-form-input full-width-btn-container">
-        <button id="placeOrderBtn" class="mobile-order-btn" disabled>
-          <i class="fas fa-paper-plane"></i> Place Order
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Order Confirmation Modal -->
-  <div id="orderConfirmationModal" class="mobile-modal" aria-hidden="true" style="display: none;">
-    <div class="mobile-modal-content">
-      <div class="mobile-modal-header">
-        <h2>Confirm Your Order</h2>
-        <button class="close-modal" id="cancelOrderBtn">&times;</button>
-      </div>
-      <div class="mobile-order-summary">
-        <div id="orderConfirmationSummary"></div>
-      </div>
-      <div class="mobile-modal-buttons">
-        <button class="mobile-modal-btn cancel-btn" id="cancelOrderBtn">Cancel</button>
-        <button class="mobile-modal-btn confirm-btn" id="confirmOrderBtn">Confirm Order</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Loading Indicator -->
-  <div id="loadingIndicator" class="loading-indicator" style="display: none;">
-    <div class="loading-spinner"></div>
-    <span id="loadingMessage"></span>
-  </div>
-
-  <footer class="mobile-footer">
-    <div class="footer-content">
-      <div class="footer-nav">
-        <a href="index.html">Home</a>
-        <a href="menu.html">Menu</a>
-        <a href="checkout.html">Checkout</a>
-      </div>
-      <p>&copy; 2025 Bake & Grill. All rights reserved.</p>
-    </div>
-  </footer>
-
-  <div class="mobile-notification" id="notification" style="display: none;">
-    <i class="fas fa-check-circle"></i>
-    <span id="notificationText"></span>
-  </div>
-
-  <!-- Scripts -->
-  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-  
-  <script type="module" src="/js/main.js"></script>
-  <script type="module" src="/js/checkout.js"></script>
-</body>
-</html>
-2. checkout.js
-javascript
-// Import necessary functions from main.js
-import { 
-  AppState,
-  db,
-  initApp,
-  showNotification,
-  saveCartToStorage,
-  calculateHaversineDistance,
-  calculateDeliveryChargeByDistance,
-  serverTimestamp,
-  GeoPoint,
-  collection,
-  addDoc,
-  doc,
-  getDoc
-} from './main.js';
-
-// Configuration constants
-const CONFIG = {
-  WHATSAPP_NUMBER: '918240266267',
-  OPENROUTE_SERVICE_API_KEY: '5b3ce3597851110001cf62488', // Your OpenRouteService API key
-  NOMINATIM_ENDPOINT: 'https://nominatim.openstreetmap.org/search',
-  OPENROUTE_SERVICE_ENDPOINT: 'https://api.openrouteservice.org/v2/directions/driving-car',
-  MAX_ORDER_HISTORY: 50,
-  MAP_TILE_PROVIDER: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  MAP_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  FALLBACK_DISTANCE_CALCULATION_TIMEOUT: 3000
 };
 
 // Checkout page variables
@@ -441,6 +69,7 @@ const confirmOrderBtn = document.getElementById('confirmOrderBtn');
 const cancelOrderBtn = document.getElementById('cancelOrderBtn');
 const notification = document.getElementById('notification');
 const notificationText = document.getElementById('notificationText');
+const addressMap = document.getElementById('addressMap');
 
 // Initialize the checkout page
 document.addEventListener('DOMContentLoaded', async function() {
@@ -450,11 +79,85 @@ document.addEventListener('DOMContentLoaded', async function() {
     updateCheckoutDisplay();
     loadOfflineOrdersQueue();
     handleOrderTypeChange();
+    initMap();
   } catch (error) {
     console.error('Initialization error:', error);
     showNotification('Failed to initialize. Please refresh the page.');
   }
 });
+
+// Initialize Leaflet map
+function initMap() {
+  if (!addressMap) return;
+
+  map = L.map('addressMap').setView([CONFIG.RESTAURANT_LOCATION.lat, CONFIG.RESTAURANT_LOCATION.lng], 13);
+  
+  L.tileLayer(CONFIG.MAP_TILE_PROVIDER, {
+    attribution: CONFIG.MAP_ATTRIBUTION,
+    maxZoom: 19
+  }).addTo(map);
+
+  // Add restaurant marker
+  L.marker([CONFIG.RESTAURANT_LOCATION.lat, CONFIG.RESTAURANT_LOCATION.lng])
+    .addTo(map)
+    .bindPopup('Bake & Grill')
+    .openPopup();
+
+  // Initialize draggable marker
+  marker = L.marker([CONFIG.RESTAURANT_LOCATION.lat, CONFIG.RESTAURANT_LOCATION.lng], {
+    draggable: true
+  }).addTo(map);
+
+  marker.on('dragend', function() {
+    updateLocationFromMarker();
+  });
+
+  map.on('click', function(e) {
+    marker.setLatLng(e.latlng);
+    updateLocationFromMarker();
+  });
+}
+
+// Update location from marker position
+function updateLocationFromMarker() {
+  if (!marker) return;
+  
+  const latlng = marker.getLatLng();
+  locationObj = { lat: latlng.lat, lng: latlng.lng };
+  calculateDeliveryDetails();
+}
+
+// Calculate delivery distance and charges
+async function calculateDeliveryDetails() {
+  if (!locationObj) return;
+
+  try {
+    showLoading(true, 'Calculating distance...');
+    
+    // Calculate road distance with fallback to haversine
+    deliveryDistance = await calculateRoadDistance(
+      CONFIG.RESTAURANT_LOCATION.lat,
+      CONFIG.RESTAURANT_LOCATION.lng,
+      locationObj.lat,
+      locationObj.lng
+    );
+
+    const deliveryCharge = calculateDeliveryChargeByDistance(deliveryDistance);
+    
+    // Update UI
+    distanceText.textContent = `${deliveryDistance.toFixed(1)} km from restaurant`;
+    deliveryChargeDisplay.textContent = `Delivery Charge: ₹${deliveryCharge}`;
+    
+    // Enable place order button if all conditions are met
+    placeOrderBtn.disabled = false;
+    
+    showLoading(false);
+  } catch (error) {
+    console.error('Error calculating delivery details:', error);
+    showLoading(false);
+    showNotification('Error calculating distance. Please try again.');
+  }
+}
 
 function setupEventListeners() {
   // Order type toggle
@@ -513,21 +216,92 @@ function setupEventListeners() {
   manualDeliveryAddress?.addEventListener('input', debounce(handleAddressInput, 500));
 }
 
-// Handle online/offline status changes
-function handleOnlineStatusChange() {
-  if (navigator.onLine) {
-    processOfflineOrdersQueue();
+// Handle order type change (Delivery/Pickup)
+function handleOrderTypeChange() {
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+  
+  if (orderType === 'Delivery') {
+    locationChoiceBlock.style.display = 'block';
+    deliveryChargeDisplay.style.display = 'block';
+    distanceText.style.display = 'block';
+    
+    // Initialize manual location fields if needed
+    if (usingManualLoc) {
+      manualLocationFields.style.display = 'block';
+    }
+    
+    // Update delivery info if location is already set
+    if (locationObj) {
+      calculateDeliveryDetails();
+    }
+  } else {
+    locationChoiceBlock.style.display = 'none';
+    manualLocationFields.style.display = 'none';
+    deliveryChargeDisplay.style.display = 'none';
+    distanceText.style.display = 'none';
+    deliveryChargeDisplay.textContent = '';
+    distanceText.textContent = '';
   }
+  
   updateCheckoutDisplay();
 }
 
-// Debounce function for address input
-function debounce(func, wait) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
-  };
+// Handle location sharing
+function handleLocationSharing() {
+  if (!navigator.geolocation) {
+    showNotification('Geolocation is not supported by your browser');
+    return;
+  }
+  
+  showLoading(true, 'Getting your location...');
+  currentLocStatusMsg.textContent = 'Getting your location...';
+  
+  // Stop any previous watch
+  if (watchPositionId) {
+    navigator.geolocation.clearWatch(watchPositionId);
+  }
+  
+  watchPositionId = navigator.geolocation.watchPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      locationObj = { lat, lng };
+      usingManualLoc = false;
+      
+      // Update map and marker
+      map.setView([lat, lng], 17);
+      marker.setLatLng([lat, lng]);
+      
+      // Calculate distance
+      calculateDeliveryDetails();
+      
+      currentLocStatusMsg.textContent = 'Location shared successfully!';
+      showLoading(false);
+    },
+    (error) => {
+      console.error('Geolocation error:', error);
+      currentLocStatusMsg.textContent = 'Error getting location. Please try again or enter manually.';
+      showLoading(false);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+}
+
+// Show manual location fields
+function showManualLocationFields() {
+  usingManualLoc = true;
+  manualLocationFields.style.display = 'block';
+  currentLocStatusMsg.textContent = 'Enter your address below';
+  
+  // Initialize map if not already done
+  if (!map) {
+    initMap();
+  }
 }
 
 // Handle address input with Nominatim
@@ -536,6 +310,8 @@ async function handleAddressInput() {
   if (query.length < 3) return;
 
   try {
+    showLoading(true, 'Searching for address...');
+    
     const response = await fetch(
       `${CONFIG.NOMINATIM_ENDPOINT}?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
     );
@@ -545,7 +321,11 @@ async function handleAddressInput() {
     }
     
     const results = await response.json();
-    if (results.length === 0) return;
+    if (results.length === 0) {
+      showLoading(false);
+      showNotification('No locations found');
+      return;
+    }
     
     // Take the first result
     const firstResult = results[0];
@@ -554,27 +334,28 @@ async function handleAddressInput() {
       lng: parseFloat(firstResult.lon)
     };
     
+    // Update map and marker
     map.setView([location.lat, location.lng], 17);
-    if (marker) {
-      marker.setLatLng([location.lat, location.lng]);
-    }
+    marker.setLatLng([location.lat, location.lng]);
     
     locationObj = { lat: location.lat, lng: location.lng };
-    updateLocationFromMarker();
     
-    // Update address field with full formatted address
+    // Update address field with full formatted address if available
     if (firstResult.display_name) {
       manualDeliveryAddress.value = firstResult.display_name;
     }
     
+    // Calculate distance
+    calculateDeliveryDetails();
+    
     showNotification('Location found!');
+    showLoading(false);
   } catch (error) {
     console.error("Error in Nominatim API call:", error);
+    showLoading(false);
     showNotification('Error finding location. Please try again.');
   }
 }
-
-// [Rest of the functions remain the same as in your original file, except for the following changes:]
 
 // Calculate road distance using OpenRouteService API with caching and fallback
 async function calculateRoadDistance(originLat, originLng, destLat, destLng) {
@@ -629,20 +410,82 @@ async function calculateRoadDistanceFromAPI(originLat, originLng, destLat, destL
   }
 }
 
-// Save order to offline queue
-async function saveOrderToOfflineQueue(orderData) {
-  try {
-    offlineOrderQueue.push({
-      ...orderData,
-      isOffline: true,
-      timestamp: new Date().getTime()
-    });
-    
-    localStorage.setItem('offlineOrdersQueue', JSON.stringify(offlineOrderQueue));
-    return true;
-  } catch (error) {
-    console.error('Error saving to offline queue:', error);
-    return false;
+// Update checkout display with cart items and totals
+function updateCheckoutDisplay() {
+  if (!checkoutItemsList || !totalItemsDisplay || !totalAmountDisplay) return;
+  
+  // Clear existing items
+  checkoutItemsList.innerHTML = '';
+  
+  if (AppState.selectedItems.length === 0) {
+    checkoutItemsList.innerHTML = '<li class="empty-cart">Your cart is empty</li>';
+    totalItemsDisplay.textContent = '0 items';
+    totalAmountDisplay.textContent = 'Total: ₹0';
+    placeOrderBtn.disabled = true;
+    return;
+  }
+  
+  // Add items to list
+  AppState.selectedItems.forEach((item, index) => {
+    const li = document.createElement('li');
+    li.className = 'checkout-item';
+    li.innerHTML = `
+      <div class="checkout-item-info">
+        <span class="checkout-item-name">${sanitizeInput(item.name)} (${sanitizeInput(item.variant)})</span>
+        <span class="checkout-item-price">₹${item.price * item.quantity}</span>
+      </div>
+      <div class="checkout-item-actions">
+        <span class="checkout-item-quantity">${item.quantity}</span>
+        <button class="checkout-item-remove" data-index="${index}">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    `;
+    checkoutItemsList.appendChild(li);
+  });
+  
+  // Calculate totals
+  const itemCount = AppState.selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  let deliveryCharge = 0;
+  if (document.querySelector('input[name="orderType"]:checked')?.value === 'Delivery' && deliveryDistance) {
+    deliveryCharge = subtotal >= 500 ? 0 : calculateDeliveryChargeByDistance(deliveryDistance);
+  }
+  
+  const total = subtotal + deliveryCharge;
+  
+  // Update display
+  totalItemsDisplay.textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+  totalAmountDisplay.textContent = `Total: ₹${total}`;
+  
+  // Enable/disable place order button based on conditions
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+  placeOrderBtn.disabled = !(
+    AppState.selectedItems.length > 0 &&
+    customerName.value.trim() &&
+    phoneNumber.value.trim() && 
+    (/^\d{10}$/.test(phoneNumber.value)) &&
+    (orderType !== 'Delivery' || (locationObj && deliveryDistance))
+  );
+  
+  // Update mobile live total
+  if (mobileLiveTotal) {
+    mobileLiveTotal.querySelector('.total-items').textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+    mobileLiveTotal.querySelector('.total-amount').textContent = `Total: ₹${total}`;
+  }
+}
+
+// Show loading indicator
+function showLoading(show, message = '') {
+  if (!loadingIndicator || !loadingMessage) return;
+  
+  if (show) {
+    loadingIndicator.style.display = 'flex';
+    loadingMessage.textContent = message;
+  } else {
+    loadingIndicator.style.display = 'none';
+    loadingMessage.textContent = '';
   }
 }
 
@@ -889,6 +732,78 @@ function closeOrderModal() {
   }
 }
 
+// Save order to offline queue
+async function saveOrderToOfflineQueue(orderData) {
+  try {
+    offlineOrderQueue.push({
+      ...orderData,
+      isOffline: true,
+      timestamp: new Date().getTime()
+    });
+    
+    localStorage.setItem('offlineOrdersQueue', JSON.stringify(offlineOrderQueue));
+    return true;
+  } catch (error) {
+    console.error('Error saving to offline queue:', error);
+    return false;
+  }
+}
+
+// Load offline orders queue
+function loadOfflineOrdersQueue() {
+  try {
+    const queue = localStorage.getItem('offlineOrdersQueue');
+    if (queue) {
+      offlineOrderQueue = JSON.parse(queue);
+    }
+  } catch (error) {
+    console.error('Error loading offline orders queue:', error);
+  }
+}
+
+// Process offline orders queue when online
+async function processOfflineOrdersQueue() {
+  if (isProcessingOfflineQueue || offlineOrderQueue.length === 0) return;
+  
+  isProcessingOfflineQueue = true;
+  showLoading(true, 'Submitting offline orders...');
+  
+  try {
+    const successfulOrders = [];
+    
+    for (const order of offlineOrderQueue) {
+      try {
+        // Convert timestamp back to serverTimestamp if needed
+        const orderToSubmit = {
+          ...order,
+          timestamp: serverTimestamp(),
+          isOffline: false
+        };
+        
+        await addDoc(collection(db, 'orders'), orderToSubmit);
+        successfulOrders.push(order);
+      } catch (error) {
+        console.error('Error submitting offline order:', error);
+      }
+    }
+    
+    // Remove successfully submitted orders from queue
+    if (successfulOrders.length > 0) {
+      offlineOrderQueue = offlineOrderQueue.filter(order => 
+        !successfulOrders.some(completed => completed.timestamp === order.timestamp)
+      );
+      
+      localStorage.setItem('offlineOrdersQueue', JSON.stringify(offlineOrderQueue));
+      showNotification(`${successfulOrders.length} offline order(s) submitted successfully!`);
+    }
+  } catch (error) {
+    console.error('Error processing offline orders queue:', error);
+  } finally {
+    isProcessingOfflineQueue = false;
+    showLoading(false);
+  }
+}
+
 // Save order to history
 function saveOrderToHistory(orderData) {
   try {
@@ -986,14 +901,36 @@ function showNotification(message) {
   }, 3000);
 }
 
+// Sanitize input to prevent XSS
+function sanitizeInput(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Request notification permission
+function requestNotificationPermission() {
+  if ('Notification' in window) {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        console.log('Notification permission granted');
+      }
+    });
+  }
+}
+
+// Handle online/offline status changes
+function handleOnlineStatusChange() {
+  if (navigator.onLine) {
+    processOfflineOrdersQueue();
+  }
+  updateCheckoutDisplay();
+}
+
 // Cleanup event listeners when page unloads
 window.addEventListener('beforeunload', function() {
   if (watchPositionId) {
     navigator.geolocation.clearWatch(watchPositionId);
-  }
-  
-  if (addressAutocomplete) {
-    google.maps.event.clearInstanceListeners(manualDeliveryAddress);
   }
   
   window.removeEventListener('online', handleOnlineStatusChange);
