@@ -391,19 +391,22 @@
     if ('serviceWorker' in navigator) {
       if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
         window.addEventListener('load', function() {
-          // Register admin service worker
-          navigator.serviceWorker.register('/admin-sw.js')
-            .then(function(registration) {
-              console.log('Admin ServiceWorker registered with scope:', registration.scope);
-              // Register Firebase messaging service worker
-              return navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            })
-            .then(function(registration) {
-              console.log('Firebase Messaging ServiceWorker registered with scope:', registration.scope);
-            })
-            .catch(function(err) {
-              console.error('ServiceWorker registration failed:', err);
-            });
+          // Register both service workers
+          Promise.all([
+            navigator.serviceWorker.register('/admin-sw.js'),
+            navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          ])
+          .then(function(registrations) {
+            console.log('Admin ServiceWorker registered with scope:', registrations[0].scope);
+            console.log('Firebase Messaging ServiceWorker registered with scope:', registrations[1].scope);
+            // Initialize Firebase messaging if needed
+            if (firebase.messaging) {
+              return firebase.messaging();
+            }
+          })
+          .catch(function(err) {
+            console.error('ServiceWorker registration failed:', err);
+          });
         });
       } else {
         console.warn('ServiceWorker registration skipped - requires HTTPS or localhost');

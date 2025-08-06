@@ -6,13 +6,30 @@
   <title>Bake & Grill – Fresh Pizza, Burgers & Sandwiches Delivery in Sanjua,Bakhrahat</title>
   <meta name="description" content="Order delicious pizzas, burgers, sandwiches, and quick bites from Bake & Grill, Sanjua, Bakhrahat. Fast delivery within 8 km, free for orders above ₹500.">
   <meta name="keywords" content="pizza delivery near me, burgers Kolkata, food delivery Bakhrahat,Amtala Bake & Grill, order food online">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bakeandgrill.com/">
+  <meta property="og:title" content="Bake & Grill – Fresh Pizza, Burgers & Sandwiches Delivery">
+  <meta property="og:description" content="Order delicious pizzas, burgers, sandwiches, and quick bites from Bake & Grill, Sanjua, Bakhrahat. Fast delivery within 8 km.">
+  <meta property="og:image" content="https://bakeandgrill.com/images/social-share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://bakeandgrill.com/">
+  <meta property="twitter:title" content="Bake & Grill – Fresh Pizza, Burgers & Sandwiches Delivery">
+  <meta property="twitter:description" content="Order delicious pizzas, burgers, sandwiches, and quick bites from Bake & Grill, Sanjua, Bakhrahat. Fast delivery within 8 km.">
+  <meta property="twitter:image" content="https://bakeandgrill.com/images/social-share.jpg">
+
   <meta name="theme-color" content="#9d4edf">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BakeAndGrill">
   
   <!-- PWA Manifest -->
-  <link rel="manifest" href="/site.webmanifest.json">
+  <link rel="manifest" href="/site.webmanifest">
   
   <!-- Favicons -->
   <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
@@ -21,67 +38,9 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="/android-chrome-192x192.png" sizes="192x192">
   
-  <!-- PWA Splash Screens -->
-  <link rel="apple-touch-startup-image" href="/splashscreens/iphone5_splash.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
-  <link rel="apple-touch-startup-image" href="/splashscreens/iphone6_splash.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
-  <link rel="apple-touch-startup-image" href="/splashscreens/iphoneplus_splash.png" media="(device-width: 621px) and (device-height: 1104px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
-  <link rel="apple-touch-startup-image" href="/splashscreens/iphonex_splash.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
-  <link rel="apple-touch-startup-image" href="/splashscreens/ipad_splash.png" media="(min-device-width: 768px) and (max-device-width: 1024px) and (-webkit-min-device-pixel-ratio: 2) and (orientation: portrait)">
-  
-  <!-- Schema.org Structured Data -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Restaurant",
-    "name": "Bake & Grill",
-    "description": "Delicious fresh pizzas, burgers & sandwiches in Sanjua, Bakhrahat",
-    "image": "/android-chrome-192x192.png",
-    "url": "https://bakeandgrill.com",
-    "telephone": "+918240266267",
-    "priceRange": "$$",
-    "servesCuisine": ["Italian", "American", "Fast Food"],
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "Sanjua, Bakhrahat",
-      "addressLocality": "Kolkata",
-      "postalCode": "743377",
-      "addressCountry": "IN"
-    },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": "22.3908",
-      "longitude": "88.2189"
-    },
-    "openingHoursSpecification": {
-      "@type": "OpeningHoursSpecification",
-      "dayOfWeek": [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday"
-      ],
-      "opens": "16:00",
-      "closes": "22:00"
-    },
-    "menu": "https://bakeandgrill.com/menu",
-    "acceptsReservations": "False",
-    "sameAs": [
-      "https://www.facebook.com/bakeandgrill",
-      "https://www.instagram.com/bakeandgrill"
-    ],
-    "potentialAction": {
-      "@type": "OrderAction",
-      "target": "https://bakeandgrill.com/menu"
-    }
-  }
-  </script>
-
   <!-- CSS -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="/css/fontawesome.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body class="mobile-view">
   
@@ -238,7 +197,7 @@
     <span id="notificationText">Item added to cart!</span>
   </div>
 
-  <script type="module" src="js/main.js"></script>
+  <script src="/js/main.js"></script>
   <script>
     // Register Service Worker
     if ('serviceWorker' in navigator) {
@@ -247,7 +206,6 @@
           .then(registration => {
             console.log('ServiceWorker registration successful');
             
-            // Check for updates every hour
             setInterval(() => {
               registration.update().then(() => {
                 console.log('Service Worker updated');
