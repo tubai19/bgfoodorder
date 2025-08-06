@@ -55,7 +55,7 @@ function initMenuDOMElements() {
   MenuElements.quantityFooter = document.getElementById('quantityFooter');
   MenuElements.quantityItemName = document.getElementById('quantityItemName');
   MenuElements.quantityVariantPrice = document.getElementById('quantityVariantPrice');
-  MenuElements.quantityDisplay = document.querySelector('.quantity-footer .quantity');
+  MenuElements.quantityDisplay = document.querySelector('.quantity-controls .quantity');
   MenuElements.cancelBtn = document.querySelector('.quantity-footer .cancel-btn');
   MenuElements.addToCartBtn = document.querySelector('.quantity-footer .add-to-cart-btn');
   MenuElements.minusBtn = document.querySelector('.quantity-footer .minus');
