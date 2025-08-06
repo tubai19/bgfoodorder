@@ -35,7 +35,13 @@ const CONFIG = {
   ],
   MAX_DELIVERY_DISTANCE: 8,
   MIN_DELIVERY_ORDER: 200,
-  FREE_DELIVERY_THRESHOLD: 500
+  FREE_DELIVERY_THRESHOLD: 500,
+  VALID_COUPONS: {
+    'WELCOME10': { type: 'percentage', value: 10, minOrder: 0 },
+    'BAKE20': { type: 'fixed', value: 20, minOrder: 100 },
+    'GRILL25': { type: 'percentage', value: 25, minOrder: 300 },
+    'FREESHIP': { type: 'free_delivery', minOrder: 0 }
+  }
 };
 
 // Checkout page variables
@@ -48,6 +54,7 @@ let watchPositionId = null;
 let distanceCalculationCache = {};
 let offlineOrderQueue = [];
 let isProcessingOfflineQueue = false;
+let appliedCoupon = null;
 
 // DOM elements
 const placeOrderBtn = document.getElementById('placeOrderBtn');
@@ -57,6 +64,7 @@ const orderNotes = document.getElementById('orderNotes');
 const mobileLiveTotal = document.getElementById('mobileLiveTotal');
 const deliveryChargeDisplay = document.getElementById('deliveryChargeDisplay');
 const distanceText = document.getElementById('distanceText');
+const discountDisplay = document.getElementById('discountDisplay');
 const locationChoiceBlock = document.getElementById('locationChoiceBlock');
 const deliveryShareLocationBtn = document.getElementById('deliveryShareLocationBtn');
 const deliveryShowManualLocBtn = document.getElementById('deliveryShowManualLocBtn');
@@ -77,6 +85,9 @@ const cancelOrderBtn = document.getElementById('cancelOrderBtn');
 const notification = document.getElementById('notification');
 const notificationText = document.getElementById('notificationText');
 const addressMap = document.getElementById('addressMap');
+const couponCode = document.getElementById('couponCode');
+const applyCouponBtn = document.getElementById('applyCouponBtn');
+const couponMessage = document.getElementById('couponMessage');
 
 // Initialize the checkout page
 document.addEventListener('DOMContentLoaded', async function() {
@@ -156,7 +167,7 @@ async function calculateDeliveryDetails() {
     deliveryChargeDisplay.textContent = `Delivery Charge: ₹${deliveryCharge}`;
     
     // Enable place order button if all conditions are met
-    placeOrderBtn.disabled = false;
+    updateCheckoutDisplay();
     
     showLoading(false);
   } catch (error) {
@@ -174,6 +185,11 @@ function calculateDeliveryChargeByDistance(distance) {
     return 0;
   }
 
+  // Check if free delivery coupon is applied
+  if (appliedCoupon && appliedCoupon.type === 'free_delivery') {
+    return 0;
+  }
+
   // Check distance ranges
   for (const range of CONFIG.DELIVERY_CHARGES) {
     if (distance >= range.min && distance < range.max) {
@@ -183,6 +199,24 @@ function calculateDeliveryChargeByDistance(distance) {
 
   // If distance exceeds maximum delivery range
   return null;
+}
+
+// Calculate discount based on applied coupon
+function calculateDiscount(subtotal) {
+  if (!appliedCoupon) return 0;
+
+  // Check minimum order requirement
+  if (subtotal < appliedCoupon.minOrder) {
+    return 0;
+  }
+
+  if (appliedCoupon.type === 'percentage') {
+    return (subtotal * appliedCoupon.value) / 100;
+  } else if (appliedCoupon.type === 'fixed') {
+    return Math.min(appliedCoupon.value, subtotal); // Don't discount more than subtotal
+  }
+
+  return 0;
 }
 
 function setupEventListeners() {
@@ -240,6 +274,46 @@ function setupEventListeners() {
   
   // Address input for Nominatim search
   manualDeliveryAddress?.addEventListener('input', debounce(handleAddressInput, 500));
+  
+  // Coupon code application
+  applyCouponBtn?.addEventListener('click', applyCoupon);
+  couponCode?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      applyCoupon();
+    }
+  });
+}
+
+// Apply coupon code
+function applyCoupon() {
+  const code = couponCode.value.trim().toUpperCase();
+  
+  if (!code) {
+    couponMessage.textContent = 'Please enter a coupon code';
+    couponMessage.className = 'coupon-message error';
+    return;
+  }
+  
+  if (!CONFIG.VALID_COUPONS[code]) {
+    couponMessage.textContent = 'Invalid coupon code';
+    couponMessage.className = 'coupon-message error';
+    return;
+  }
+  
+  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  if (subtotal < CONFIG.VALID_COUPONS[code].minOrder) {
+    couponMessage.textContent = `Minimum order of ₹${CONFIG.VALID_COUPONS[code].minOrder} required for this coupon`;
+    couponMessage.className = 'coupon-message error';
+    return;
+  }
+  
+  appliedCoupon = CONFIG.VALID_COUPONS[code];
+  couponMessage.textContent = 'Coupon applied successfully!';
+  couponMessage.className = 'coupon-message success';
+  
+  // Update the display with the new discount
+  updateCheckoutDisplay();
 }
 
 // Handle order type change (Delivery/Pickup)
@@ -448,6 +522,7 @@ function updateCheckoutDisplay() {
     totalItemsDisplay.textContent = '0 items';
     totalAmountDisplay.textContent = 'Total: ₹0';
     placeOrderBtn.disabled = true;
+    discountDisplay.textContent = '';
     return;
   }
   
@@ -487,14 +562,25 @@ function updateCheckoutDisplay() {
     }
     
     // Calculate delivery charge
-    deliveryCharge = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD ? 0 : calculateDeliveryChargeByDistance(deliveryDistance);
+    deliveryCharge = calculateDeliveryChargeByDistance(deliveryDistance);
   }
   
-  const total = subtotal + deliveryCharge;
+  // Calculate discount
+  const discount = calculateDiscount(subtotal);
+  const total = subtotal + deliveryCharge - discount;
+  
+  // Update discount display
+  if (discount > 0) {
+    discountDisplay.textContent = `Discount: -₹${discount.toFixed(2)}`;
+    discountDisplay.style.display = 'block';
+  } else {
+    discountDisplay.textContent = '';
+    discountDisplay.style.display = 'none';
+  }
   
   // Update display
   totalItemsDisplay.textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
-  totalAmountDisplay.textContent = `Total: ₹${total}`;
+  totalAmountDisplay.textContent = `Total: ₹${total.toFixed(2)}`;
   
   // Enable/disable place order button based on conditions
   placeOrderBtn.disabled = !(
@@ -513,7 +599,7 @@ function updateCheckoutDisplay() {
   // Update mobile live total
   if (mobileLiveTotal) {
     mobileLiveTotal.querySelector('.total-items').textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
-    mobileLiveTotal.querySelector('.total-amount').textContent = `Total: ₹${total}`;
+    mobileLiveTotal.querySelector('.total-amount').textContent = `Total: ₹${total.toFixed(2)}`;
   }
 }
 
@@ -589,7 +675,9 @@ async function prepareOrderData() {
   if (orderType === 'Delivery') {
     deliveryCharge = subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD ? 0 : calculateDeliveryChargeByDistance(deliveryDistance);
   }
-  const total = subtotal + deliveryCharge;
+  
+  const discount = calculateDiscount(subtotal);
+  const total = subtotal + deliveryCharge - discount;
 
   const orderData = {
     customerName: name,
@@ -598,12 +686,20 @@ async function prepareOrderData() {
     items: [...AppState.selectedItems],
     subtotal: subtotal,
     deliveryCharge: deliveryCharge,
+    discount: discount,
     total: total,
     status: "Pending",
     timestamp: serverTimestamp(),
     notes: notes,
     isOffline: !navigator.onLine
   };
+
+  // Add coupon info if applied
+  if (appliedCoupon) {
+    orderData.couponCode = couponCode.value.trim().toUpperCase();
+    orderData.couponType = appliedCoupon.type;
+    orderData.couponValue = appliedCoupon.value || null;
+  }
 
   if (orderType === 'Delivery') {
     if (usingManualLoc) {
@@ -688,6 +784,7 @@ function showOrderConfirmationModal(orderData) {
         ${orderData.deliveryLocation ? `<p><strong>Location:</strong> <a href="https://www.google.com/maps?q=${orderData.deliveryLocation.latitude},${orderData.deliveryLocation.longitude}" target="_blank">View on Map</a></p>` : ''}
       ` : ''}
       ${orderData.notes ? `<p><strong>Notes:</strong> ${orderData.notes}</p>` : ''}
+      ${orderData.couponCode ? `<p><strong>Coupon Code:</strong> ${orderData.couponCode}</p>` : ''}
     </div>
     
     <div class="order-summary-section">
@@ -713,7 +810,8 @@ function showOrderConfirmationModal(orderData) {
       <p><strong>Subtotal:</strong> ₹${orderData.subtotal}</p>
       ${orderData.deliveryCharge > 0 ? `<p><strong>Delivery Charge:</strong> ₹${orderData.deliveryCharge}</p>` : ''}
       ${orderData.orderType === 'Delivery' && orderData.deliveryCharge === 0 ? `<p><strong>Delivery Charge:</strong> Free</p>` : ''}
-      <p class="grand-total"><strong>Total Amount:</strong> ₹${orderData.total}</p>
+      ${orderData.discount > 0 ? `<p><strong>Discount:</strong> -₹${orderData.discount.toFixed(2)}</p>` : ''}
+      <p class="grand-total"><strong>Total Amount:</strong> ₹${orderData.total.toFixed(2)}</p>
     </div>
   `;
   
@@ -746,6 +844,10 @@ async function processOrderConfirmation() {
     orderNotes.value = '';
     locationObj = null;
     deliveryDistance = null;
+    appliedCoupon = null;
+    couponCode.value = '';
+    couponMessage.textContent = '';
+    couponMessage.className = 'coupon-message';
     
     closeOrderModal();
     showNotification('Order placed successfully!');
@@ -901,6 +1003,10 @@ function generateWhatsAppMessage(orderData) {
     }
   }
   
+  if (orderData.couponCode) {
+    message += `*Coupon Code:* ${orderData.couponCode}\n`;
+  }
+  
   message += `\n*Order Items:*\n`;
   orderData.items.forEach((item, index) => {
     message += `${index + 1}. ${item.name} (${item.variant}) x ${item.quantity} - ₹${item.price * item.quantity}\n`;
@@ -912,7 +1018,10 @@ function generateWhatsAppMessage(orderData) {
   } else if (orderData.orderType === 'Delivery') {
     message += `*Delivery Charge:* Free\n`;
   }
-  message += `*Total Amount:* ₹${orderData.total}\n\n`;
+  if (orderData.discount > 0) {
+    message += `*Discount:* -₹${orderData.discount.toFixed(2)}\n`;
+  }
+  message += `*Total Amount:* ₹${orderData.total.toFixed(2)}\n\n`;
   message += `Please confirm this order. Thank you!`;
   
   return message;
