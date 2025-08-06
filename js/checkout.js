@@ -3,7 +3,6 @@ import {
   AppState,
   db,
   initApp,
-  showNotification,
   saveCartToStorage,
   calculateHaversineDistance,
   calculateDeliveryChargeByDistance,
@@ -18,7 +17,7 @@ import {
 // Configuration constants
 const CONFIG = {
   WHATSAPP_NUMBER: '918240266267',
-  OPENROUTE_SERVICE_API_KEY: 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijg5OWE3ZmRmYzhkODRmYmE5MmEzOGU5MDEzMTEyYjIzIiwiaCI6Im11cm11cjY0In0', // Your OpenRouteService API key
+  OPENROUTE_SERVICE_API_KEY: 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijg5OWE3ZmRmYzhkODRmYmE5MmEzOGU5MDEzMTEyYjIzIiwiaCI6Im11cm11cjY0In0',
   NOMINATIM_ENDPOINT: 'https://nominatim.openstreetmap.org/search',
   OPENROUTE_SERVICE_ENDPOINT: 'https://api.openrouteservice.org/v2/directions/driving-car',
   MAX_ORDER_HISTORY: 50,
@@ -26,8 +25,8 @@ const CONFIG = {
   MAP_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   FALLBACK_DISTANCE_CALCULATION_TIMEOUT: 3000,
   RESTAURANT_LOCATION: {
-    lat: 22.3908, // Replace with your restaurant's latitude
-    lng: 88.2189  // Replace with your restaurant's longitude
+    lat: 22.3908,
+    lng: 88.2189
   }
 };
 
@@ -925,6 +924,15 @@ function handleOnlineStatusChange() {
     processOfflineOrdersQueue();
   }
   updateCheckoutDisplay();
+}
+
+// Debounce function
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
 }
 
 // Cleanup event listeners when page unloads
