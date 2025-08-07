@@ -16,8 +16,8 @@ import {
   getMessaging,
   getToken,
   onMessage,
-  onTokenRefresh,
-  isSupported as isMessagingSupported
+  isMessagingSupported,
+  registerCustomerToken
 } from './main.js';
 
 // Configuration constants
@@ -142,13 +142,6 @@ async function initializeFirebaseMessaging() {
     });
     console.log('FCM Token:', currentFCMToken);
     
-    // Listen for token refresh
-    onTokenRefresh(messaging, async () => {
-      currentFCMToken = await getToken(messaging);
-      console.log('FCM Token refreshed:', currentFCMToken);
-      await registerCustomerToken();
-    });
-    
     // Handle incoming messages
     onMessage(messaging, (payload) => {
       console.log('Message received:', payload);
@@ -157,33 +150,11 @@ async function initializeFirebaseMessaging() {
     
     // Register the token if we have a phone number
     if (elements.phoneNumber.value && /^\d{10}$/.test(elements.phoneNumber.value)) {
-      await registerCustomerToken();
+      await registerCustomerToken(elements.phoneNumber.value, elements.customerName.value || null);
     }
     
   } catch (error) {
     console.error('Firebase Messaging error:', error);
-  }
-}
-
-async function registerCustomerToken() {
-  if (!currentFCMToken || !elements.phoneNumber.value || !/^\d{10}$/.test(elements.phoneNumber.value)) {
-    return;
-  }
-  
-  try {
-    const phoneNumber = sanitizeInput(elements.phoneNumber.value);
-    const tokenRef = doc(db, CONFIG.FCM_TOKEN_COLLECTION, phoneNumber);
-    
-    await setDoc(tokenRef, {
-      token: currentFCMToken,
-      phoneNumber: phoneNumber,
-      timestamp: serverTimestamp(),
-      name: elements.customerName.value ? sanitizeInput(elements.customerName.value) : null
-    }, { merge: true });
-    
-    console.log('FCM token registered for customer:', phoneNumber);
-  } catch (error) {
-    console.error('Error registering FCM token:', error);
   }
 }
 
@@ -562,7 +533,7 @@ async function processOrderConfirmation() {
     
     // Register customer token if available
     if (currentFCMToken && orderData.phoneNumber) {
-      await registerCustomerToken();
+      await registerCustomerToken(orderData.phoneNumber, orderData.customerName);
     }
     
     updateCheckoutDisplay();
