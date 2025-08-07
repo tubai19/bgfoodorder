@@ -24,7 +24,6 @@ import {
 const CONFIG = {
   WHATSAPP_NUMBER: '918240266267',
   OPENROUTE_SERVICE_API_KEY: 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6Ijg5OWE3ZmRmYzhkODRmYmE5MmEzOGU5MDEzMTEyYjIzIiwiaCI6Im11cm11cjY0In0',
-  NOMINATIM_ENDPOINT: 'https://nominatim.openstreetmap.org/search',
   OPENROUTE_SERVICE_ENDPOINT: 'https://api.openrouteservice.org/v2/directions/driving-car',
   MAX_ORDER_HISTORY: 50,
   MAP_TILE_PROVIDER: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -852,9 +851,6 @@ function setupEventListeners() {
   window.addEventListener('online', handleOnlineStatusChange);
   window.addEventListener('offline', handleOnlineStatusChange);
   
-  // Address input for Nominatim search
-  elements.manualDeliveryAddress?.addEventListener('input', debounce(handleAddressInput, 500));
-  
   // Coupon code application
   elements.applyCouponBtn?.addEventListener('click', applyCoupon);
   elements.couponCode?.addEventListener('keypress', function(e) {
@@ -943,54 +939,6 @@ function showManualLocationFields() {
   
   if (!map) {
     initMap();
-  }
-}
-
-async function handleAddressInput() {
-  const query = elements.manualDeliveryAddress.value.trim();
-  if (query.length < 3) return;
-
-  try {
-    showLoading(true, 'Searching for address...');
-    
-    const response = await fetch(
-      `${CONFIG.NOMINATIM_ENDPOINT}?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Nominatim API responded with status ${response.status}`);
-    }
-    
-    const results = await response.json();
-    if (results.length === 0) {
-      showLoading(false);
-      showNotification('No locations found');
-      return;
-    }
-    
-    const firstResult = results[0];
-    const location = {
-      lat: parseFloat(firstResult.lat),
-      lng: parseFloat(firstResult.lon)
-    };
-    
-    map.setView([location.lat, location.lng], 17);
-    marker.setLatLng([location.lat, location.lng]);
-    
-    locationObj = { lat: location.lat, lng: location.lng };
-    
-    if (firstResult.display_name) {
-      elements.manualDeliveryAddress.value = firstResult.display_name;
-    }
-    
-    calculateDeliveryDetails();
-    
-    showNotification('Location found!');
-    showLoading(false);
-  } catch (error) {
-    console.error("Error in Nominatim API call:", error);
-    showLoading(false);
-    showNotification('Error finding location. Please try again.');
   }
 }
 
