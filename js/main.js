@@ -91,11 +91,31 @@ async function getFCMToken() {
       return null;
     }
     
-    // Register service worker
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/'
-    });
-    console.log('Service Worker registered');
+    // First check for existing registration
+    let registration = await navigator.serviceWorker.getRegistration();
+    
+    // If no registration exists, register a new one
+    if (!registration) {
+      registration = await navigator.serviceWorker.register('/sw.js', {
+        scope: '/'
+      });
+      console.log('Service Worker registered');
+      
+      // Wait for the service worker to be active
+      await new Promise((resolve) => {
+        if (registration.active) {
+          resolve();
+        } else {
+          const listener = () => {
+            if (registration.active) {
+              registration.removeEventListener('updatefound', listener);
+              resolve();
+            }
+          };
+          registration.addEventListener('updatefound', listener);
+        }
+      });
+    }
     
     const messaging = getMessaging(app);
     const currentToken = await getToken(messaging, {
@@ -125,7 +145,6 @@ function setupMessageHandler() {
       console.log('Foreground message:', payload);
       showNotification(payload.notification?.body || 'New update from Bake & Grill');
       
-      // Handle specific message types
       if (payload.data?.type === 'statusUpdate') {
         updateStatusDisplay();
       }
@@ -375,12 +394,11 @@ export {
   setDoc,
   getCategoryIcon,
   isCategoryAvailableForOrderType,
-  getFCMToken,
-  registerCustomerToken,
-  requestNotificationPermission,
-  // Add these messaging-related exports:
   getMessaging,
   getToken,
   onMessage,
-  isMessagingSupported
+  isMessagingSupported,
+  getFCMToken,
+  registerCustomerToken,
+  requestNotificationPermission
 };

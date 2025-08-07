@@ -110,7 +110,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     handleOrderTypeChange();
     initMap();
     checkNotificationPermission();
-    await initializeFirebaseMessaging();
+    
+    // Initialize Firebase Messaging after slight delay to ensure service worker is ready
+    setTimeout(async () => {
+      await initializeFirebaseMessaging();
+    }, 1000);
   } catch (error) {
     console.error('Initialization error:', error);
     showNotification('Failed to initialize. Please refresh the page.');
@@ -136,9 +140,17 @@ async function initializeFirebaseMessaging() {
     }
     
     // Get FCM token
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      console.error('No service worker registration found');
+      return;
+    }
+
     currentFCMToken = await getToken(messaging, {
-      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY'
+      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY',
+      serviceWorkerRegistration: registration
     });
+    
     console.log('FCM Token:', currentFCMToken);
     
     // Handle incoming messages
@@ -159,6 +171,7 @@ async function initializeFirebaseMessaging() {
     }
   }
 }
+
 
 function checkNotificationPermission() {
   if (!('Notification' in window)) {
