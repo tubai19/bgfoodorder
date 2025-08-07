@@ -140,7 +140,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js', {
-          type: 'module'
+          No type: 'module'
         }).then(registration => {
           console.log('ServiceWorker registered');
         }).catch(err => {
