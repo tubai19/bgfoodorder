@@ -57,37 +57,39 @@ let isProcessingOfflineQueue = false;
 let appliedCoupon = null;
 
 // DOM elements
-const placeOrderBtn = document.getElementById('placeOrderBtn');
-const customerName = document.getElementById('customerName');
-const phoneNumber = document.getElementById('phoneNumber');
-const orderNotes = document.getElementById('orderNotes');
-const mobileLiveTotal = document.getElementById('mobileLiveTotal');
-const deliveryChargeDisplay = document.getElementById('deliveryChargeDisplay');
-const distanceText = document.getElementById('distanceText');
-const discountDisplay = document.getElementById('discountDisplay');
-const locationChoiceBlock = document.getElementById('locationChoiceBlock');
-const deliveryShareLocationBtn = document.getElementById('deliveryShareLocationBtn');
-const deliveryShowManualLocBtn = document.getElementById('deliveryShowManualLocBtn');
-const currentLocStatusMsg = document.getElementById('currentLocStatusMsg');
-const manualLocationFields = document.getElementById('manualLocationFields');
-const manualDeliveryAddress = document.getElementById('manualDeliveryAddress');
-const orderTypeRadios = document.querySelectorAll('input[name="orderType"]');
-const totalItemsDisplay = document.getElementById('totalItems');
-const totalAmountDisplay = document.getElementById('totalAmount');
-const checkoutItemsList = document.getElementById('checkoutItemsList');
-const clearCartBtn = document.getElementById('clearCartBtn');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const loadingMessage = document.getElementById('loadingMessage');
-const orderConfirmationModal = document.getElementById('orderConfirmationModal');
-const orderConfirmationSummary = document.getElementById('orderConfirmationSummary');
-const confirmOrderBtn = document.getElementById('confirmOrderBtn');
-const cancelOrderBtn = document.getElementById('cancelOrderBtn');
-const notification = document.getElementById('notification');
-const notificationText = document.getElementById('notificationText');
-const addressMap = document.getElementById('addressMap');
-const couponCode = document.getElementById('couponCode');
-const applyCouponBtn = document.getElementById('applyCouponBtn');
-const couponMessage = document.getElementById('couponMessage');
+const elements = {
+  placeOrderBtn: document.getElementById('placeOrderBtn'),
+  customerName: document.getElementById('customerName'),
+  phoneNumber: document.getElementById('phoneNumber'),
+  orderNotes: document.getElementById('orderNotes'),
+  mobileLiveTotal: document.getElementById('mobileLiveTotal'),
+  deliveryChargeDisplay: document.getElementById('deliveryChargeDisplay'),
+  distanceText: document.getElementById('distanceText'),
+  discountDisplay: document.getElementById('discountDisplay'),
+  locationChoiceBlock: document.getElementById('locationChoiceBlock'),
+  deliveryShareLocationBtn: document.getElementById('deliveryShareLocationBtn'),
+  deliveryShowManualLocBtn: document.getElementById('deliveryShowManualLocBtn'),
+  currentLocStatusMsg: document.getElementById('currentLocStatusMsg'),
+  manualLocationFields: document.getElementById('manualLocationFields'),
+  manualDeliveryAddress: document.getElementById('manualDeliveryAddress'),
+  orderTypeRadios: document.querySelectorAll('input[name="orderType"]'),
+  totalItemsDisplay: document.getElementById('totalItems'),
+  totalAmountDisplay: document.getElementById('totalAmount'),
+  checkoutItemsList: document.getElementById('checkoutItemsList'),
+  clearCartBtn: document.getElementById('clearCartBtn'),
+  loadingIndicator: document.getElementById('loadingIndicator'),
+  loadingMessage: document.getElementById('loadingMessage'),
+  orderConfirmationModal: document.getElementById('orderConfirmationModal'),
+  orderConfirmationSummary: document.getElementById('orderConfirmationSummary'),
+  confirmOrderBtn: document.getElementById('confirmOrderBtn'),
+  cancelOrderBtn: document.getElementById('cancelOrderBtn'),
+  notification: document.getElementById('notification'),
+  notificationText: document.getElementById('notificationText'),
+  addressMap: document.getElementById('addressMap'),
+  couponCode: document.getElementById('couponCode'),
+  applyCouponBtn: document.getElementById('applyCouponBtn'),
+  couponMessage: document.getElementById('couponMessage')
+};
 
 // Initialize the checkout page
 document.addEventListener('DOMContentLoaded', async function() {
@@ -104,9 +106,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 });
 
-// Initialize Leaflet map
+/* ========== MAP FUNCTIONS ========== */
 function initMap() {
-  if (!addressMap) return;
+  if (!elements.addressMap) return;
 
   map = L.map('addressMap').setView([CONFIG.RESTAURANT_LOCATION.lat, CONFIG.RESTAURANT_LOCATION.lng], 13);
   
@@ -126,33 +128,27 @@ function initMap() {
     draggable: true
   }).addTo(map);
 
-  marker.on('dragend', function() {
-    updateLocationFromMarker();
-  });
-
+  marker.on('dragend', updateLocationFromMarker);
   map.on('click', function(e) {
     marker.setLatLng(e.latlng);
     updateLocationFromMarker();
   });
 }
 
-// Update location from marker position
 function updateLocationFromMarker() {
   if (!marker) return;
-  
   const latlng = marker.getLatLng();
   locationObj = { lat: latlng.lat, lng: latlng.lng };
   calculateDeliveryDetails();
 }
 
-// Calculate delivery distance and charges
+/* ========== DELIVERY CALCULATION ========== */
 async function calculateDeliveryDetails() {
   if (!locationObj) return;
 
   try {
     showLoading(true, 'Calculating distance...');
     
-    // Calculate road distance with fallback to haversine
     deliveryDistance = await calculateRoadDistance(
       CONFIG.RESTAURANT_LOCATION.lat,
       CONFIG.RESTAURANT_LOCATION.lng,
@@ -162,13 +158,10 @@ async function calculateDeliveryDetails() {
 
     const deliveryCharge = calculateDeliveryChargeByDistance(deliveryDistance);
     
-    // Update UI
-    distanceText.textContent = `${deliveryDistance.toFixed(1)} km from restaurant`;
-    deliveryChargeDisplay.textContent = `Delivery Charge: ₹${deliveryCharge}`;
+    elements.distanceText.textContent = `${deliveryDistance.toFixed(1)} km from restaurant`;
+    elements.deliveryChargeDisplay.textContent = `Delivery Charge: ₹${deliveryCharge}`;
     
-    // Enable place order button if all conditions are met
     updateCheckoutDisplay();
-    
     showLoading(false);
   } catch (error) {
     console.error('Error calculating delivery details:', error);
@@ -177,453 +170,79 @@ async function calculateDeliveryDetails() {
   }
 }
 
-// Calculate delivery charge based on distance
 function calculateDeliveryChargeByDistance(distance) {
-  // Free delivery for orders over ₹500
   const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  if (subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD) {
-    return 0;
-  }
+  if (subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD) return 0;
+  if (appliedCoupon?.type === 'free_delivery') return 0;
 
-  // Check if free delivery coupon is applied
-  if (appliedCoupon && appliedCoupon.type === 'free_delivery') {
-    return 0;
-  }
-
-  // Check distance ranges
   for (const range of CONFIG.DELIVERY_CHARGES) {
     if (distance >= range.min && distance < range.max) {
       return range.charge;
     }
   }
-
-  // If distance exceeds maximum delivery range
   return null;
 }
 
-// Calculate discount based on applied coupon
 function calculateDiscount(subtotal) {
   if (!appliedCoupon) return 0;
-
-  // Check minimum order requirement
-  if (subtotal < appliedCoupon.minOrder) {
-    return 0;
-  }
+  if (subtotal < appliedCoupon.minOrder) return 0;
 
   if (appliedCoupon.type === 'percentage') {
     return (subtotal * appliedCoupon.value) / 100;
   } else if (appliedCoupon.type === 'fixed') {
-    return Math.min(appliedCoupon.value, subtotal); // Don't discount more than subtotal
+    return Math.min(appliedCoupon.value, subtotal);
   }
-
   return 0;
 }
 
-function setupEventListeners() {
-  // Order type toggle
-  orderTypeRadios.forEach(radio => {
-    radio.addEventListener('change', handleOrderTypeChange);
-  });
-  
-  // Location sharing
-  deliveryShareLocationBtn?.addEventListener('click', handleLocationSharing);
-  
-  // Manual location entry
-  deliveryShowManualLocBtn?.addEventListener('click', showManualLocationFields);
-  
-  // Place order button
-  placeOrderBtn?.addEventListener('click', confirmOrder);
-  
-  // Phone number validation
-  phoneNumber?.addEventListener('change', function() {
-    if (this.value && this.value.length === 10) {
-      localStorage.setItem('userPhone', sanitizeInput(this.value));
-      requestNotificationPermission();
-    }
-  });
-  
-  // Clear cart button
-  clearCartBtn?.addEventListener('click', function() {
-    if (AppState.selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
-      AppState.selectedItems = [];
-      saveCartToStorage();
-      updateCheckoutDisplay();
-      showNotification('Cart cleared');
-    }
-  });
-  
-  // Item remove buttons
-  checkoutItemsList?.addEventListener('click', function(e) {
-    if (e.target.closest('.checkout-item-remove')) {
-      const index = e.target.closest('.checkout-item-remove').dataset.index;
-      const item = AppState.selectedItems[index];
-      AppState.selectedItems.splice(index, 1);
-      saveCartToStorage();
-      updateCheckoutDisplay();
-      showNotification(`${sanitizeInput(item.name)} removed from cart`);
-    }
-  });
-  
-  // Modal buttons
-  confirmOrderBtn?.addEventListener('click', processOrderConfirmation);
-  cancelOrderBtn?.addEventListener('click', closeOrderModal);
-  
-  // Online/offline detection
-  window.addEventListener('online', handleOnlineStatusChange);
-  window.addEventListener('offline', handleOnlineStatusChange);
-  
-  // Address input for Nominatim search
-  manualDeliveryAddress?.addEventListener('input', debounce(handleAddressInput, 500));
-  
-  // Coupon code application
-  applyCouponBtn?.addEventListener('click', applyCoupon);
-  couponCode?.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      applyCoupon();
-    }
-  });
-}
-
-// Apply coupon code
-function applyCoupon() {
-  const code = couponCode.value.trim().toUpperCase();
-  
-  if (!code) {
-    couponMessage.textContent = 'Please enter a coupon code';
-    couponMessage.className = 'coupon-message error';
-    return;
-  }
-  
-  if (!CONFIG.VALID_COUPONS[code]) {
-    couponMessage.textContent = 'Invalid coupon code';
-    couponMessage.className = 'coupon-message error';
-    return;
-  }
-  
-  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  if (subtotal < CONFIG.VALID_COUPONS[code].minOrder) {
-    couponMessage.textContent = `Minimum order of ₹${CONFIG.VALID_COUPONS[code].minOrder} required for this coupon`;
-    couponMessage.className = 'coupon-message error';
-    return;
-  }
-  
-  appliedCoupon = CONFIG.VALID_COUPONS[code];
-  couponMessage.textContent = 'Coupon applied successfully!';
-  couponMessage.className = 'coupon-message success';
-  
-  // Update the display with the new discount
-  updateCheckoutDisplay();
-}
-
-// Handle order type change (Delivery/Pickup)
-function handleOrderTypeChange() {
-  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
-  
-  if (orderType === 'Delivery') {
-    locationChoiceBlock.style.display = 'block';
-    deliveryChargeDisplay.style.display = 'block';
-    distanceText.style.display = 'block';
-    
-    // Initialize manual location fields if needed
-    if (usingManualLoc) {
-      manualLocationFields.style.display = 'block';
-    }
-    
-    // Update delivery info if location is already set
-    if (locationObj) {
-      calculateDeliveryDetails();
-    }
-  } else {
-    locationChoiceBlock.style.display = 'none';
-    manualLocationFields.style.display = 'none';
-    deliveryChargeDisplay.style.display = 'none';
-    distanceText.style.display = 'none';
-    deliveryChargeDisplay.textContent = '';
-    distanceText.textContent = '';
-  }
-  
-  updateCheckoutDisplay();
-}
-
-// Handle location sharing
-function handleLocationSharing() {
-  if (!navigator.geolocation) {
-    showNotification('Geolocation is not supported by your browser');
-    return;
-  }
-  
-  showLoading(true, 'Getting your location...');
-  currentLocStatusMsg.textContent = 'Getting your location...';
-  
-  // Stop any previous watch
-  if (watchPositionId) {
-    navigator.geolocation.clearWatch(watchPositionId);
-  }
-  
-  watchPositionId = navigator.geolocation.watchPosition(
-    (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      
-      locationObj = { lat, lng };
-      usingManualLoc = false;
-      
-      // Update map and marker
-      map.setView([lat, lng], 17);
-      marker.setLatLng([lat, lng]);
-      
-      // Calculate distance
-      calculateDeliveryDetails();
-      
-      currentLocStatusMsg.textContent = 'Location shared successfully!';
-      showLoading(false);
-    },
-    (error) => {
-      console.error('Geolocation error:', error);
-      currentLocStatusMsg.textContent = 'Error getting location. Please try again or enter manually.';
-      showLoading(false);
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    }
-  );
-}
-
-// Show manual location fields
-function showManualLocationFields() {
-  usingManualLoc = true;
-  manualLocationFields.style.display = 'block';
-  currentLocStatusMsg.textContent = 'Enter your address below';
-  
-  // Initialize map if not already done
-  if (!map) {
-    initMap();
-  }
-}
-
-// Handle address input with Nominatim
-async function handleAddressInput() {
-  const query = manualDeliveryAddress.value.trim();
-  if (query.length < 3) return;
-
+/* ========== ORDER PROCESSING ========== */
+async function confirmOrder() {
   try {
-    showLoading(true, 'Searching for address...');
+    if ('vibrate' in navigator) navigator.vibrate(50);
+    showLoading(true, 'Processing your order...');
     
-    const response = await fetch(
-      `${CONFIG.NOMINATIM_ENDPOINT}?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Nominatim API responded with status ${response.status}`);
-    }
-    
-    const results = await response.json();
-    if (results.length === 0) {
+    const isShopOpen = await checkShopStatus();
+    if (!isShopOpen) {
       showLoading(false);
-      showNotification('No locations found');
+      alert("Sorry, the shop is currently closed. Please try again later.");
       return;
     }
     
-    // Take the first result
-    const firstResult = results[0];
-    const location = {
-      lat: parseFloat(firstResult.lat),
-      lng: parseFloat(firstResult.lon)
-    };
-    
-    // Update map and marker
-    map.setView([location.lat, location.lng], 17);
-    marker.setLatLng([location.lat, location.lng]);
-    
-    locationObj = { lat: location.lat, lng: location.lng };
-    
-    // Update address field with full formatted address if available
-    if (firstResult.display_name) {
-      manualDeliveryAddress.value = firstResult.display_name;
-    }
-    
-    // Calculate distance
-    calculateDeliveryDetails();
-    
-    showNotification('Location found!');
-    showLoading(false);
-  } catch (error) {
-    console.error("Error in Nominatim API call:", error);
-    showLoading(false);
-    showNotification('Error finding location. Please try again.');
-  }
-}
-
-// Calculate road distance using OpenRouteService API with caching and fallback
-async function calculateRoadDistance(originLat, originLng, destLat, destLng) {
-  const cacheKey = `${originLat},${originLng},${destLat},${destLng}`;
-  
-  // Check cache first
-  if (distanceCalculationCache[cacheKey]) {
-    return distanceCalculationCache[cacheKey];
-  }
-  
-  // Use Promise.race to implement timeout
-  try {
-    const distance = await Promise.race([
-      calculateRoadDistanceFromAPI(originLat, originLng, destLat, destLng),
-      new Promise((_, reject) => setTimeout(
-        () => reject(new Error('Distance calculation timeout')),
-        CONFIG.FALLBACK_DISTANCE_CALCULATION_TIMEOUT
-      ))
-    ]);
-    
-    // Cache the result
-    distanceCalculationCache[cacheKey] = distance;
-    return distance;
-  } catch (error) {
-    console.error("Error calculating road distance:", error);
-    // Fallback to haversine distance
-    return calculateHaversineDistance(originLat, originLng, destLat, destLng);
-  }
-}
-
-// Actual API call to OpenRouteService
-async function calculateRoadDistanceFromAPI(originLat, originLng, destLat, destLng) {
-  try {
-    const response = await fetch(
-      `${CONFIG.OPENROUTE_SERVICE_ENDPOINT}?api_key=${CONFIG.OPENROUTE_SERVICE_API_KEY}&start=${originLng},${originLat}&end=${destLng},${destLat}`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`OpenRouteService API responded with status ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data.routes && data.routes.length > 0) {
-      return data.routes[0].summary.distance / 1000; // Convert meters to kilometers
-    } else {
-      throw new Error('No routes found in OpenRouteService response');
-    }
-  } catch (error) {
-    console.error("Error in OpenRouteService API call:", error);
-    throw error;
-  }
-}
-
-// Update checkout display with cart items and totals
-function updateCheckoutDisplay() {
-  if (!checkoutItemsList || !totalItemsDisplay || !totalAmountDisplay) return;
-  
-  // Clear existing items
-  checkoutItemsList.innerHTML = '';
-  
-  if (AppState.selectedItems.length === 0) {
-    checkoutItemsList.innerHTML = '<li class="empty-cart">Your cart is empty</li>';
-    totalItemsDisplay.textContent = '0 items';
-    totalAmountDisplay.textContent = 'Total: ₹0';
-    placeOrderBtn.disabled = true;
-    discountDisplay.textContent = '';
-    return;
-  }
-  
-  // Add items to list
-  AppState.selectedItems.forEach((item, index) => {
-    const li = document.createElement('li');
-    li.className = 'checkout-item';
-    li.innerHTML = `
-      <div class="checkout-item-info">
-        <span class="checkout-item-name">${sanitizeInput(item.name)} (${sanitizeInput(item.variant)})</span>
-        <span class="checkout-item-price">₹${item.price * item.quantity}</span>
-      </div>
-      <div class="checkout-item-actions">
-        <span class="checkout-item-quantity">${item.quantity}</span>
-        <button class="checkout-item-remove" data-index="${index}">
-          <i class="fas fa-trash"></i>
-        </button>
-      </div>
-    `;
-    checkoutItemsList.appendChild(li);
-  });
-  
-  // Calculate totals
-  const itemCount = AppState.selectedItems.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  let deliveryCharge = 0;
-  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
-  
-  if (orderType === 'Delivery' && deliveryDistance) {
-    // Check if distance is within delivery range
-    if (deliveryDistance > CONFIG.MAX_DELIVERY_DISTANCE) {
-      deliveryChargeDisplay.textContent = `Delivery not available beyond ${CONFIG.MAX_DELIVERY_DISTANCE}km`;
-      distanceText.textContent = `${deliveryDistance.toFixed(1)} km (out of range)`;
-      placeOrderBtn.disabled = true;
+    const orderData = await prepareOrderData();
+    if (!orderData) {
+      showLoading(false);
       return;
     }
     
-    // Calculate delivery charge
-    deliveryCharge = calculateDeliveryChargeByDistance(deliveryDistance);
-  }
-  
-  // Calculate discount
-  const discount = calculateDiscount(subtotal);
-  const total = subtotal + deliveryCharge - discount;
-  
-  // Update discount display
-  if (discount > 0) {
-    discountDisplay.textContent = `Discount: -₹${discount.toFixed(2)}`;
-    discountDisplay.style.display = 'block';
-  } else {
-    discountDisplay.textContent = '';
-    discountDisplay.style.display = 'none';
-  }
-  
-  // Update display
-  totalItemsDisplay.textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
-  totalAmountDisplay.textContent = `Total: ₹${total.toFixed(2)}`;
-  
-  // Enable/disable place order button based on conditions
-  placeOrderBtn.disabled = !(
-    AppState.selectedItems.length > 0 &&
-    customerName.value.trim() &&
-    phoneNumber.value.trim() && 
-    (/^\d{10}$/.test(phoneNumber.value)) &&
-    (orderType !== 'Delivery' || (
-      locationObj && 
-      deliveryDistance && 
-      deliveryDistance <= CONFIG.MAX_DELIVERY_DISTANCE &&
-      subtotal >= CONFIG.MIN_DELIVERY_ORDER
-    ))
-  );
-  
-  // Update mobile live total
-  if (mobileLiveTotal) {
-    mobileLiveTotal.querySelector('.total-items').textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
-    mobileLiveTotal.querySelector('.total-amount').textContent = `Total: ₹${total.toFixed(2)}`;
+    if (!navigator.onLine) {
+      const saved = await saveOrderToOfflineQueue(orderData);
+      showLoading(false);
+      
+      if (saved) {
+        showNotification('Order saved offline. Will submit when back online.');
+        AppState.selectedItems = [];
+        saveCartToStorage();
+        updateCheckoutDisplay();
+      }
+      return;
+    }
+    
+    showOrderConfirmationModal(orderData);
+    showLoading(false);
+  } catch (error) {
+    showLoading(false);
+    console.error("Error confirming order:", error);
+    showNotification("There was an error processing your order. Please try again.");
   }
 }
 
-// Show loading indicator
-function showLoading(show, message = '') {
-  if (!loadingIndicator || !loadingMessage) return;
-  
-  if (show) {
-    loadingIndicator.style.display = 'flex';
-    loadingMessage.textContent = message;
-  } else {
-    loadingIndicator.style.display = 'none';
-    loadingMessage.textContent = '';
-  }
-}
-
-// Prepare order data for submission
 async function prepareOrderData() {
-  const name = sanitizeInput(customerName.value.trim());
-  const phone = sanitizeInput(phoneNumber.value.trim());
-  const notes = sanitizeInput(orderNotes.value.trim());
+  const name = sanitizeInput(elements.customerName.value.trim());
+  const phone = sanitizeInput(elements.phoneNumber.value.trim());
+  const notes = sanitizeInput(elements.orderNotes.value.trim());
   const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
   const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
+
   // Validation
   if (!orderType) {
     alert("Please select an order type (Delivery or Pickup).");
@@ -648,15 +267,15 @@ async function prepareOrderData() {
   if (orderType === 'Delivery') {
     if (!locationObj) {
       alert("Location is required for delivery. Please share your location or enter your address manually.");
-      if (locationChoiceBlock) {
-        locationChoiceBlock.scrollIntoView({ behavior: 'smooth' });
+      if (elements.locationChoiceBlock) {
+        elements.locationChoiceBlock.scrollIntoView({ behavior: 'smooth' });
       }
       return null;
     }
     
-    if (usingManualLoc && !manualDeliveryAddress.value.trim()) {
+    if (usingManualLoc && !elements.manualDeliveryAddress.value.trim()) {
       alert("Please enter your complete delivery address.");
-      if (manualDeliveryAddress) manualDeliveryAddress.focus();
+      if (elements.manualDeliveryAddress) elements.manualDeliveryAddress.focus();
       return null;
     }
     
@@ -696,14 +315,14 @@ async function prepareOrderData() {
 
   // Add coupon info if applied
   if (appliedCoupon) {
-    orderData.couponCode = couponCode.value.trim().toUpperCase();
+    orderData.couponCode = elements.couponCode.value.trim().toUpperCase();
     orderData.couponType = appliedCoupon.type;
     orderData.couponValue = appliedCoupon.value || null;
   }
 
   if (orderType === 'Delivery') {
     if (usingManualLoc) {
-      orderData.deliveryAddress = sanitizeInput(manualDeliveryAddress.value);
+      orderData.deliveryAddress = sanitizeInput(elements.manualDeliveryAddress.value);
       if (locationObj) {
         orderData.deliveryLocation = new GeoPoint(locationObj.lat, locationObj.lng);
       }
@@ -716,61 +335,8 @@ async function prepareOrderData() {
   return orderData;
 }
 
-// Confirm order
-async function confirmOrder() {
-  try {
-    // Add haptic feedback if available
-    if ('vibrate' in navigator) {
-      try {
-        navigator.vibrate(50);
-      } catch (vibrationError) {
-        console.warn('Vibration API error:', vibrationError);
-      }
-    }
-    
-    showLoading(true, 'Processing your order...');
-    
-    const isShopOpen = await checkShopStatus();
-    if (!isShopOpen) {
-      showLoading(false);
-      alert("Sorry, the shop is currently closed. Please try again later.");
-      return;
-    }
-    
-    const orderData = await prepareOrderData();
-    if (!orderData) {
-      showLoading(false);
-      return;
-    }
-    
-    // Check if offline
-    if (!navigator.onLine) {
-      const saved = await saveOrderToOfflineQueue(orderData);
-      showLoading(false);
-      
-      if (saved) {
-        showNotification('Order saved offline. Will submit when back online.');
-        AppState.selectedItems = [];
-        saveCartToStorage();
-        updateCheckoutDisplay();
-      } else {
-        showNotification('Failed to save order offline. Please try again when online.');
-      }
-      return;
-    }
-    
-    showOrderConfirmationModal(orderData);
-    showLoading(false);
-  } catch (error) {
-    showLoading(false);
-    console.error("Error confirming order:", error);
-    showNotification("There was an error processing your order. Please try again.");
-  }
-}
-
-// Show order confirmation modal
 function showOrderConfirmationModal(orderData) {
-  if (!orderConfirmationModal || !orderConfirmationSummary) return;
+  if (!elements.orderConfirmationModal || !elements.orderConfirmationSummary) return;
   
   let summaryHTML = `
     <div class="order-summary-section">
@@ -815,14 +381,13 @@ function showOrderConfirmationModal(orderData) {
     </div>
   `;
   
-  orderConfirmationSummary.innerHTML = summaryHTML;
-  orderConfirmationModal.style.display = 'block';
-  orderConfirmationModal.setAttribute('aria-hidden', 'false');
+  elements.orderConfirmationSummary.innerHTML = summaryHTML;
+  elements.orderConfirmationModal.style.display = 'block';
+  elements.orderConfirmationModal.setAttribute('aria-hidden', 'false');
   
-  if (confirmOrderBtn) confirmOrderBtn.focus();
+  if (elements.confirmOrderBtn) elements.confirmOrderBtn.focus();
 }
 
-// Process order confirmation
 async function processOrderConfirmation() {
   try {
     showLoading(true, 'Placing your order...');
@@ -839,15 +404,15 @@ async function processOrderConfirmation() {
     // Clear cart and reset form
     AppState.selectedItems = [];
     saveCartToStorage();
-    customerName.value = '';
-    phoneNumber.value = '';
-    orderNotes.value = '';
+    elements.customerName.value = '';
+    elements.phoneNumber.value = '';
+    elements.orderNotes.value = '';
     locationObj = null;
     deliveryDistance = null;
     appliedCoupon = null;
-    couponCode.value = '';
-    couponMessage.textContent = '';
-    couponMessage.className = 'coupon-message';
+    elements.couponCode.value = '';
+    elements.couponMessage.textContent = '';
+    elements.couponMessage.className = 'coupon-message';
     
     closeOrderModal();
     showNotification('Order placed successfully!');
@@ -867,15 +432,14 @@ async function processOrderConfirmation() {
   }
 }
 
-// Close order modal
 function closeOrderModal() {
-  if (orderConfirmationModal) {
-    orderConfirmationModal.style.display = 'none';
-    orderConfirmationModal.setAttribute('aria-hidden', 'true');
+  if (elements.orderConfirmationModal) {
+    elements.orderConfirmationModal.style.display = 'none';
+    elements.orderConfirmationModal.setAttribute('aria-hidden', 'true');
   }
 }
 
-// Save order to offline queue
+/* ========== OFFLINE ORDER HANDLING ========== */
 async function saveOrderToOfflineQueue(orderData) {
   try {
     offlineOrderQueue.push({
@@ -892,7 +456,6 @@ async function saveOrderToOfflineQueue(orderData) {
   }
 }
 
-// Load offline orders queue
 function loadOfflineOrdersQueue() {
   try {
     const queue = localStorage.getItem('offlineOrdersQueue');
@@ -904,7 +467,6 @@ function loadOfflineOrdersQueue() {
   }
 }
 
-// Process offline orders queue when online
 async function processOfflineOrdersQueue() {
   if (isProcessingOfflineQueue || offlineOrderQueue.length === 0) return;
   
@@ -916,7 +478,6 @@ async function processOfflineOrdersQueue() {
     
     for (const order of offlineOrderQueue) {
       try {
-        // Convert timestamp back to serverTimestamp if needed
         const orderToSubmit = {
           ...order,
           timestamp: serverTimestamp(),
@@ -930,7 +491,6 @@ async function processOfflineOrdersQueue() {
       }
     }
     
-    // Remove successfully submitted orders from queue
     if (successfulOrders.length > 0) {
       offlineOrderQueue = offlineOrderQueue.filter(order => 
         !successfulOrders.some(completed => completed.timestamp === order.timestamp)
@@ -947,7 +507,6 @@ async function processOfflineOrdersQueue() {
   }
 }
 
-// Save order to history
 function saveOrderToHistory(orderData) {
   try {
     const orders = JSON.parse(localStorage.getItem('bakeAndGrillOrders')) || [];
@@ -956,7 +515,6 @@ function saveOrderToHistory(orderData) {
       timestamp: orderData.timestamp?.toDate?.()?.toISOString?.() || new Date().toISOString()
     });
     
-    // Limit history size
     if (orders.length > CONFIG.MAX_ORDER_HISTORY) {
       orders.length = CONFIG.MAX_ORDER_HISTORY;
     }
@@ -967,7 +525,7 @@ function saveOrderToHistory(orderData) {
   }
 }
 
-// Send order via WhatsApp
+/* ========== WHATSAPP INTEGRATION ========== */
 function sendWhatsAppOrder(orderData) {
   try {
     const message = generateWhatsAppMessage(orderData);
@@ -983,7 +541,6 @@ function sendWhatsAppOrder(orderData) {
   }
 }
 
-// Generate WhatsApp message
 function generateWhatsAppMessage(orderData) {
   let message = `*New Order for Bake & Grill*\n\n`;
   message += `*Customer Name:* ${orderData.customerName}\n`;
@@ -1027,7 +584,7 @@ function generateWhatsAppMessage(orderData) {
   return message;
 }
 
-// Check shop status
+/* ========== SHOP STATUS ========== */
 async function checkShopStatus() {
   try {
     const statusRef = doc(db, 'publicStatus', 'current');
@@ -1035,30 +592,373 @@ async function checkShopStatus() {
     return docSnap.exists() ? docSnap.data().isShopOpen !== false : true;
   } catch (error) {
     console.error("Error checking shop status:", error);
-    return true; // Default to open if there's an error
+    return true;
   }
 }
 
-// Show notification
-function showNotification(message) {
-  if (!notification || !notificationText) return;
+/* ========== UI UPDATES ========== */
+function updateCheckoutDisplay() {
+  if (!elements.checkoutItemsList || !elements.totalItemsDisplay || !elements.totalAmountDisplay) return;
   
-  notificationText.textContent = message;
-  notification.style.display = 'flex';
+  // Clear existing items
+  elements.checkoutItemsList.innerHTML = '';
   
-  setTimeout(() => {
-    notification.style.display = 'none';
-  }, 3000);
+  if (AppState.selectedItems.length === 0) {
+    elements.checkoutItemsList.innerHTML = '<li class="empty-cart">Your cart is empty</li>';
+    elements.totalItemsDisplay.textContent = '0 items';
+    elements.totalAmountDisplay.textContent = 'Total: ₹0';
+    elements.placeOrderBtn.disabled = true;
+    elements.discountDisplay.textContent = '';
+    return;
+  }
+  
+  // Add items to list
+  AppState.selectedItems.forEach((item, index) => {
+    const li = document.createElement('li');
+    li.className = 'checkout-item';
+    li.innerHTML = `
+      <div class="checkout-item-info">
+        <span class="checkout-item-name">${sanitizeInput(item.name)} (${sanitizeInput(item.variant)})</span>
+        <span class="checkout-item-price">₹${item.price * item.quantity}</span>
+      </div>
+      <div class="checkout-item-actions">
+        <span class="checkout-item-quantity">${item.quantity}</span>
+        <button class="checkout-item-remove" data-index="${index}">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    `;
+    elements.checkoutItemsList.appendChild(li);
+  });
+  
+  // Calculate totals
+  const itemCount = AppState.selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  let deliveryCharge = 0;
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+  
+  if (orderType === 'Delivery' && deliveryDistance) {
+    if (deliveryDistance > CONFIG.MAX_DELIVERY_DISTANCE) {
+      elements.deliveryChargeDisplay.textContent = `Delivery not available beyond ${CONFIG.MAX_DELIVERY_DISTANCE}km`;
+      elements.distanceText.textContent = `${deliveryDistance.toFixed(1)} km (out of range)`;
+      elements.placeOrderBtn.disabled = true;
+      return;
+    }
+    
+    deliveryCharge = calculateDeliveryChargeByDistance(deliveryDistance);
+  }
+  
+  const discount = calculateDiscount(subtotal);
+  const total = subtotal + deliveryCharge - discount;
+  
+  if (discount > 0) {
+    elements.discountDisplay.textContent = `Discount: -₹${discount.toFixed(2)}`;
+    elements.discountDisplay.style.display = 'block';
+  } else {
+    elements.discountDisplay.textContent = '';
+    elements.discountDisplay.style.display = 'none';
+  }
+  
+  elements.totalItemsDisplay.textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+  elements.totalAmountDisplay.textContent = `Total: ₹${total.toFixed(2)}`;
+  
+  elements.placeOrderBtn.disabled = !(
+    AppState.selectedItems.length > 0 &&
+    elements.customerName.value.trim() &&
+    elements.phoneNumber.value.trim() && 
+    (/^\d{10}$/.test(elements.phoneNumber.value)) &&
+    (orderType !== 'Delivery' || (
+      locationObj && 
+      deliveryDistance && 
+      deliveryDistance <= CONFIG.MAX_DELIVERY_DISTANCE &&
+      subtotal >= CONFIG.MIN_DELIVERY_ORDER
+    ))
+  );
+  
+  if (elements.mobileLiveTotal) {
+    elements.mobileLiveTotal.querySelector('.total-items').textContent = `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+    elements.mobileLiveTotal.querySelector('.total-amount').textContent = `Total: ₹${total.toFixed(2)}`;
+  }
 }
 
-// Sanitize input to prevent XSS
-function sanitizeInput(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+/* ========== EVENT HANDLERS ========== */
+function setupEventListeners() {
+  // Order type toggle
+  elements.orderTypeRadios.forEach(radio => {
+    radio.addEventListener('change', handleOrderTypeChange);
+  });
+  
+  // Location sharing
+  elements.deliveryShareLocationBtn?.addEventListener('click', handleLocationSharing);
+  
+  // Manual location entry
+  elements.deliveryShowManualLocBtn?.addEventListener('click', showManualLocationFields);
+  
+  // Place order button
+  elements.placeOrderBtn?.addEventListener('click', confirmOrder);
+  
+  // Phone number validation
+  elements.phoneNumber?.addEventListener('change', function() {
+    if (this.value && this.value.length === 10) {
+      localStorage.setItem('userPhone', sanitizeInput(this.value));
+      requestNotificationPermission();
+    }
+  });
+  
+  // Clear cart button
+  elements.clearCartBtn?.addEventListener('click', function() {
+    if (AppState.selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
+      AppState.selectedItems = [];
+      saveCartToStorage();
+      updateCheckoutDisplay();
+      showNotification('Cart cleared');
+    }
+  });
+  
+  // Item remove buttons
+  elements.checkoutItemsList?.addEventListener('click', function(e) {
+    if (e.target.closest('.checkout-item-remove')) {
+      const index = e.target.closest('.checkout-item-remove').dataset.index;
+      const item = AppState.selectedItems[index];
+      AppState.selectedItems.splice(index, 1);
+      saveCartToStorage();
+      updateCheckoutDisplay();
+      showNotification(`${sanitizeInput(item.name)} removed from cart`);
+    }
+  });
+  
+  // Modal buttons
+  elements.confirmOrderBtn?.addEventListener('click', processOrderConfirmation);
+  elements.cancelOrderBtn?.addEventListener('click', closeOrderModal);
+  
+  // Online/offline detection
+  window.addEventListener('online', handleOnlineStatusChange);
+  window.addEventListener('offline', handleOnlineStatusChange);
+  
+  // Address input for Nominatim search
+  elements.manualDeliveryAddress?.addEventListener('input', debounce(handleAddressInput, 500));
+  
+  // Coupon code application
+  elements.applyCouponBtn?.addEventListener('click', applyCoupon);
+  elements.couponCode?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      applyCoupon();
+    }
+  });
 }
 
-// Request notification permission
+function handleOrderTypeChange() {
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+  
+  if (orderType === 'Delivery') {
+    elements.locationChoiceBlock.style.display = 'block';
+    elements.deliveryChargeDisplay.style.display = 'block';
+    elements.distanceText.style.display = 'block';
+    
+    if (usingManualLoc) {
+      elements.manualLocationFields.style.display = 'block';
+    }
+    
+    if (locationObj) {
+      calculateDeliveryDetails();
+    }
+  } else {
+    elements.locationChoiceBlock.style.display = 'none';
+    elements.manualLocationFields.style.display = 'none';
+    elements.deliveryChargeDisplay.style.display = 'none';
+    elements.distanceText.style.display = 'none';
+    elements.deliveryChargeDisplay.textContent = '';
+    elements.distanceText.textContent = '';
+  }
+  
+  updateCheckoutDisplay();
+}
+
+function handleLocationSharing() {
+  if (!navigator.geolocation) {
+    showNotification('Geolocation is not supported by your browser');
+    return;
+  }
+  
+  showLoading(true, 'Getting your location...');
+  elements.currentLocStatusMsg.textContent = 'Getting your location...';
+  
+  if (watchPositionId) {
+    navigator.geolocation.clearWatch(watchPositionId);
+  }
+  
+  watchPositionId = navigator.geolocation.watchPosition(
+    (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      locationObj = { lat, lng };
+      usingManualLoc = false;
+      
+      map.setView([lat, lng], 17);
+      marker.setLatLng([lat, lng]);
+      
+      calculateDeliveryDetails();
+      
+      elements.currentLocStatusMsg.textContent = 'Location shared successfully!';
+      showLoading(false);
+    },
+    (error) => {
+      console.error('Geolocation error:', error);
+      elements.currentLocStatusMsg.textContent = 'Error getting location. Please try again or enter manually.';
+      showLoading(false);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+}
+
+function showManualLocationFields() {
+  usingManualLoc = true;
+  elements.manualLocationFields.style.display = 'block';
+  elements.currentLocStatusMsg.textContent = 'Enter your address below';
+  
+  if (!map) {
+    initMap();
+  }
+}
+
+async function handleAddressInput() {
+  const query = elements.manualDeliveryAddress.value.trim();
+  if (query.length < 3) return;
+
+  try {
+    showLoading(true, 'Searching for address...');
+    
+    const response = await fetch(
+      `${CONFIG.NOMINATIM_ENDPOINT}?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Nominatim API responded with status ${response.status}`);
+    }
+    
+    const results = await response.json();
+    if (results.length === 0) {
+      showLoading(false);
+      showNotification('No locations found');
+      return;
+    }
+    
+    const firstResult = results[0];
+    const location = {
+      lat: parseFloat(firstResult.lat),
+      lng: parseFloat(firstResult.lon)
+    };
+    
+    map.setView([location.lat, location.lng], 17);
+    marker.setLatLng([location.lat, location.lng]);
+    
+    locationObj = { lat: location.lat, lng: location.lng };
+    
+    if (firstResult.display_name) {
+      elements.manualDeliveryAddress.value = firstResult.display_name;
+    }
+    
+    calculateDeliveryDetails();
+    
+    showNotification('Location found!');
+    showLoading(false);
+  } catch (error) {
+    console.error("Error in Nominatim API call:", error);
+    showLoading(false);
+    showNotification('Error finding location. Please try again.');
+  }
+}
+
+async function calculateRoadDistance(originLat, originLng, destLat, destLng) {
+  const cacheKey = `${originLat},${originLng},${destLat},${destLng}`;
+  
+  if (distanceCalculationCache[cacheKey]) {
+    return distanceCalculationCache[cacheKey];
+  }
+  
+  try {
+    const distance = await Promise.race([
+      calculateRoadDistanceFromAPI(originLat, originLng, destLat, destLng),
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('Distance calculation timeout')),
+        CONFIG.FALLBACK_DISTANCE_CALCULATION_TIMEOUT
+      ))
+    ]);
+    
+    distanceCalculationCache[cacheKey] = distance;
+    return distance;
+  } catch (error) {
+    console.error("Error calculating road distance:", error);
+    return calculateHaversineDistance(originLat, originLng, destLat, destLng);
+  }
+}
+
+async function calculateRoadDistanceFromAPI(originLat, originLng, destLat, destLng) {
+  try {
+    const response = await fetch(
+      `${CONFIG.OPENROUTE_SERVICE_ENDPOINT}?api_key=${CONFIG.OPENROUTE_SERVICE_API_KEY}&start=${originLng},${originLat}&end=${destLng},${destLat}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`OpenRouteService API responded with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.routes?.length > 0) {
+      return data.routes[0].summary.distance / 1000;
+    } else {
+      throw new Error('No routes found in OpenRouteService response');
+    }
+  } catch (error) {
+    console.error("Error in OpenRouteService API call:", error);
+    throw error;
+  }
+}
+
+function applyCoupon() {
+  const code = elements.couponCode.value.trim().toUpperCase();
+  
+  if (!code) {
+    elements.couponMessage.textContent = 'Please enter a coupon code';
+    elements.couponMessage.className = 'coupon-message error';
+    return;
+  }
+  
+  if (!CONFIG.VALID_COUPONS[code]) {
+    elements.couponMessage.textContent = 'Invalid coupon code';
+    elements.couponMessage.className = 'coupon-message error';
+    return;
+  }
+  
+  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  if (subtotal < CONFIG.VALID_COUPONS[code].minOrder) {
+    elements.couponMessage.textContent = `Minimum order of ₹${CONFIG.VALID_COUPONS[code].minOrder} required for this coupon`;
+    elements.couponMessage.className = 'coupon-message error';
+    return;
+  }
+  
+  appliedCoupon = CONFIG.VALID_COUPONS[code];
+  elements.couponMessage.textContent = 'Coupon applied successfully!';
+  elements.couponMessage.className = 'coupon-message success';
+  
+  updateCheckoutDisplay();
+}
+
+function handleOnlineStatusChange() {
+  if (navigator.onLine) {
+    processOfflineOrdersQueue();
+  }
+  updateCheckoutDisplay();
+}
+
 function requestNotificationPermission() {
   if ('Notification' in window) {
     Notification.requestPermission().then(permission => {
@@ -1069,15 +969,6 @@ function requestNotificationPermission() {
   }
 }
 
-// Handle online/offline status changes
-function handleOnlineStatusChange() {
-  if (navigator.onLine) {
-    processOfflineOrdersQueue();
-  }
-  updateCheckoutDisplay();
-}
-
-// Debounce function
 function debounce(func, wait) {
   let timeout;
   return function(...args) {
@@ -1088,10 +979,7 @@ function debounce(func, wait) {
 
 // Cleanup event listeners when page unloads
 window.addEventListener('beforeunload', function() {
-  if (watchPositionId) {
-    navigator.geolocation.clearWatch(watchPositionId);
-  }
-  
+  if (watchPositionId) navigator.geolocation.clearWatch(watchPositionId);
   window.removeEventListener('online', handleOnlineStatusChange);
   window.removeEventListener('offline', handleOnlineStatusChange);
 });
