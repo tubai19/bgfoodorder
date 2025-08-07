@@ -1,8 +1,8 @@
 // sw.js - Combined PWA + Firebase Messaging
 
-// sw.js - Module version
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js';
-import { getMessaging } from 'https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-sw.js';
+// Firebase imports
+importScripts('https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js');
 
 // Firebase config
 firebase.initializeApp({
