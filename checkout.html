@@ -16,50 +16,52 @@
   
   <!-- Content Security Policy -->
   <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 
-      https://bakeandgrillorder.shop 
-      https://firestore.googleapis.com 
-      https://unpkg.com 
-      https://cdnjs.cloudflare.com 
-      https://www.gstatic.com
-      https://www.googletagmanager.com
-      https://www.google-analytics.com
-      https://static.cloudflareinsights.com
-      https://googleads.g.doubleclick.net
-      'unsafe-inline' 'unsafe-eval';
-    style-src 'self' 'unsafe-inline' 
-      https://fonts.googleapis.com
-      https://tagmanager.google.com
-      https://unpkg.com/leaflet@1.7.1/dist/leaflet.css;
-    img-src 'self' data: 
-      https://*.tile.openstreetmap.org
-      https://www.google-analytics.com
-      https://www.googletagmanager.com
-      https://stats.g.doubleclick.net
-      https://unpkg.com/leaflet@1.7.1/dist/images/
-      https://firebaseinstallations.googleapis.com
-      https://www.google.com
-      https://www.google.co.in;
-    font-src 'self' 
-      https://fonts.gstatic.com
-      https://fonts.googleapis.com;
-    connect-src 'self' 
-      https://bakeandgrillorder.shop 
-      https://firestore.googleapis.com 
-      https://api.openrouteservice.org 
-      https://nominatim.openstreetmap.org
-      https://www.google-analytics.com
-      https://region1.google-analytics.com
-      https://stats.g.doubleclick.net
-      https://td.doubleclick.net
-      https://www.google.com
-      https://googleads.g.doubleclick.net
-      https://firebaseinstallations.googleapis.com;
-    worker-src 'self';
-    frame-src 
-      https://www.googletagmanager.com
-      https://td.doubleclick.net;
+  default-src 'self';
+  script-src 'self' 
+    https://bakeandgrillorder.shop 
+    https://firestore.googleapis.com 
+    https://unpkg.com 
+    https://cdnjs.cloudflare.com 
+    https://www.gstatic.com
+    https://www.googletagmanager.com
+    https://www.google-analytics.com
+    https://static.cloudflareinsights.com
+    https://googleads.g.doubleclick.net
+    'unsafe-inline' 'unsafe-eval';
+  style-src 'self' 'unsafe-inline' 
+    https://fonts.googleapis.com
+    https://tagmanager.google.com
+    https://unpkg.com/leaflet@1.7.1/dist/leaflet.css;
+  img-src 'self' data: 
+    https://*.tile.openstreetmap.org
+    https://www.google-analytics.com
+    https://www.googletagmanager.com
+    https://stats.g.doubleclick.net
+    https://unpkg.com/leaflet@1.7.1/dist/images/
+    https://firebaseinstallations.googleapis.com
+    https://www.google.com
+    https://www.google.co.in;
+  font-src 'self' 
+    https://fonts.gstatic.com
+    https://fonts.googleapis.com;
+  connect-src 'self' 
+    https://bakeandgrillorder.shop 
+    https://firestore.googleapis.com 
+    https://api.openrouteservice.org 
+    https://nominatim.openstreetmap.org
+    https://www.google-analytics.com
+    https://region1.google-analytics.com
+    https://stats.g.doubleclick.net
+    https://td.doubleclick.net
+    https://www.google.com
+    https://googleads.g.doubleclick.net
+    https://firebaseinstallations.googleapis.com
+    https://fcmregistrations.googleapis.com
+    https://fcm.googleapis.com;
+  worker-src 'self';
+  frame-src 
+    https://www.googletagmanager.com
+    https://td.doubleclick.net;
   ">
   
   <!-- Preconnect to improve performance -->
