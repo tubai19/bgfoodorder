@@ -15,7 +15,6 @@ import {
   getMessaging,
   getToken,
   onMessage,
-  onTokenRefresh,
   isSupported as isMessagingSupported
 } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-messaging.js";
 
@@ -362,6 +361,5 @@ export {
   getMessaging,
   getToken,
   onMessage,
-  onTokenRefresh,
   isMessagingSupported
 };

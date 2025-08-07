@@ -155,6 +155,9 @@ async function initializeFirebaseMessaging() {
     
   } catch (error) {
     console.error('Firebase Messaging error:', error);
+    if (error.code === 'messaging/unsupported-browser') {
+      console.log('This browser does not support Firebase Messaging');
+    }
   }
 }
 
@@ -1063,7 +1066,7 @@ function applyCoupon() {
   
   appliedCoupon = CONFIG.VALID_COUPONS[code];
   elements.couponMessage.textContent = 'Coupon applied successfully!';
-  elements.couponMessage.className = 'coupon-message success';
+    elements.couponMessage.className = 'coupon-message success';
   
   updateCheckoutDisplay();
 }
