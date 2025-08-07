@@ -619,7 +619,7 @@ async function updateOrderStatus(data) {
   }
 }
 
-// Enhanced notification sending function
+// Enhanced notification sending function with duplicate prevention
 async function sendOrderNotification(orderId, newStatus, phoneNumber) {
   try {
     if (!phoneNumber) {
@@ -627,8 +627,21 @@ async function sendOrderNotification(orderId, newStatus, phoneNumber) {
       return;
     }
 
-    // 1. Create notification document in Firestore
-    await db.collection('notifications').add({
+    // 1. Check for recent duplicate notification in Firestore
+    const duplicateCheck = await db.collection('notifications')
+      .where('orderId', '==', orderId)
+      .where('status', '==', newStatus)
+      .where('timestamp', '>', firebase.firestore.Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000))) // Last 24 hours
+      .limit(1)
+      .get();
+
+    if (!duplicateCheck.empty) {
+      console.log('Duplicate notification prevented for order', orderId, 'status', newStatus);
+      return;
+    }
+
+    // 2. Create notification document in Firestore
+    const notificationRef = await db.collection('notifications').add({
       orderId,
       status: newStatus,
       phoneNumber,
@@ -636,15 +649,16 @@ async function sendOrderNotification(orderId, newStatus, phoneNumber) {
       read: false
     });
 
-    // 2. Try to send push notification
+    // 3. Try to send push notification
     try {
       const token = await getCustomerToken(phoneNumber);
       if (token) {
         const statusText = getStatusText(newStatus);
+        const shortOrderId = orderId.substring(0, 6);
         
         const message = {
           notification: {
-            title: `Order #${orderId.substring(0, 6)} Update`,
+            title: `Order #${shortOrderId} Update`,
             body: `Your order ${statusText}. Tap for details.`,
             icon: '/android-chrome-192x192.png'
           },
@@ -652,7 +666,8 @@ async function sendOrderNotification(orderId, newStatus, phoneNumber) {
             orderId,
             status: newStatus,
             click_action: 'FLUTTER_NOTIFICATION_CLICK',
-            url: `/checkout.html?orderId=${orderId}`
+            url: `/checkout.html?orderId=${orderId}`,
+            timestamp: Date.now().toString()
           },
           token: token
         };
@@ -660,14 +675,30 @@ async function sendOrderNotification(orderId, newStatus, phoneNumber) {
         // Send using Firebase Messaging
         const response = await messaging.send(message);
         console.log("Notification sent successfully:", response);
+        
+        // Update notification document with success status
+        await notificationRef.update({
+          sent: true,
+          method: 'push',
+          sentAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
         return;
       }
     } catch (fcmError) {
       console.error("FCM send error:", fcmError);
+      await notificationRef.update({
+        error: fcmError.message,
+        method: 'push'
+      });
     }
     
-    // 3. Fallback to WhatsApp if FCM fails
+    // 4. Fallback to WhatsApp if FCM fails
     await sendWhatsAppNotification(phoneNumber, orderId, newStatus);
+    await notificationRef.update({
+      method: 'whatsapp',
+      sentAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
     
   } catch (error) {
     console.error("Error sending notification:", error);

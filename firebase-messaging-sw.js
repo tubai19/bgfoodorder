@@ -14,53 +14,55 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Track displayed notifications to prevent duplicates
+const displayedNotifications = new Set();
+
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message:', payload);
+  console.log('[firebase-messaging-sw.js] Received background message ', payload);
   
-  // Determine if this is for admin or customer
-  const isAdminNotification = payload.data?.url?.includes('/admin.html');
+  // Check for duplicate notification
+  const notificationId = payload.data?.orderId + payload.data?.status;
+  if (displayedNotifications.has(notificationId)) {
+    console.log('Duplicate notification ignored');
+    return;
+  }
   
-  const notificationTitle = payload.notification?.title || 
-    (isAdminNotification ? 'New Order Update' : 'Your Order Update');
+  displayedNotifications.add(notificationId);
   
+  // Clean up old notifications from the set periodically
+  if (displayedNotifications.size > 100) {
+    displayedNotifications.clear();
+  }
+
+  const notificationTitle = payload.notification?.title || 'Order Update';
   const notificationOptions = {
-    body: payload.notification?.body || 
-      (isAdminNotification ? 'Order status has changed' : 'Your order status has been updated'),
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
-    data: payload.data || {},
-    vibrate: [200, 100, 200]
+    body: payload.notification?.body || 'Your order status has changed',
+    icon: '/android-chrome-192x192.png',
+    badge: '/android-chrome-192x192.png',
+    data: {
+      url: payload.data?.url || '/checkout.html',
+      orderId: payload.data?.orderId,
+      status: payload.data?.status
+    },
+    tag: notificationId // Use tag to replace notifications for the same order
   };
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
-  const urlToOpen = event.notification.data.url || 
-    (event.notification.data.orderId ? `/order-status.html?orderId=${event.notification.data.orderId}` : '/');
+  // Extract order ID from notification data
+  const orderId = event.notification.data?.orderId;
+  const url = orderId ? `/checkout.html?orderId=${orderId}` : '/';
   
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then((clientList) => {
-      // Check if there's already a tab open with this URL
-      for (const client of clientList) {
-        if (client.url.includes(urlToOpen) && 'focus' in client) {
-          return client.focus();
-        }
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      if (clientList.length > 0) {
+        return clientList[0].focus();
       }
-      
-      // Otherwise open a new tab
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
+      return clients.openWindow(url);
     })
   );
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
 });
