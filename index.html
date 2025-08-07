@@ -137,18 +137,17 @@
 
   <script type="module" src="/js/main.js"></script>
   <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', {
-          No type: 'module'
-        }).then(registration => {
-          console.log('ServiceWorker registered');
-        }).catch(err => {
-          console.log('ServiceWorker registration failed: ', err);
-        });
-      });
-    }
-
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(registration => {
+      console.log('ServiceWorker registration successful:', registration);
+    })
+    .catch(error => {
+      console.log('ServiceWorker registration failed:', error);
+    });
+}
+</script>
+  
     window.addEventListener('online', () => {
       document.querySelector('.offline-indicator').style.display = 'none';
     });
