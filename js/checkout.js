@@ -5,7 +5,6 @@ import {
   initApp,
   saveCartToStorage,
   calculateHaversineDistance,
-  calculateDeliveryChargeByDistance,
   serverTimestamp,
   GeoPoint,
   collection,
@@ -267,6 +266,19 @@ function updateLocationFromMarker() {
 }
 
 /* ========== DELIVERY CALCULATION ========== */
+function calculateDeliveryChargeByDistance(distance) {
+  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  if (subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD) return 0;
+  if (appliedCoupon?.type === 'free_delivery') return 0;
+
+  for (const range of CONFIG.DELIVERY_CHARGES) {
+    if (distance >= range.min && distance < range.max) {
+      return range.charge;
+    }
+  }
+  return null;
+}
+
 async function calculateDeliveryDetails() {
   if (!locationObj) return;
 
@@ -292,19 +304,6 @@ async function calculateDeliveryDetails() {
     showLoading(false);
     showNotification('Error calculating distance. Please try again.');
   }
-}
-
-function calculateDeliveryChargeByDistance(distance) {
-  const subtotal = AppState.selectedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  if (subtotal >= CONFIG.FREE_DELIVERY_THRESHOLD) return 0;
-  if (appliedCoupon?.type === 'free_delivery') return 0;
-
-  for (const range of CONFIG.DELIVERY_CHARGES) {
-    if (distance >= range.min && distance < range.max) {
-      return range.charge;
-    }
-  }
-  return null;
 }
 
 function calculateDiscount(subtotal) {
