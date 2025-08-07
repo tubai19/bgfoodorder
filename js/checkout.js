@@ -2,6 +2,7 @@
 import { 
   AppState,
   db,
+  app,
   initApp,
   saveCartToStorage,
   calculateHaversineDistance,
@@ -10,7 +11,13 @@ import {
   collection,
   addDoc,
   doc,
-  getDoc
+  getDoc,
+  setDoc,
+  getMessaging,
+  getToken,
+  onMessage,
+  onTokenRefresh,
+  isSupported as isMessagingSupported
 } from './main.js';
 
 // Configuration constants
@@ -104,7 +111,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     handleOrderTypeChange();
     initMap();
     checkNotificationPermission();
-    initializeFirebaseMessaging();
+    await initializeFirebaseMessaging();
   } catch (error) {
     console.error('Initialization error:', error);
     showNotification('Failed to initialize. Please refresh the page.');
@@ -114,29 +121,36 @@ document.addEventListener('DOMContentLoaded', async function() {
 /* ========== FIREBASE MESSAGING (NOTIFICATIONS) ========== */
 async function initializeFirebaseMessaging() {
   try {
-    if (!firebase.messaging.isSupported()) {
+    const isSupported = await isMessagingSupported();
+    if (!isSupported) {
       console.log('Firebase Messaging not supported');
       return;
     }
 
-    const messaging = firebase.messaging();
+    const messaging = getMessaging(app);
     
     // Request notification permission
-    await messaging.requestPermission();
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('Notification permission not granted');
+      return;
+    }
     
     // Get FCM token
-    currentFCMToken = await messaging.getToken();
+    currentFCMToken = await getToken(messaging, {
+      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY'
+    });
     console.log('FCM Token:', currentFCMToken);
     
     // Listen for token refresh
-    messaging.onTokenRefresh(async () => {
-      currentFCMToken = await messaging.getToken();
+    onTokenRefresh(messaging, async () => {
+      currentFCMToken = await getToken(messaging);
       console.log('FCM Token refreshed:', currentFCMToken);
       await registerCustomerToken();
     });
     
     // Handle incoming messages
-    messaging.onMessage((payload) => {
+    onMessage(messaging, (payload) => {
       console.log('Message received:', payload);
       showNotification(payload.notification?.body || 'New update from Bake & Grill');
     });

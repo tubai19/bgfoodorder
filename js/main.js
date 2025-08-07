@@ -15,6 +15,7 @@ import {
   getMessaging,
   getToken,
   onMessage,
+  onTokenRefresh,
   isSupported as isMessagingSupported
 } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-messaging.js";
 
@@ -31,14 +32,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-let messaging = null;
-
-// Initialize Firebase Messaging if supported
-(async function() {
-  if (await isMessagingSupported()) {
-    messaging = getMessaging(app);
-  }
-})();
 
 const DEFAULT_STATUS = {
   isShopOpen: true,
@@ -67,11 +60,13 @@ const AppState = {
 
 // Get FCM token
 async function getFCMToken() {
-  if (!messaging) return null;
-  
   try {
+    const isSupported = await isMessagingSupported();
+    if (!isSupported) return null;
+    
+    const messaging = getMessaging(app);
     const currentToken = await getToken(messaging, {
-      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY' // Replace with your VAPID key
+      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY'
     });
     
     if (currentToken) {
@@ -89,12 +84,15 @@ async function getFCMToken() {
 
 // Set up message handler
 function setupMessageHandler() {
-  if (!messaging) return;
-  
-  onMessage(messaging, (payload) => {
-    console.log('Message received:', payload);
-    showNotification(payload.notification?.body || 'New update from Bake & Grill');
-  });
+  try {
+    const messaging = getMessaging(app);
+    onMessage(messaging, (payload) => {
+      console.log('Message received:', payload);
+      showNotification(payload.notification?.body || 'New update from Bake & Grill');
+    });
+  } catch (error) {
+    console.error('Error setting up message handler:', error);
+  }
 }
 
 // Register customer token in Firestore
@@ -340,6 +338,7 @@ async function initApp() {
 
 export { 
   db,
+  app,
   AppState,
   initApp,
   updateCartBadge,
@@ -359,5 +358,10 @@ export {
   isCategoryAvailableForOrderType,
   getFCMToken,
   registerCustomerToken,
-  requestNotificationPermission
+  requestNotificationPermission,
+  getMessaging,
+  getToken,
+  onMessage,
+  onTokenRefresh,
+  isMessagingSupported
 };
