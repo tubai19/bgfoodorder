@@ -11,6 +11,12 @@ import {
   GeoPoint,
   setDoc
 } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+import { 
+  getMessaging,
+  getToken,
+  onMessage,
+  isSupported as isMessagingSupported
+} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
@@ -22,8 +28,17 @@ const firebaseConfig = {
   measurementId: "G-SLG2R88J72"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+let messaging = null;
+
+// Initialize Firebase Messaging if supported
+(async function() {
+  if (await isMessagingSupported()) {
+    messaging = getMessaging(app);
+  }
+})();
 
 const DEFAULT_STATUS = {
   isShopOpen: true,
@@ -36,18 +51,72 @@ const AppState = {
   MAX_DELIVERY_DISTANCE: 8,
   MIN_DELIVERY_ORDER: 200,
   MENU_CATEGORIES: {
-  "Veg Pizzas": { icon: "🍕", availableForDelivery: true },
-  "Paneer Specials": { icon: "🧀", availableForDelivery: true },
-  "Non-Veg Pizzas": { icon: "🍗", availableForDelivery: true },
-  "Burgers": { icon: "🍔", availableForDelivery: true },
-  "Sandwiches": { icon: "🥪", availableForDelivery: true },
-  "Quick Bites": { icon: "🍟", availableForDelivery: true },
-  "Dips": { icon: "🥫", availableForDelivery: true },
-  "Combos": { icon: "🎁", availableForDelivery: false }
-},
+    "Veg Pizzas": { icon: "🍕", availableForDelivery: true },
+    "Paneer Specials": { icon: "🧀", availableForDelivery: true },
+    "Non-Veg Pizzas": { icon: "🍗", availableForDelivery: true },
+    "Burgers": { icon: "🍔", availableForDelivery: true },
+    "Sandwiches": { icon: "🥪", availableForDelivery: true },
+    "Quick Bites": { icon: "🍟", availableForDelivery: true },
+    "Dips": { icon: "🥫", availableForDelivery: true },
+    "Combos": { icon: "🎁", availableForDelivery: false }
+  },
   domElements: {},
-  currentStatus: {...DEFAULT_STATUS}
+  currentStatus: {...DEFAULT_STATUS},
+  currentFCMToken: null
 };
+
+// Get FCM token
+async function getFCMToken() {
+  if (!messaging) return null;
+  
+  try {
+    const currentToken = await getToken(messaging, {
+      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY' // Replace with your VAPID key
+    });
+    
+    if (currentToken) {
+      AppState.currentFCMToken = currentToken;
+      return currentToken;
+    }
+    
+    console.log('No registration token available. Request permission to generate one.');
+    return null;
+  } catch (err) {
+    console.error('An error occurred while retrieving token:', err);
+    return null;
+  }
+}
+
+// Set up message handler
+function setupMessageHandler() {
+  if (!messaging) return;
+  
+  onMessage(messaging, (payload) => {
+    console.log('Message received:', payload);
+    showNotification(payload.notification?.body || 'New update from Bake & Grill');
+  });
+}
+
+// Register customer token in Firestore
+async function registerCustomerToken(phoneNumber, customerName = null) {
+  if (!AppState.currentFCMToken || !phoneNumber) return;
+  
+  try {
+    const tokenRef = doc(db, 'customerTokens', phoneNumber);
+    
+    await setDoc(tokenRef, {
+      token: AppState.currentFCMToken,
+      phoneNumber: phoneNumber,
+      timestamp: serverTimestamp(),
+      name: customerName,
+      lastActive: serverTimestamp()
+    }, { merge: true });
+    
+    console.log('FCM token registered for customer:', phoneNumber);
+  } catch (error) {
+    console.error('Error registering FCM token:', error);
+  }
+}
 
 function getCartFromStorage() {
   try {
@@ -70,7 +139,9 @@ function initDOMElements() {
     shopStatusText: document.getElementById('shopStatusText'),
     deliveryStatusText: document.getElementById('deliveryStatusText'),
     shopStatusBanner: document.getElementById('shopStatusBanner'),
-    deliveryStatusBanner: document.getElementById('deliveryStatusBanner')
+    deliveryStatusBanner: document.getElementById('deliveryStatusBanner'),
+    notificationPermissionBtn: document.getElementById('notificationPermissionBtn'),
+    notificationStatus: document.getElementById('notificationStatus')
   };
 
   Object.keys(elements).forEach(key => {
@@ -181,6 +252,64 @@ function isCategoryAvailableForOrderType(category, orderType) {
   return true;
 }
 
+// Check notification permission status
+function checkNotificationPermission() {
+  if (!('Notification' in window)) {
+    if (AppState.domElements.notificationPermissionBtn) {
+      AppState.domElements.notificationPermissionBtn.style.display = 'none';
+    }
+    return;
+  }
+  
+  if (Notification.permission === 'granted') {
+    if (AppState.domElements.notificationPermissionBtn) {
+      AppState.domElements.notificationPermissionBtn.style.display = 'none';
+    }
+    if (AppState.domElements.notificationStatus) {
+      AppState.domElements.notificationStatus.textContent = 'Notifications enabled';
+      AppState.domElements.notificationStatus.className = 'notification-status enabled';
+    }
+  } else {
+    if (AppState.domElements.notificationStatus) {
+      AppState.domElements.notificationStatus.textContent = 'Notifications disabled';
+      AppState.domElements.notificationStatus.className = 'notification-status disabled';
+    }
+  }
+}
+
+// Request notification permission
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    showNotification('Notifications not supported in this browser');
+    return;
+  }
+  
+  try {
+    const permission = await Notification.requestPermission();
+    
+    if (permission === 'granted') {
+      showNotification('Notifications enabled! You will receive order updates.');
+      if (AppState.domElements.notificationPermissionBtn) {
+        AppState.domElements.notificationPermissionBtn.style.display = 'none';
+      }
+      if (AppState.domElements.notificationStatus) {
+        AppState.domElements.notificationStatus.textContent = 'Notifications enabled';
+        AppState.domElements.notificationStatus.className = 'notification-status enabled';
+      }
+      
+      // Get FCM token after permission is granted
+      await getFCMToken();
+    } else {
+      if (AppState.domElements.notificationStatus) {
+        AppState.domElements.notificationStatus.textContent = 'Notifications blocked';
+        AppState.domElements.notificationStatus.className = 'notification-status disabled';
+      }
+    }
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+  }
+}
+
 async function initApp() {
   try {
     initDOMElements();
@@ -188,6 +317,22 @@ async function initApp() {
     updateCartBadge();
     await updateStatusDisplay();
     setupStatusListener();
+    checkNotificationPermission();
+    
+    // Initialize messaging if supported
+    if (await isMessagingSupported()) {
+      setupMessageHandler();
+      
+      // Get FCM token if permission already granted
+      if (Notification.permission === 'granted') {
+        await getFCMToken();
+      }
+    }
+    
+    // Set up notification permission button if exists
+    if (AppState.domElements.notificationPermissionBtn) {
+      AppState.domElements.notificationPermissionBtn.addEventListener('click', requestNotificationPermission);
+    }
   } catch (error) {
     console.error('Error initializing application:', error);
   }
@@ -209,6 +354,10 @@ export {
   addDoc,
   serverTimestamp,
   GeoPoint,
+  setDoc,
   getCategoryIcon,
-  isCategoryAvailableForOrderType
+  isCategoryAvailableForOrderType,
+  getFCMToken,
+  registerCustomerToken,
+  requestNotificationPermission
 };

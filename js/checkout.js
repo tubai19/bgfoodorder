@@ -41,7 +41,8 @@ const CONFIG = {
     'BAKE20': { type: 'fixed', value: 20, minOrder: 100 },
     'GRILL25': { type: 'percentage', value: 25, minOrder: 300 },
     'FREESHIP': { type: 'free_delivery', minOrder: 0 }
-  }
+  },
+  FCM_TOKEN_COLLECTION: 'customerTokens'
 };
 
 // Checkout page variables
@@ -55,6 +56,7 @@ let distanceCalculationCache = {};
 let offlineOrderQueue = [];
 let isProcessingOfflineQueue = false;
 let appliedCoupon = null;
+let currentFCMToken = null;
 
 // DOM elements
 const elements = {
@@ -88,7 +90,9 @@ const elements = {
   addressMap: document.getElementById('addressMap'),
   couponCode: document.getElementById('couponCode'),
   applyCouponBtn: document.getElementById('applyCouponBtn'),
-  couponMessage: document.getElementById('couponMessage')
+  couponMessage: document.getElementById('couponMessage'),
+  notificationPermissionBtn: document.getElementById('notificationPermissionBtn'),
+  notificationStatus: document.getElementById('notificationStatus')
 };
 
 // Initialize the checkout page
@@ -100,11 +104,131 @@ document.addEventListener('DOMContentLoaded', async function() {
     loadOfflineOrdersQueue();
     handleOrderTypeChange();
     initMap();
+    checkNotificationPermission();
+    initializeFirebaseMessaging();
   } catch (error) {
     console.error('Initialization error:', error);
     showNotification('Failed to initialize. Please refresh the page.');
   }
 });
+
+/* ========== FIREBASE MESSAGING (NOTIFICATIONS) ========== */
+async function initializeFirebaseMessaging() {
+  try {
+    if (!firebase.messaging.isSupported()) {
+      console.log('Firebase Messaging not supported');
+      return;
+    }
+
+    const messaging = firebase.messaging();
+    
+    // Request notification permission
+    await messaging.requestPermission();
+    
+    // Get FCM token
+    currentFCMToken = await messaging.getToken();
+    console.log('FCM Token:', currentFCMToken);
+    
+    // Listen for token refresh
+    messaging.onTokenRefresh(async () => {
+      currentFCMToken = await messaging.getToken();
+      console.log('FCM Token refreshed:', currentFCMToken);
+      await registerCustomerToken();
+    });
+    
+    // Handle incoming messages
+    messaging.onMessage((payload) => {
+      console.log('Message received:', payload);
+      showNotification(payload.notification?.body || 'New update from Bake & Grill');
+    });
+    
+    // Register the token if we have a phone number
+    if (elements.phoneNumber.value && /^\d{10}$/.test(elements.phoneNumber.value)) {
+      await registerCustomerToken();
+    }
+    
+  } catch (error) {
+    console.error('Firebase Messaging error:', error);
+  }
+}
+
+async function registerCustomerToken() {
+  if (!currentFCMToken || !elements.phoneNumber.value || !/^\d{10}$/.test(elements.phoneNumber.value)) {
+    return;
+  }
+  
+  try {
+    const phoneNumber = sanitizeInput(elements.phoneNumber.value);
+    const tokenRef = doc(db, CONFIG.FCM_TOKEN_COLLECTION, phoneNumber);
+    
+    await setDoc(tokenRef, {
+      token: currentFCMToken,
+      phoneNumber: phoneNumber,
+      timestamp: serverTimestamp(),
+      name: elements.customerName.value ? sanitizeInput(elements.customerName.value) : null
+    }, { merge: true });
+    
+    console.log('FCM token registered for customer:', phoneNumber);
+  } catch (error) {
+    console.error('Error registering FCM token:', error);
+  }
+}
+
+function checkNotificationPermission() {
+  if (!('Notification' in window)) {
+    if (elements.notificationPermissionBtn) {
+      elements.notificationPermissionBtn.style.display = 'none';
+    }
+    return;
+  }
+  
+  if (Notification.permission === 'granted') {
+    if (elements.notificationPermissionBtn) {
+      elements.notificationPermissionBtn.style.display = 'none';
+    }
+    if (elements.notificationStatus) {
+      elements.notificationStatus.textContent = 'Notifications enabled';
+      elements.notificationStatus.className = 'notification-status enabled';
+    }
+  } else {
+    if (elements.notificationStatus) {
+      elements.notificationStatus.textContent = 'Notifications disabled';
+      elements.notificationStatus.className = 'notification-status disabled';
+    }
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    showNotification('Notifications not supported in this browser');
+    return;
+  }
+  
+  try {
+    const permission = await Notification.requestPermission();
+    
+    if (permission === 'granted') {
+      showNotification('Notifications enabled! You will receive order updates.');
+      if (elements.notificationPermissionBtn) {
+        elements.notificationPermissionBtn.style.display = 'none';
+      }
+      if (elements.notificationStatus) {
+        elements.notificationStatus.textContent = 'Notifications enabled';
+        elements.notificationStatus.className = 'notification-status enabled';
+      }
+      
+      // Initialize messaging if permission granted
+      await initializeFirebaseMessaging();
+    } else {
+      if (elements.notificationStatus) {
+        elements.notificationStatus.textContent = 'Notifications blocked';
+        elements.notificationStatus.className = 'notification-status disabled';
+      }
+    }
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+  }
+}
 
 /* ========== MAP FUNCTIONS ========== */
 function initMap() {
@@ -422,6 +546,11 @@ async function processOrderConfirmation() {
     
     // Save to history
     saveOrderToHistory(orderData);
+    
+    // Register customer token if available
+    if (currentFCMToken && orderData.phoneNumber) {
+      await registerCustomerToken();
+    }
     
     updateCheckoutDisplay();
   } catch (error) {
@@ -746,6 +875,9 @@ function setupEventListeners() {
       applyCoupon();
     }
   });
+  
+  // Notification permission button
+  elements.notificationPermissionBtn?.addEventListener('click', requestNotificationPermission);
 }
 
 function handleOrderTypeChange() {
@@ -959,14 +1091,31 @@ function handleOnlineStatusChange() {
   updateCheckoutDisplay();
 }
 
-function requestNotificationPermission() {
-  if ('Notification' in window) {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('Notification permission granted');
-      }
-    });
+function showLoading(show, message = '') {
+  if (elements.loadingIndicator) {
+    elements.loadingIndicator.style.display = show ? 'flex' : 'none';
   }
+  if (elements.loadingMessage && message) {
+    elements.loadingMessage.textContent = message;
+  }
+}
+
+function showNotification(message, duration = 3000) {
+  if (!elements.notification || !elements.notificationText) return;
+  
+  elements.notificationText.textContent = message;
+  elements.notification.style.display = 'block';
+  elements.notification.setAttribute('aria-hidden', 'false');
+  
+  setTimeout(() => {
+    elements.notification.style.display = 'none';
+    elements.notification.setAttribute('aria-hidden', 'true');
+  }, duration);
+}
+
+function sanitizeInput(input) {
+  if (!input) return '';
+  return input.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function debounce(func, wait) {
