@@ -377,5 +377,10 @@ export {
   isCategoryAvailableForOrderType,
   getFCMToken,
   registerCustomerToken,
-  requestNotificationPermission
+  requestNotificationPermission,
+  // Add these messaging-related exports:
+  getMessaging,
+  getToken,
+  onMessage,
+  isMessagingSupported
 };
