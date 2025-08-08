@@ -1,16 +1,12 @@
-// main.js
+// main.js - Main application module
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
 import { 
   getFirestore,
   doc,
   getDoc,
   onSnapshot,
-  collection,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  GeoPoint,
-  setDoc
+  setDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 import { 
   getMessaging,
@@ -58,7 +54,7 @@ const AppState = {
   currentFCMToken: null
 };
 
-// DOM Elements initialization
+// Initialize DOM elements
 function initDOMElements() {
   const elements = {
     notification: document.getElementById('notification'),
@@ -78,28 +74,22 @@ function initDOMElements() {
   });
 }
 
-// Firebase Messaging Functions
+// Firebase Messaging
 async function initializeFirebaseMessaging() {
   try {
     const isSupported = await isMessagingSupported();
     if (!isSupported) {
-      console.log('Firebase Messaging not supported in this browser');
+      console.log('Firebase Messaging not supported');
       return null;
     }
 
     const messaging = getMessaging(app);
-    
-    // Request notification permission
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.log('Notification permission not granted');
-      return null;
-    }
-    
-    // Get FCM token
+    if (permission !== 'granted') return null;
+
     const registration = await navigator.serviceWorker.getRegistration();
     if (!registration) {
-      console.error('No service worker registration found');
+      console.error('No service worker registration');
       return null;
     }
 
@@ -107,17 +97,14 @@ async function initializeFirebaseMessaging() {
       vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY',
       serviceWorkerRegistration: registration
     });
-    
+
     if (token) {
-      console.log('FCM Token:', token);
       AppState.currentFCMToken = token;
       return token;
     }
-    
-    console.log('No registration token available.');
     return null;
   } catch (error) {
-    console.error('Firebase Messaging initialization error:', error);
+    console.error('Messaging init error:', error);
     return null;
   }
 }
@@ -125,20 +112,12 @@ async function initializeFirebaseMessaging() {
 function setupMessageHandler() {
   try {
     const messaging = getMessaging(app);
-    
     onMessage(messaging, (payload) => {
-      console.log('Message received:', payload);
-      
-      // Show notification in foreground
       showNotification(payload.notification?.body || 'New update from Bake & Grill');
-      
-      // Handle custom data
-      if (payload.data?.type === 'statusUpdate') {
-        updateStatusDisplay();
-      }
+      if (payload.data?.type === 'statusUpdate') updateStatusDisplay();
     });
   } catch (error) {
-    console.error('Error setting up message handler:', error);
+    console.error('Message handler error:', error);
   }
 }
 
@@ -146,42 +125,39 @@ async function registerCustomerToken(phoneNumber, customerName = null) {
   try {
     if (!AppState.currentFCMToken || !phoneNumber) return false;
     
-    const tokenRef = doc(db, 'customerTokens', phoneNumber);
-    await setDoc(tokenRef, {
+    await setDoc(doc(db, 'customerTokens', phoneNumber), {
       token: AppState.currentFCMToken,
       phoneNumber,
       name: customerName,
       lastActive: serverTimestamp()
     }, { merge: true });
     
-    console.log('Token registered for customer:', phoneNumber);
     return true;
   } catch (error) {
-    console.error('Error registering customer token:', error);
+    console.error('Token registration error:', error);
     return false;
   }
 }
 
+// Notification permission
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
-    showNotification('Notifications not supported in this browser');
+    showNotification('Notifications not supported');
     return false;
   }
   
   try {
     const permission = await Notification.requestPermission();
+    const enabled = permission === 'granted';
     
-    if (permission === 'granted') {
-      showNotification('Notifications enabled! You will receive order updates.');
-      updateNotificationUI(true);
-      return await initializeFirebaseMessaging();
-    } else {
-      showNotification('Notifications blocked. You may miss important order updates.');
-      updateNotificationUI(false);
-      return false;
-    }
+    showNotification(enabled 
+      ? 'Notifications enabled! You will receive order updates.'
+      : 'Notifications blocked. You may miss important order updates.');
+    
+    updateNotificationUI(enabled);
+    return enabled ? initializeFirebaseMessaging() : false;
   } catch (error) {
-    console.error('Error requesting notification permission:', error);
+    console.error('Permission error:', error);
     return false;
   }
 }
@@ -200,15 +176,10 @@ function updateNotificationUI(enabled) {
 }
 
 function checkNotificationPermission() {
-  if (!('Notification' in window)) {
-    updateNotificationUI(false);
-    return;
-  }
-  
   updateNotificationUI(Notification.permission === 'granted');
 }
 
-// Shop Status Management
+// Shop status management
 async function updateStatusDisplay() {
   const { 
     shopStatusText, 
@@ -220,12 +191,8 @@ async function updateStatusDisplay() {
   if (!shopStatusText || !deliveryStatusText) return;
 
   try {
-    const statusRef = doc(db, 'publicStatus', 'current');
-    const docSnap = await getDoc(statusRef);
-    
-    if (docSnap.exists()) {
-      AppState.currentStatus = docSnap.data();
-    }
+    const docSnap = await getDoc(doc(db, 'publicStatus', 'current'));
+    if (docSnap.exists()) AppState.currentStatus = docSnap.data();
 
     const isShopOpen = AppState.currentStatus.isShopOpen !== false;
     const isDeliveryAvailable = AppState.currentStatus.isDeliveryAvailable !== false && isShopOpen;
@@ -240,7 +207,7 @@ async function updateStatusDisplay() {
       deliveryStatusBanner.className = isDeliveryAvailable ? 'status-item open' : 'status-item closed';
     }
   } catch (error) {
-    console.error("Error updating status:", error);
+    console.error("Status update error:", error);
     shopStatusText.textContent = 'Shop: Status Unknown';
     deliveryStatusText.textContent = 'Delivery: Status Unknown';
   }
@@ -248,23 +215,20 @@ async function updateStatusDisplay() {
 
 function setupStatusListener() {
   try {
-    const statusRef = doc(db, 'publicStatus', 'current');
-    return onSnapshot(statusRef, () => {
-      updateStatusDisplay();
-    });
+    return onSnapshot(doc(db, 'publicStatus', 'current'), updateStatusDisplay);
   } catch (error) {
-    console.error("Error setting up status listener:", error);
+    console.error("Status listener error:", error);
     return null;
   }
 }
 
-// Cart Management
+// Cart management
 function getCartFromStorage() {
   try {
     const cartData = localStorage.getItem('cartItems');
     return cartData ? JSON.parse(cartData) : [];
   } catch (e) {
-    console.error('Error parsing cart data', e);
+    console.error('Cart parse error', e);
     return [];
   }
 }
@@ -274,7 +238,7 @@ function saveCartToStorage() {
     localStorage.setItem('cartItems', JSON.stringify(AppState.selectedItems));
     updateCartBadge();
   } catch (error) {
-    console.error('Error saving cart:', error);
+    console.error('Cart save error:', error);
   }
 }
 
@@ -306,7 +270,7 @@ async function initApp() {
     AppState.selectedItems = getCartFromStorage();
     updateCartBadge();
     
-    document.body.addEventListener('touchstart', function() {}, { passive: true });
+    document.body.addEventListener('touchstart', () => {}, { passive: true });
     
     await updateStatusDisplay();
     setupStatusListener();
@@ -315,7 +279,6 @@ async function initApp() {
     
     if (await isMessagingSupported()) {
       setupMessageHandler();
-      
       if (Notification.permission === 'granted') {
         await initializeFirebaseMessaging();
       }
@@ -325,7 +288,7 @@ async function initApp() {
       AppState.domElements.notificationPermissionBtn.addEventListener('click', requestNotificationPermission);
     }
   } catch (error) {
-    console.error('Error initializing app:', error);
+    console.error('App init error:', error);
   }
 }
 
@@ -354,38 +317,23 @@ function getCategoryIcon(category) {
 }
 
 function isCategoryAvailableForOrderType(category, orderType) {
-  if (orderType === "Delivery") {
-    return AppState.MENU_CATEGORIES[category]?.availableForDelivery !== false;
-  }
-  return true;
+  return orderType !== "Delivery" || 
+    AppState.MENU_CATEGORIES[category]?.availableForDelivery !== false;
 }
 
-// Export all necessary functions
+// Initialize the app
+initApp();
+
+// Export functions if needed by other modules
 export { 
   db,
   app,
   AppState,
-  initApp,
-  updateCartBadge,
-  showNotification,
   saveCartToStorage,
+  showNotification,
   calculateHaversineDistance,
   calculateDeliveryChargeByDistance,
-  doc,
-  getDoc,
-  collection,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  GeoPoint,
-  setDoc,
   getCategoryIcon,
   isCategoryAvailableForOrderType,
-  getMessaging,
-  getToken,
-  onMessage,
-  isMessagingSupported,
-  initializeFirebaseMessaging,
-  registerCustomerToken,
-  requestNotificationPermission
+  registerCustomerToken
 };
