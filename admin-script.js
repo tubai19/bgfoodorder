@@ -1,6 +1,6 @@
 // admin-script.js - Complete Admin Dashboard for Bake & Grill
-// Version: 2.0.0
-// Last Updated: 2023-11-15
+// Version: 2.0.2 - Fixed FCM and Service Worker issues
+// Last Updated: 2023-11-17
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -19,7 +19,7 @@ if (!firebase.apps.length) {
 }
 const auth = firebase.auth();
 const db = firebase.firestore();
-const messaging = firebase.messaging();
+let messaging;
 
 // Constants
 const ADMIN_EMAIL = "suvradeep.pal93@gmail.com";
@@ -39,28 +39,19 @@ const DEFAULT_SETTINGS = {
 
 // DOM Elements
 const elements = {
-  // Auth elements
   loginScreen: document.getElementById('loginScreen'),
   adminDashboard: document.getElementById('adminDashboard'),
   loginForm: document.getElementById('loginForm'),
   loginError: document.getElementById('loginError'),
   logoutBtn: document.getElementById('logoutBtn'),
   currentTime: document.getElementById('currentTime'),
-  
-  // Navigation
   navItems: document.querySelectorAll('.sidebar li'),
   contentSections: document.querySelectorAll('.content-section'),
-  
-  // Orders
   orderFilter: document.getElementById('orderFilter'),
   orderSearch: document.getElementById('orderSearch'),
   ordersListContainer: document.getElementById('ordersListContainer'),
-  
-  // Menu
   addCategoryBtn: document.getElementById('addCategoryBtn'),
   menuCategoriesContainer: document.getElementById('menuCategoriesContainer'),
-  
-  // Settings
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   shopOpenToggle: document.getElementById('shopOpenToggle'),
   deliveryOpenToggle: document.getElementById('deliveryOpenToggle'),
@@ -74,14 +65,10 @@ const elements = {
   charge46kmInput: document.getElementById('charge46km'),
   charge68kmInput: document.getElementById('charge68km'),
   freeDeliveryAboveInput: document.getElementById('freeDeliveryAbove'),
-  
-  // Modals
   addCategoryModal: document.getElementById('addCategoryModal'),
   menuItemModal: document.getElementById('menuItemModal'),
   confirmationModal: document.getElementById('confirmationModal'),
   closeModalButtons: document.querySelectorAll('.close-modal, .cancel-btn'),
-  
-  // Menu Item Form
   categoryNameInput: document.getElementById('categoryName'),
   categoryIconInput: document.getElementById('categoryIcon'),
   itemNameInput: document.getElementById('itemName'),
@@ -96,11 +83,7 @@ const elements = {
   confirmActionBtn: document.getElementById('confirmActionBtn'),
   confirmationTitle: document.getElementById('confirmationTitle'),
   confirmationMessage: document.getElementById('confirmationMessage'),
-  
-  // Service Worker Status
   swStatus: document.getElementById('swStatus'),
-  
-  // Analytics
   totalSalesAmount: document.getElementById('totalSalesAmount'),
   totalOrdersCount: document.getElementById('totalOrdersCount'),
   averageOrderAmount: document.getElementById('averageOrderAmount'),
@@ -134,7 +117,6 @@ document.addEventListener('DOMContentLoaded', async function() {
       setupRealtimeListeners();
       loadSettings();
       await initializeServiceWorker();
-      await initializeMessaging();
     } else {
       showLoginScreen();
     }
@@ -156,12 +138,27 @@ async function initializeServiceWorker() {
   }
 
   try {
+    // Register the service worker
     state.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/'
     });
     
     console.log('Service Worker registered:', state.serviceWorkerRegistration);
     updateServiceWorkerStatus('Service Worker: Active', 'success');
+    
+    // Wait for service worker to be ready
+    if (state.serviceWorkerRegistration.installing) {
+      await new Promise(resolve => {
+        state.serviceWorkerRegistration.installing.addEventListener('statechange', () => {
+          if (state.serviceWorkerRegistration.installing.state === 'activated') {
+            resolve();
+          }
+        });
+      });
+    }
+    
+    // Initialize messaging
+    await initializeMessaging();
     
     // Listen for updates
     state.serviceWorkerRegistration.addEventListener('updatefound', () => {
@@ -179,30 +176,25 @@ async function initializeServiceWorker() {
   }
 }
 
-function updateServiceWorkerStatus(message, type) {
-  if (!elements.swStatus) return;
-  
-  elements.swStatus.textContent = message;
-  elements.swStatus.className = `sw-status ${type}`;
-}
-
-// Replace the initializeMessaging function with this:
+// MESSAGING INITIALIZATION
 async function initializeMessaging() {
   try {
+    // Check if messaging is supported
     if (!firebase.messaging.isSupported()) {
       console.log('FCM not supported in this browser');
       return;
     }
-
-    // Register your combined service worker
-    state.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/'
-    });
-
-    // Wait for service worker to be ready
-    await navigator.serviceWorker.ready;
-
-    // Get FCM token with your combined service worker
+    
+    messaging = firebase.messaging();
+    
+    // Request notification permission
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('Notification permission not granted');
+      return;
+    }
+    
+    // Get FCM token
     const token = await messaging.getToken({
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: state.serviceWorkerRegistration
@@ -224,10 +216,10 @@ async function initializeMessaging() {
 
 async function getAdminFCMToken() {
   try {
-    if (!state.serviceWorkerRegistration) {
-      throw new Error('Service worker not registered');
+    if (!messaging) {
+      await initializeMessaging();
     }
-
+    
     const currentToken = await messaging.getToken({
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: state.serviceWorkerRegistration

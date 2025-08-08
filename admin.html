@@ -391,14 +391,14 @@
     if ('serviceWorker' in navigator) {
       if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
         window.addEventListener('load', function() {
-          // Register both service workers
+          // Register both service workers (admin and main)
           Promise.all([
             navigator.serviceWorker.register('/admin-sw.js'),
             navigator.serviceWorker.register('/sw.js')
           ])
           .then(function(registrations) {
             console.log('Admin ServiceWorker registered with scope:', registrations[0].scope);
-            console.log('Firebase Messaging ServiceWorker registered with scope:', registrations[1].scope);
+            console.log('Main ServiceWorker registered with scope:', registrations[1].scope);
             // Initialize Firebase messaging if needed
             if (firebase.messaging) {
               return firebase.messaging();
