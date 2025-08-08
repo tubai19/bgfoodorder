@@ -387,6 +387,7 @@
 
   <script src="admin-script.js"></script>
   <script>
+    // Properly formatted Firebase initialization
     const firebaseConfig = {
       apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
       authDomain: "bakeandgrill-44c25.firebaseapp.com",
@@ -398,27 +399,24 @@
     };
 
     // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
+    const app = firebase.initializeApp(firebaseConfig);
     
-    // Initialize services
+    // Initialize services with proper variable declarations
     const auth = firebase.auth();
     const db = firebase.firestore();
     const storage = firebase.storage();
     
-    // Register Service Worker with improved error handling
+    // Service Worker Registration
     if ('serviceWorker' in navigator) {
       if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
         window.addEventListener('load', function() {
-          // Only register the admin service worker for admin pages
           navigator.serviceWorker.register('/admin-sw.js')
             .then(function(registration) {
-              console.log('Admin ServiceWorker registered with scope:', registration.scope);
+              console.log('ServiceWorker registration successful:', registration.scope);
               
-              // Initialize Firebase messaging if needed
               if (firebase.messaging && firebase.messaging.isSupported()) {
                 const messaging = firebase.messaging();
                 
-                // Request notification permission
                 messaging.requestPermission()
                   .then(function() {
                     console.log('Notification permission granted.');
@@ -426,7 +424,6 @@
                   })
                   .then(function(token) {
                     console.log('FCM token:', token);
-                    // Store this token in Firestore for admin notifications
                     if (auth.currentUser) {
                       db.collection('adminTokens').doc(auth.currentUser.uid).set({
                         token: token,
@@ -435,29 +432,26 @@
                     }
                   })
                   .catch(function(err) {
-                    console.log('Unable to get permission to notify.', err);
+                    console.log('Unable to get permission:', err);
                   });
                 
-                // Handle incoming messages
-                messaging.onMessage((payload) => {
+                messaging.onMessage(function(payload) {
                   console.log('Message received:', payload);
                   showNotification(payload.notification.title, payload.notification.body);
                 });
               }
             })
             .catch(function(err) {
-              console.error('ServiceWorker registration failed:', err);
+              console.log('ServiceWorker registration failed:', err);
             });
         });
-      } else {
-        console.warn('ServiceWorker registration skipped - requires HTTPS or localhost');
       }
     }
     
-    // Helper function to show notifications
+    // Notification function
     function showNotification(title, body) {
       if (!("Notification" in window)) {
-        console.log("This browser does not support desktop notification");
+        console.log("Notifications not supported");
         return;
       }
       
@@ -467,11 +461,11 @@
     }
 
     // Online/offline detection
-    window.addEventListener('online', () => {
+    window.addEventListener('online', function() {
       document.querySelector('.offline-indicator')?.style.display = 'none';
     });
 
-    window.addEventListener('offline', () => {
+    window.addEventListener('offline', function() {
       document.querySelector('.offline-indicator')?.style.display = 'block';
     });
   </script>
