@@ -1,6 +1,6 @@
 // admin-script.js - Complete Admin Dashboard for Bake & Grill
-// Version: 2.0.2 - Fixed FCM and Service Worker issues
-// Last Updated: 2023-11-17
+// Version: 2.0.3 - Improved FCM initialization and error handling
+// Last Updated: 2023-11-18
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -176,28 +176,28 @@ async function initializeServiceWorker() {
   }
 }
 
-// MESSAGING INITIALIZATION
+// MESSAGING INITIALIZATION - UPDATED VERSION
 async function initializeMessaging() {
   try {
     // Check if messaging is supported
     if (!firebase.messaging.isSupported()) {
       console.log('FCM not supported in this browser');
-      return;
+      return null;
     }
     
     messaging = firebase.messaging();
     
-    // Request notification permission
+    // Request notification permission using the modern API
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
       console.log('Notification permission not granted');
-      return;
+      return null;
     }
     
     // Get FCM token
     const token = await messaging.getToken({
       vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: state.serviceWorkerRegistration
+      serviceWorkerRegistration: await navigator.serviceWorker.ready
     });
     
     if (token) {
@@ -590,13 +590,13 @@ async function loadSettings() {
     const doc = await db.collection('publicStatus').doc('current').get();
     
     if (doc.exists) {
-      settingsData = doc.data();
-      updateSettingsForm(settingsData);
+      state.settingsData = doc.data();
+      updateSettingsForm(state.settingsData);
     } else {
       // Initialize default settings
-      settingsData = defaultSettings;
-      await db.collection('publicStatus').doc('current').set(settingsData);
-      updateSettingsForm(settingsData);
+      state.settingsData = DEFAULT_SETTINGS;
+      await db.collection('publicStatus').doc('current').set(state.settingsData);
+      updateSettingsForm(state.settingsData);
     }
   } catch (error) {
     console.error("Error loading settings:", error);
@@ -643,7 +643,7 @@ async function saveSettings() {
   
   try {
     await db.collection('publicStatus').doc('current').set(settings, { merge: true });
-    showError('Settings saved successfully');
+    showAdminNotification('Settings saved successfully');
   } catch (error) {
     console.error("Error saving settings:", error);
     showError('Failed to save settings');
@@ -721,7 +721,7 @@ async function updateOrderStatus(data) {
     sendOrderNotification(data.orderId, data.status, orderData.phoneNumber)
       .catch(err => console.error("Notification failed silently:", err));
     
-    showError(`Order status updated to ${data.status}`);
+    showAdminNotification(`Order status updated to ${data.status}`);
   } catch (error) {
     console.error("Error updating order status:", error);
     showError(error.message || 'Failed to update order status');
@@ -921,11 +921,11 @@ async function logNotificationAttempt(orderId, phoneNumber, method, success, err
 async function loadAnalyticsData() {
   try {
     // Destroy existing charts if they exist
-    if (dailySalesChart) {
-      dailySalesChart.destroy();
+    if (state.dailySalesChart) {
+      state.dailySalesChart.destroy();
     }
-    if (topItemsChart) {
-      topItemsChart.destroy();
+    if (state.topItemsChart) {
+      state.topItemsChart.destroy();
     }
     
     // Get orders for the selected time period
@@ -1016,7 +1016,7 @@ async function loadAnalyticsData() {
     
     // Create charts
     const dailySalesCtx = document.getElementById('salesTrendChart').getContext('2d');
-    dailySalesChart = new Chart(dailySalesCtx, {
+    state.dailySalesChart = new Chart(dailySalesCtx, {
       type: 'bar',
       data: {
         labels: days,
@@ -1039,7 +1039,7 @@ async function loadAnalyticsData() {
     });
     
     const topItemsCtx = document.getElementById('topItemsChart').getContext('2d');
-    topItemsChart = new Chart(topItemsCtx, {
+    state.topItemsChart = new Chart(topItemsCtx, {
       type: 'pie',
       data: {
         labels: topItemNames,
@@ -1073,7 +1073,7 @@ function renderOrderCard(order) {
   orderCard.dataset.orderId = order.id;
   
   // Add new order notification class if this is the latest order
-  if (order.id === lastOrderId) {
+  if (order.id === state.lastOrderId) {
     orderCard.classList.add('new-order-notification');
     setTimeout(() => {
       orderCard.classList.remove('new-order-notification');
@@ -1318,7 +1318,7 @@ function showAddMenuItemModal(categoryId) {
 }
 
 function showEditMenuItemModal(categoryId, itemName) {
-  const category = menuData[categoryId];
+  const category = state.menuData[categoryId];
   if (!category) return;
   
   const item = category.items.find(i => i.name === itemName);
@@ -1385,7 +1385,7 @@ async function addNewCategory() {
       icon
     });
     
-    showError('Category added successfully');
+    showAdminNotification('Category added successfully');
     hideModal(elements.addCategoryModal);
   } catch (error) {
     console.error("Error saving category:", error);
@@ -1455,7 +1455,7 @@ async function saveMenuItem() {
     // Update category with new items
     await categoryRef.update({ items });
     
-    showError('Menu item saved successfully');
+    showAdminNotification('Menu item saved successfully');
     hideModal(elements.menuItemModal);
   } catch (error) {
     console.error("Error saving menu item:", error);
@@ -1477,7 +1477,7 @@ async function deleteMenuItem(data) {
     
     await categoryRef.update({ items });
     
-    showError('Menu item deleted successfully');
+    showAdminNotification('Menu item deleted successfully');
   } catch (error) {
     console.error("Error deleting menu item:", error);
     showError('Failed to delete menu item');
@@ -1541,4 +1541,11 @@ function formatOrderDate(date) {
     minute: '2-digit',
     hour12: true
   });
+}
+
+function updateServiceWorkerStatus(message, type) {
+  if (elements.swStatus) {
+    elements.swStatus.textContent = message;
+    elements.swStatus.className = `sw-status ${type}`;
+  }
 }
