@@ -15,7 +15,7 @@ const PRECACHE_URLS = [
   '/js/main.js',
   '/js/menu.js',
   '/js/checkout.js',
-  '/images/android-chrome-192x192.png'
+  '/image/android-chrome-192x192.png'
 ];
 
 // Import Firebase scripts
