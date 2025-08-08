@@ -387,6 +387,24 @@
 
   <script src="admin-script.js"></script>
   <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    
+    // Initialize services
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    
     // Register Service Worker with improved error handling
     if ('serviceWorker' in navigator) {
       if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
@@ -408,11 +426,23 @@
                   })
                   .then(function(token) {
                     console.log('FCM token:', token);
-                    // You can send this token to your server to target this device
+                    // Store this token in Firestore for admin notifications
+                    if (auth.currentUser) {
+                      db.collection('adminTokens').doc(auth.currentUser.uid).set({
+                        token: token,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                      });
+                    }
                   })
                   .catch(function(err) {
                     console.log('Unable to get permission to notify.', err);
                   });
+                
+                // Handle incoming messages
+                messaging.onMessage((payload) => {
+                  console.log('Message received:', payload);
+                  showNotification(payload.notification.title, payload.notification.body);
+                });
               }
             })
             .catch(function(err) {
@@ -421,6 +451,18 @@
         });
       } else {
         console.warn('ServiceWorker registration skipped - requires HTTPS or localhost');
+      }
+    }
+    
+    // Helper function to show notifications
+    function showNotification(title, body) {
+      if (!("Notification" in window)) {
+        console.log("This browser does not support desktop notification");
+        return;
+      }
+      
+      if (Notification.permission === "granted") {
+        new Notification(title, { body });
       }
     }
   </script>
