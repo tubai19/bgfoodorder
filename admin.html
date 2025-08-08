@@ -460,14 +460,20 @@
       }
     }
 
-    // Online/offline detection
-    window.addEventListener('online', function() {
-    document.querySelector('.offline-indicator')?.style.display = 'none';
-    });
+  // Online/offline detection - fixed version
+window.addEventListener('online', function() {
+  const offlineIndicator = document.querySelector('.offline-indicator');
+  if (offlineIndicator) {
+    offlineIndicator.style.display = 'none';
+  }
+});
 
-    window.addEventListener('offline', function() {
-      document.querySelector('.offline-indicator')?.style.display = 'block';
-    });
+window.addEventListener('offline', function() {
+  const offlineIndicator = document.querySelector('.offline-indicator');
+  if (offlineIndicator) {
+    offlineIndicator.style.display = 'block';
+  }
+});
   </script>
 </body>
 </html>
