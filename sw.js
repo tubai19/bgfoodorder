@@ -1,6 +1,6 @@
 // sw.js - Combined PWA + Firebase Messaging
-// Version: 1.0.0
-const VERSION = '1.0.0';
+// Version: 1.0.1
+const VERSION = '1.0.1';
 const CACHE_NAME = `bake-and-grill-${VERSION}`;
 const API_CACHE_NAME = `${CACHE_NAME}-api`;
 const OFFLINE_URL = 'offline.html';
@@ -47,21 +47,22 @@ try {
   const messaging = firebase.messaging();
   const displayedNotifications = new Set();
 
+  // Set Firebase messaging background handler
+  messaging.onBackgroundMessage((payload) => {
+    console.log('[sw.js] Received background message:', payload);
+    handlePushNotification(payload);
+  });
+
   // Install event - cache app shell
   self.addEventListener('install', event => {
     event.waitUntil(
       caches.open(CACHE_NAME)
         .then(cache => {
           console.log('ServiceWorker: Caching app shell');
-          return cache.addAll(PRECACHE_URLS.map(url => 
-            new Request(url, { 
-              cache: 'reload', 
-              credentials: 'same-origin' 
-            })
-          ).catch(error => {
-            console.error('ServiceWorker: Cache addAll error:', error);
-            return Promise.resolve();
-          });
+          return cache.addAll(PRECACHE_URLS);
+        })
+        .catch(error => {
+          console.error('ServiceWorker: Cache addAll error:', error);
         })
         .then(() => {
           console.log('ServiceWorker: Skip waiting');
@@ -120,54 +121,8 @@ try {
     );
   });
 
-  // Network first strategy for API calls
-  async function networkFirstThenCache(request, cacheName) {
-    try {
-      const networkResponse = await fetch(request);
-      if (networkResponse.ok) {
-        const cache = await caches.open(cacheName);
-        await cache.put(request, networkResponse.clone());
-        return networkResponse;
-      }
-      throw new Error('Network response not OK');
-    } catch (error) {
-      const cachedResponse = await caches.match(request);
-      return cachedResponse || Response.error();
-    }
-  }
-
-  // Cache first strategy for static assets
-  async function cacheFirstThenNetwork(request) {
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) return cachedResponse;
-
-    try {
-      const networkResponse = await fetch(request);
-      if (networkResponse.ok) {
-        const cache = await caches.open(CACHE_NAME);
-        await cache.put(request, networkResponse.clone());
-      }
-      return networkResponse;
-    } catch (error) {
-      // Special handling for images
-      if (request.headers.get('accept').includes('image')) {
-        return new Response(
-          '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">' +
-          '<rect width="100" height="100" fill="#eee"/>' +
-          '<text x="50" y="50" font-family="Arial" font-size="10" ' +
-          'text-anchor="middle" fill="#aaa">Image not available offline</text>' +
-          '</svg>', 
-          { headers: { 'Content-Type': 'image/svg+xml' } }
-        );
-      }
-      return Response.error();
-    }
-  }
-
-  // Firebase Background Message Handling
-  messaging.onBackgroundMessage((payload) => {
-    console.log('[sw.js] Received background message:', payload);
-
+  // Notification handler function
+  function handlePushNotification(payload) {
     // Create unique notification ID
     const notificationId = payload.data?.orderId 
       ? `${payload.data.orderId}-${payload.data.status || Date.now()}` 
@@ -207,7 +162,7 @@ try {
       .catch(error => {
         console.error('Failed to show notification:', error);
       });
-  });
+  }
 
   // Notification click handler
   self.addEventListener('notificationclick', event => {

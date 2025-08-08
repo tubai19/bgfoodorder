@@ -186,7 +186,7 @@ function updateServiceWorkerStatus(message, type) {
   elements.swStatus.className = `sw-status ${type}`;
 }
 
-// FIREBASE MESSAGING
+// Replace the initializeMessaging function with this:
 async function initializeMessaging() {
   try {
     if (!firebase.messaging.isSupported()) {
@@ -194,17 +194,31 @@ async function initializeMessaging() {
       return;
     }
 
-    if (!state.serviceWorkerRegistration) {
-      await initializeServiceWorker();
-    }
+    // Register your combined service worker
+    state.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/'
+    });
 
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      console.log('Notification permission granted');
-      await getAdminFCMToken();
+    // Wait for service worker to be ready
+    await navigator.serviceWorker.ready;
+
+    // Get FCM token with your combined service worker
+    const token = await messaging.getToken({
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: state.serviceWorkerRegistration
+    });
+    
+    if (token) {
+      console.log('Admin FCM Token:', token);
+      await saveAdminToken(token);
+      return token;
     }
+    
+    console.log('No registration token available.');
+    return null;
   } catch (error) {
     console.error('Error initializing messaging:', error);
+    throw error;
   }
 }
 
