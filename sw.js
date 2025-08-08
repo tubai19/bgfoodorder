@@ -1,9 +1,10 @@
 // sw.js - Combined PWA + Firebase Messaging
-// Version: 1.0.1
-const VERSION = '1.0.1';
+// Version: 1.0.2
+const VERSION = '1.0.2';
 const CACHE_NAME = `bake-and-grill-${VERSION}`;
 const API_CACHE_NAME = `${CACHE_NAME}-api`;
 const OFFLINE_URL = 'offline.html';
+const CACHE_TIMEOUT = 5000; // 5 seconds timeout for network requests
 
 // Precached URLs for app shell
 const PRECACHE_URLS = [
@@ -24,9 +25,81 @@ const PRECACHE_URLS = [
   '/css/leaflet.css',
   '/webfonts/fa-solid-900.woff2',
   '/webfonts/fa-brands-400.woff2',
-  '/image/android-chrome-192x192.png',
-  '/image/android-chrome-512x512.png'
+  '/images/android-chrome-192x192.png',
+  '/images/android-chrome-512x512.png'
 ];
+
+// Cache-first strategy with network fallback
+async function cacheFirstThenNetwork(request) {
+  try {
+    // Try to get from cache first
+    const cache = await caches.open(CACHE_NAME);
+    const cachedResponse = await cache.match(request);
+    
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    // If not in cache, try network with timeout
+    const networkPromise = fetch(request);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), CACHE_TIMEOUT)
+    );
+    
+    const networkResponse = await Promise.race([networkPromise, timeoutPromise]);
+    
+    // Cache the successful response
+    if (networkResponse && networkResponse.ok) {
+      await cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.log('Cache first failed, returning offline page:', error);
+    return caches.match(OFFLINE_URL);
+  }
+}
+
+// Network-first strategy with cache fallback
+async function networkFirstThenCache(request, cacheName = API_CACHE_NAME) {
+  try {
+    // Try network first with timeout
+    const networkPromise = fetch(request);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timeout')), CACHE_TIMEOUT)
+    );
+    
+    const networkResponse = await Promise.race([networkPromise, timeoutPromise]);
+    
+    // Cache the successful response
+    if (networkResponse && networkResponse.ok) {
+      const cache = await caches.open(cacheName);
+      await cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.log('Network first failed, trying cache:', error);
+    
+    // Try to get from cache
+    const cache = await caches.open(cacheName);
+    const cachedResponse = await cache.match(request);
+    
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    // For API requests, return empty response rather than offline page
+    if (request.url.includes('/api/')) {
+      return new Response(JSON.stringify({ error: 'You are offline' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    return caches.match(OFFLINE_URL);
+  }
+}
 
 try {
   // Firebase imports (using latest compatible version)
@@ -59,14 +132,27 @@ try {
       caches.open(CACHE_NAME)
         .then(cache => {
           console.log('ServiceWorker: Caching app shell');
-          return cache.addAll(PRECACHE_URLS);
-        })
-        .catch(error => {
-          console.error('ServiceWorker: Cache addAll error:', error);
+          return Promise.all(
+            PRECACHE_URLS.map(url => {
+              return fetch(url)
+                .then(response => {
+                  if (response.ok) {
+                    return cache.put(url, response);
+                  }
+                  console.warn(`Failed to cache ${url}:`, response.status);
+                })
+                .catch(error => {
+                  console.warn(`Failed to fetch ${url} for caching:`, error);
+                });
+            })
+          );
         })
         .then(() => {
           console.log('ServiceWorker: Skip waiting');
           return self.skipWaiting();
+        })
+        .catch(error => {
+          console.error('ServiceWorker: Installation failed:', error);
         })
     );
   });
@@ -204,6 +290,16 @@ try {
         const newSubscription = results[1];
         // Send new token to server if needed
         console.log('Push subscription renewed:', newToken);
+        return fetch('/api/update-subscription', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            oldToken: event.oldSubscription.endpoint,
+            newToken: newToken
+          })
+        });
       })
     );
   });
