@@ -137,17 +137,18 @@
 
   <script type="module" src="/js/main.js"></script>
   <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
-    .then(registration => {
-      console.log('ServiceWorker registration successful:', registration);
-    })
-    .catch(error => {
-      console.log('ServiceWorker registration failed:', error);
-    });
-}
-</script>
-  
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', {
+          type: 'module'
+        }).then(registration => {
+          console.log('ServiceWorker registered');
+        }).catch(err => {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
+
     window.addEventListener('online', () => {
       document.querySelector('.offline-indicator').style.display = 'none';
     });
@@ -156,5 +157,28 @@ if ('serviceWorker' in navigator) {
       document.querySelector('.offline-indicator').style.display = 'block';
     });
   </script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then(registration => {
+          console.log('ServiceWorker registration successful with scope:', registration.scope);
+        })
+        .catch(err => {
+          console.log('ServiceWorker registration failed:', err);
+        });
+    });
+  }
+
+  window.addEventListener('online', () => {
+    document.querySelector('.offline-indicator')?.style.display = 'none';
+  });
+
+  window.addEventListener('offline', () => {
+    document.querySelector('.offline-indicator')?.style.display = 'block';
+  });
+</script>
+
 </body>
 </html>
