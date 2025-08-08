@@ -391,22 +391,33 @@
     if ('serviceWorker' in navigator) {
       if (window.location.protocol === 'https:' || window.location.hostname === 'localhost') {
         window.addEventListener('load', function() {
-          // Register both service workers (admin and main)
-          Promise.all([
-            navigator.serviceWorker.register('/admin-sw.js'),
-            navigator.serviceWorker.register('/sw.js')
-          ])
-          .then(function(registrations) {
-            console.log('Admin ServiceWorker registered with scope:', registrations[0].scope);
-            console.log('Main ServiceWorker registered with scope:', registrations[1].scope);
-            // Initialize Firebase messaging if needed
-            if (firebase.messaging) {
-              return firebase.messaging();
-            }
-          })
-          .catch(function(err) {
-            console.error('ServiceWorker registration failed:', err);
-          });
+          // Only register the admin service worker for admin pages
+          navigator.serviceWorker.register('/admin-sw.js')
+            .then(function(registration) {
+              console.log('Admin ServiceWorker registered with scope:', registration.scope);
+              
+              // Initialize Firebase messaging if needed
+              if (firebase.messaging && firebase.messaging.isSupported()) {
+                const messaging = firebase.messaging();
+                
+                // Request notification permission
+                messaging.requestPermission()
+                  .then(function() {
+                    console.log('Notification permission granted.');
+                    return messaging.getToken();
+                  })
+                  .then(function(token) {
+                    console.log('FCM token:', token);
+                    // You can send this token to your server to target this device
+                  })
+                  .catch(function(err) {
+                    console.log('Unable to get permission to notify.', err);
+                  });
+              }
+            })
+            .catch(function(err) {
+              console.error('ServiceWorker registration failed:', err);
+            });
         });
       } else {
         console.warn('ServiceWorker registration skipped - requires HTTPS or localhost');
