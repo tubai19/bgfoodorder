@@ -1,4 +1,8 @@
-// Initialize Firebase
+// admin-script.js - Complete Admin Dashboard for Bake & Grill
+// Version: 2.0.0
+// Last Updated: 2023-11-15
+
+// Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
   authDomain: "bakeandgrill-44c25.firebaseapp.com",
@@ -17,13 +21,21 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const messaging = firebase.messaging();
 
-// Sound notification for new orders
-const newOrderSound = new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3');
-newOrderSound.volume = 0.5;
-let lastOrderId = null;
-
-// Admin configuration
+// Constants
 const ADMIN_EMAIL = "suvradeep.pal93@gmail.com";
+const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
+const DEFAULT_SETTINGS = {
+  isShopOpen: true,
+  isDeliveryAvailable: true,
+  openingTime: "16:00",
+  closingTime: "22:00",
+  deliveryRadius: 8,
+  minDeliveryOrder: 200,
+  charge04km: 0,
+  charge46km: 20,
+  charge68km: 30,
+  freeDeliveryAbove: 500
+};
 
 // DOM Elements
 const elements = {
@@ -83,56 +95,107 @@ const elements = {
   confirmAddCategoryBtn: document.getElementById('confirmAddCategoryBtn'),
   confirmActionBtn: document.getElementById('confirmActionBtn'),
   confirmationTitle: document.getElementById('confirmationTitle'),
-  confirmationMessage: document.getElementById('confirmationMessage')
+  confirmationMessage: document.getElementById('confirmationMessage'),
+  
+  // Service Worker Status
+  swStatus: document.getElementById('swStatus'),
+  
+  // Analytics
+  totalSalesAmount: document.getElementById('totalSalesAmount'),
+  totalOrdersCount: document.getElementById('totalOrdersCount'),
+  averageOrderAmount: document.getElementById('averageOrderAmount'),
+  timePeriod: document.getElementById('timePeriod'),
+  startDate: document.getElementById('startDate'),
+  endDate: document.getElementById('endDate')
 };
 
-// Default Settings
-const defaultSettings = {
-  isShopOpen: true,
-  isDeliveryAvailable: true,
-  openingTime: "16:00",
-  closingTime: "22:00",
-  deliveryRadius: 8,
-  minDeliveryOrder: 200,
-  charge04km: 0,
-  charge46km: 20,
-  charge68km: 30,
-  freeDeliveryAbove: 500
+// Global State
+const state = {
+  currentAction: null,
+  actionData: null,
+  menuData: {},
+  settingsData: {},
+  lastOrderId: null,
+  dailySalesChart: null,
+  topItemsChart: null,
+  serviceWorkerRegistration: null,
+  notificationSound: new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3')
 };
 
-// Global variables
-let currentAction = null;
-let actionData = null;
-let menuData = {};
-let settingsData = {};
-let dailySalesChart = null;
-let topItemsChart = null;
-
-// Initialize the admin interface
-document.addEventListener('DOMContentLoaded', function() {
-  // Check auth state
-  auth.onAuthStateChanged(user => {
+// Initialize the application
+document.addEventListener('DOMContentLoaded', async function() {
+  // Set notification sound volume
+  state.notificationSound.volume = 0.5;
+  
+  // Check authentication state
+  auth.onAuthStateChanged(async user => {
     if (user && user.email === ADMIN_EMAIL) {
       showAdminDashboard();
       setupRealtimeListeners();
       loadSettings();
-      initializeMessaging();
+      await initializeServiceWorker();
+      await initializeMessaging();
     } else {
       showLoginScreen();
     }
   });
 
+  // Update current time every second
   updateCurrentTime();
   setInterval(updateCurrentTime, 1000);
+  
+  // Setup event listeners
   setupEventListeners();
 });
 
-// Initialize messaging and request permissions
+// SERVICE WORKER MANAGEMENT
+async function initializeServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    updateServiceWorkerStatus('Service Worker: Not Supported', 'error');
+    return;
+  }
+
+  try {
+    state.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/'
+    });
+    
+    console.log('Service Worker registered:', state.serviceWorkerRegistration);
+    updateServiceWorkerStatus('Service Worker: Active', 'success');
+    
+    // Listen for updates
+    state.serviceWorkerRegistration.addEventListener('updatefound', () => {
+      const newWorker = state.serviceWorkerRegistration.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          showAdminNotification('New version available. Please refresh the page.');
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error('Service Worker registration failed:', error);
+    updateServiceWorkerStatus('Service Worker: Failed', 'error');
+  }
+}
+
+function updateServiceWorkerStatus(message, type) {
+  if (!elements.swStatus) return;
+  
+  elements.swStatus.textContent = message;
+  elements.swStatus.className = `sw-status ${type}`;
+}
+
+// FIREBASE MESSAGING
 async function initializeMessaging() {
   try {
     if (!firebase.messaging.isSupported()) {
       console.log('FCM not supported in this browser');
       return;
+    }
+
+    if (!state.serviceWorkerRegistration) {
+      await initializeServiceWorker();
     }
 
     const permission = await Notification.requestPermission();
@@ -145,23 +208,31 @@ async function initializeMessaging() {
   }
 }
 
-// Get and store admin FCM token
 async function getAdminFCMToken() {
   try {
+    if (!state.serviceWorkerRegistration) {
+      throw new Error('Service worker not registered');
+    }
+
     const currentToken = await messaging.getToken({
-      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY'
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: state.serviceWorkerRegistration
     });
     
     if (currentToken) {
       console.log('Admin FCM Token:', currentToken);
       await saveAdminToken(currentToken);
+      return currentToken;
     }
+    
+    console.log('No registration token available.');
+    return null;
   } catch (error) {
     console.error('Error getting FCM token:', error);
+    throw error;
   }
 }
 
-// Save admin token to Firestore
 async function saveAdminToken(token) {
   try {
     const user = auth.currentUser;
@@ -172,12 +243,13 @@ async function saveAdminToken(token) {
       email: user.email,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       lastActive: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    }, { merge: true });
   } catch (error) {
     console.error('Error saving admin token:', error);
   }
 }
 
+// EVENT LISTENERS
 function setupEventListeners() {
   // Login form submission
   if (elements.loginForm) {
@@ -271,25 +343,25 @@ function setupEventListeners() {
     elements.confirmActionBtn.addEventListener('click', () => {
       hideModal(elements.confirmationModal);
       
-      switch(currentAction) {
+      switch(state.currentAction) {
         case 'updateOrderStatus':
-          updateOrderStatus(actionData);
+          updateOrderStatus(state.actionData);
           break;
         case 'deleteCategory':
-          deleteCategory(actionData);
+          deleteCategory(state.actionData);
           break;
         case 'deleteMenuItem':
-          deleteMenuItem(actionData);
+          deleteMenuItem(state.actionData);
           break;
       }
       
-      currentAction = null;
-      actionData = null;
+      state.currentAction = null;
+      state.actionData = null;
     });
   }
 }
 
-// Authentication functions
+// AUTHENTICATION FUNCTIONS
 async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('adminEmail').value;
@@ -303,7 +375,8 @@ async function handleLogin(e) {
       showAdminDashboard();
       setupRealtimeListeners();
       loadSettings();
-      initializeMessaging();
+      await initializeServiceWorker();
+      await initializeMessaging();
     } else {
       await auth.signOut();
       showError('Access restricted to admin only');
@@ -325,17 +398,19 @@ async function handleLogout() {
 }
 
 function getErrorMessage(errorCode) {
-  switch(errorCode) {
-    case 'auth/invalid-email': return 'Invalid email address';
-    case 'auth/user-disabled': return 'Account disabled';
-    case 'auth/user-not-found': return 'Account not found';
-    case 'auth/wrong-password': return 'Incorrect password';
-    case 'auth/too-many-requests': return 'Too many attempts. Try again later';
-    default: return 'Login failed. Please try again';
-  }
+  const errorMessages = {
+    'auth/invalid-email': 'Invalid email address',
+    'auth/user-disabled': 'Account disabled',
+    'auth/user-not-found': 'Account not found',
+    'auth/wrong-password': 'Incorrect password',
+    'auth/too-many-requests': 'Too many attempts. Try again later',
+    'auth/network-request-failed': 'Network error. Please check your connection'
+  };
+  
+  return errorMessages[errorCode] || 'Login failed. Please try again';
 }
 
-// UI Functions
+// UI FUNCTIONS
 function showLoginScreen() {
   if (elements.loginScreen) elements.loginScreen.style.display = 'flex';
   if (elements.adminDashboard) elements.adminDashboard.style.display = 'none';
@@ -382,6 +457,37 @@ function showError(message) {
   }
 }
 
+function showAdminNotification(message, duration = 5000) {
+  const notification = document.createElement('div');
+  notification.className = 'admin-notification';
+  notification.innerHTML = `
+    <div class="admin-notification-content">
+      <span>${message}</span>
+      <button class="close-notification">&times;</button>
+    </div>
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Trigger animation
+  setTimeout(() => {
+    notification.classList.add('show');
+  }, 10);
+  
+  // Auto-hide
+  const timeout = setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, duration);
+  
+  // Manual close
+  notification.querySelector('.close-notification').addEventListener('click', () => {
+    clearTimeout(timeout);
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  });
+}
+
 function showModal(modal) {
   if (modal) modal.style.display = 'block';
 }
@@ -391,19 +497,19 @@ function hideModal(modal) {
 }
 
 function showConfirmation(title, message, action, data = null) {
-  currentAction = action;
-  actionData = data;
+  state.currentAction = action;
+  state.actionData = data;
   if (elements.confirmationTitle) elements.confirmationTitle.textContent = title;
   if (elements.confirmationMessage) elements.confirmationMessage.textContent = message;
   showModal(elements.confirmationModal);
 }
 
 function playNewOrderSound() {
-  newOrderSound.currentTime = 0;
-  newOrderSound.play().catch(e => console.log("Sound playback prevented:", e));
+  state.notificationSound.currentTime = 0;
+  state.notificationSound.play().catch(e => console.log("Sound playback prevented:", e));
 }
 
-// Setup real-time Firestore listeners
+// REALTIME DATA LISTENERS
 function setupRealtimeListeners() {
   // Real-time orders listener
   db.collection('orders')
@@ -422,11 +528,12 @@ function setupRealtimeListeners() {
       // Check for new orders
       if (snapshot.docs.length > 0) {
         const latestOrder = snapshot.docs[0];
-        if (lastOrderId !== latestOrder.id) {
-          if (lastOrderId !== null) { // Don't play sound on first load
+        if (state.lastOrderId !== latestOrder.id) {
+          if (state.lastOrderId !== null) {
             playNewOrderSound();
+            showAdminNotification('New order received!');
           }
-          lastOrderId = latestOrder.id;
+          state.lastOrderId = latestOrder.id;
         }
       }
       
@@ -444,7 +551,7 @@ function setupRealtimeListeners() {
 
   // Real-time menu listener
   db.collection('menu').onSnapshot(snapshot => {
-    menuData = {};
+    state.menuData = {};
     if (!elements.menuCategoriesContainer) return;
     
     elements.menuCategoriesContainer.innerHTML = '';
@@ -460,7 +567,7 @@ function setupRealtimeListeners() {
         name: doc.id,
         items: doc.data().items
       };
-      menuData[category.id] = category;
+      state.menuData[category.id] = category;
       renderCategoryCard(category);
     });
   }, error => {
