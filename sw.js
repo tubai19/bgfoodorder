@@ -25,8 +25,8 @@ const PRECACHE_URLS = [
   '/css/leaflet.css',
   '/webfonts/fa-solid-900.woff2',
   '/webfonts/fa-brands-400.woff2',
-  '/images/android-chrome-192x192.png',
-  '/images/android-chrome-512x512.png'
+  '/image/android-chrome-192x192.png',
+  '/image/android-chrome-512x512.png'
 ];
 
 // Cache-first strategy with network fallback
