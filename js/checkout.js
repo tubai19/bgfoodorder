@@ -16,8 +16,7 @@ import {
   getMessaging,
   getToken,
   onMessage,
-  isMessagingSupported,
-  registerCustomerToken
+  isMessagingSupported
 } from './main.js';
 
 // Configuration constants
@@ -121,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 });
 
-/* ========== FIREBASE MESSAGING (NOTIFICATIONS) ========== */
+/* ========== NOTIFICATION FUNCTIONS ========== */
 async function initializeFirebaseMessaging() {
   try {
     const isSupported = await isMessagingSupported();
@@ -172,6 +171,154 @@ async function initializeFirebaseMessaging() {
   }
 }
 
+async function registerCustomerToken(phoneNumber, customerName = null) {
+  try {
+    if (!currentFCMToken || !phoneNumber) return false;
+    
+    const tokenRef = doc(db, 'customerTokens', phoneNumber);
+    await setDoc(tokenRef, {
+      token: currentFCMToken,
+      phoneNumber,
+      name: customerName,
+      lastActive: serverTimestamp()
+    }, { merge: true });
+    
+    console.log('Token registered for customer:', phoneNumber);
+    return true;
+  } catch (error) {
+    console.error('Error registering customer token:', error);
+    return false;
+  }
+}
+
+async function sendOrderNotification(orderId, newStatus, phoneNumber) {
+  try {
+    if (!phoneNumber) {
+      console.log("No phone number, skipping notification");
+      return;
+    }
+
+    // Get customer token
+    const token = await getCustomerToken(phoneNumber);
+    if (!token) {
+      console.log('No FCM token found for customer');
+      return;
+    }
+
+    const statusText = getStatusText(newStatus);
+    const shortOrderId = orderId.substring(0, 6);
+    
+    const message = {
+      notification: {
+        title: `Order #${shortOrderId} Update`,
+        body: `Your order ${statusText}. Tap for details.`,
+        icon: '/android-chrome-192x192.png'
+      },
+      data: {
+        orderId,
+        status: newStatus,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        url: `/checkout.html?orderId=${orderId}`,
+        timestamp: Date.now().toString()
+      },
+      token: token
+    };
+
+    // Send using Firebase Messaging
+    const messaging = getMessaging(app);
+    const response = await messaging.send(message);
+    console.log("Notification sent successfully:", response);
+    
+    // Log the notification attempt
+    await logNotificationAttempt(orderId, phoneNumber, 'push', true);
+    
+  } catch (error) {
+    console.error("Error sending notification:", error);
+    await logNotificationAttempt(orderId, phoneNumber, 'push', false, error);
+    
+    // Fallback to WhatsApp
+    await sendWhatsAppNotification(phoneNumber, orderId, newStatus);
+  }
+}
+
+async function getCustomerToken(phoneNumber) {
+  try {
+    // Normalize phone number format
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    if (!normalizedPhone) return null;
+
+    // Check cache first
+    if (localStorage.getItem(`fcmToken-${normalizedPhone}`)) {
+      return localStorage.getItem(`fcmToken-${normalizedPhone}`);
+    }
+
+    // Query Firestore
+    const tokensRef = doc(db, 'customerTokens', normalizedPhone);
+    const docSnap = await getDoc(tokensRef);
+    
+    if (docSnap.exists()) {
+      const token = docSnap.data().token;
+      // Cache the token
+      localStorage.setItem(`fcmToken-${normalizedPhone}`, token);
+      return token;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting customer token:", error);
+    return null;
+  }
+}
+
+async function logNotificationAttempt(orderId, phoneNumber, method, success, error = null) {
+  try {
+    await addDoc(collection(db, 'notificationLogs'), {
+      orderId,
+      phoneNumber,
+      method,
+      success,
+      error: error ? error.message : null,
+      timestamp: serverTimestamp()
+    });
+  } catch (err) {
+    console.error("Error logging notification attempt:", err);
+  }
+}
+
+function getStatusText(status) {
+  const statusMap = {
+    pending: "is pending",
+    preparing: "is being prepared",
+    delivering: "is out for delivery",
+    completed: "has been completed",
+    cancelled: "has been cancelled"
+  };
+  return statusMap[status] || "status has been updated";
+}
+
+async function sendWhatsAppNotification(phoneNumber, orderId, status) {
+  try {
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    const formattedPhone = phoneNumber.startsWith('+') ? cleanPhone : `91${cleanPhone}`;
+
+    const statusText = getStatusText(status);
+    const message = `Your order #${orderId.substring(0, 6)} ${statusText}.\n\n` +
+      `View order status: ${window.location.origin}/order-status.html?orderId=${orderId}`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+    
+    const newWindow = window.open(whatsappUrl, '_blank');
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      throw new Error('Failed to open WhatsApp');
+    }
+    
+    await logNotificationAttempt(orderId, phoneNumber, 'whatsapp', true);
+  } catch (error) {
+    console.error("WhatsApp notification failed:", error);
+    await logNotificationAttempt(orderId, phoneNumber, 'whatsapp', false, error);
+    throw error;
+  }
+}
 
 function checkNotificationPermission() {
   if (!('Notification' in window)) {
@@ -551,6 +698,9 @@ async function processOrderConfirmation() {
       await registerCustomerToken(orderData.phoneNumber, orderData.customerName);
     }
     
+    // Send initial notification
+    await sendOrderNotification(orderData.id, 'pending', orderData.phoneNumber);
+    
     updateCheckoutDisplay();
   } catch (error) {
     console.error("Order error:", error);
@@ -612,8 +762,13 @@ async function processOfflineOrdersQueue() {
           isOffline: false
         };
         
-        await addDoc(collection(db, 'orders'), orderToSubmit);
+        const docRef = await addDoc(collection(db, 'orders'), orderToSubmit);
         successfulOrders.push(order);
+        
+        // Send notification for successfully submitted offline orders
+        if (order.phoneNumber) {
+          await sendOrderNotification(docRef.id, 'pending', order.phoneNumber);
+        }
       } catch (error) {
         console.error('Error submitting offline order:', error);
       }
@@ -1027,7 +1182,7 @@ function applyCoupon() {
   
   appliedCoupon = CONFIG.VALID_COUPONS[code];
   elements.couponMessage.textContent = 'Coupon applied successfully!';
-    elements.couponMessage.className = 'coupon-message success';
+  elements.couponMessage.className = 'coupon-message success';
   
   updateCheckoutDisplay();
 }

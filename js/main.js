@@ -1,3 +1,4 @@
+// main.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
 import { 
   getFirestore,
@@ -77,74 +78,61 @@ function initDOMElements() {
   });
 }
 
-// FCM Token Management
-async function getFCMToken() {
+// Firebase Messaging Functions
+async function initializeFirebaseMessaging() {
   try {
     const isSupported = await isMessagingSupported();
     if (!isSupported) {
-      console.log('FCM not supported in this browser');
+      console.log('Firebase Messaging not supported in this browser');
       return null;
     }
-    
-    if (!('serviceWorker' in navigator)) {
-      console.error('Service workers are not supported');
-      return null;
-    }
-    
-    // First check for existing registration
-    let registration = await navigator.serviceWorker.getRegistration();
-    
-    // If no registration exists, register a new one
-    if (!registration) {
-      registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
-      });
-      console.log('Service Worker registered');
-      
-      // Wait for the service worker to be active
-      await new Promise((resolve) => {
-        if (registration.active) {
-          resolve();
-        } else {
-          const listener = () => {
-            if (registration.active) {
-              registration.removeEventListener('updatefound', listener);
-              resolve();
-            }
-          };
-          registration.addEventListener('updatefound', listener);
-        }
-      });
-    }
-    
+
     const messaging = getMessaging(app);
-    const currentToken = await getToken(messaging, {
+    
+    // Request notification permission
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('Notification permission not granted');
+      return null;
+    }
+    
+    // Get FCM token
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      console.error('No service worker registration found');
+      return null;
+    }
+
+    const token = await getToken(messaging, {
       vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY',
       serviceWorkerRegistration: registration
     });
     
-    if (currentToken) {
-      AppState.currentFCMToken = currentToken;
-      console.log('FCM Token:', currentToken);
-      return currentToken;
+    if (token) {
+      console.log('FCM Token:', token);
+      AppState.currentFCMToken = token;
+      return token;
     }
     
     console.log('No registration token available.');
     return null;
-  } catch (err) {
-    console.error('Error retrieving token:', err);
+  } catch (error) {
+    console.error('Firebase Messaging initialization error:', error);
     return null;
   }
 }
 
-// Message Handling
 function setupMessageHandler() {
   try {
     const messaging = getMessaging(app);
+    
     onMessage(messaging, (payload) => {
-      console.log('Foreground message:', payload);
+      console.log('Message received:', payload);
+      
+      // Show notification in foreground
       showNotification(payload.notification?.body || 'New update from Bake & Grill');
       
+      // Handle custom data
       if (payload.data?.type === 'statusUpdate') {
         updateStatusDisplay();
       }
@@ -154,10 +142,29 @@ function setupMessageHandler() {
   }
 }
 
-// Notification Permission
+async function registerCustomerToken(phoneNumber, customerName = null) {
+  try {
+    if (!AppState.currentFCMToken || !phoneNumber) return false;
+    
+    const tokenRef = doc(db, 'customerTokens', phoneNumber);
+    await setDoc(tokenRef, {
+      token: AppState.currentFCMToken,
+      phoneNumber,
+      name: customerName,
+      lastActive: serverTimestamp()
+    }, { merge: true });
+    
+    console.log('Token registered for customer:', phoneNumber);
+    return true;
+  } catch (error) {
+    console.error('Error registering customer token:', error);
+    return false;
+  }
+}
+
 async function requestNotificationPermission() {
   if (!('Notification' in window)) {
-    showNotification('Notifications not supported');
+    showNotification('Notifications not supported in this browser');
     return false;
   }
   
@@ -165,15 +172,16 @@ async function requestNotificationPermission() {
     const permission = await Notification.requestPermission();
     
     if (permission === 'granted') {
-      showNotification('Notifications enabled!');
+      showNotification('Notifications enabled! You will receive order updates.');
       updateNotificationUI(true);
-      return await getFCMToken();
+      return await initializeFirebaseMessaging();
     } else {
+      showNotification('Notifications blocked. You may miss important order updates.');
       updateNotificationUI(false);
       return false;
     }
   } catch (error) {
-    console.error('Error requesting permission:', error);
+    console.error('Error requesting notification permission:', error);
     return false;
   }
 }
@@ -198,27 +206,6 @@ function checkNotificationPermission() {
   }
   
   updateNotificationUI(Notification.permission === 'granted');
-}
-
-// Customer Token Registration
-async function registerCustomerToken(phoneNumber, customerName = null) {
-  if (!AppState.currentFCMToken || !phoneNumber) return false;
-  
-  try {
-    const tokenRef = doc(db, 'customerTokens', phoneNumber);
-    await setDoc(tokenRef, {
-      token: AppState.currentFCMToken,
-      phoneNumber,
-      name: customerName,
-      lastActive: serverTimestamp()
-    }, { merge: true });
-    
-    console.log('Token registered for:', phoneNumber);
-    return true;
-  } catch (error) {
-    console.error('Error registering token:', error);
-    return false;
-  }
 }
 
 // Shop Status Management
@@ -330,7 +317,7 @@ async function initApp() {
       setupMessageHandler();
       
       if (Notification.permission === 'granted') {
-        await getFCMToken();
+        await initializeFirebaseMessaging();
       }
     }
     
@@ -398,7 +385,7 @@ export {
   getToken,
   onMessage,
   isMessagingSupported,
-  getFCMToken,
+  initializeFirebaseMessaging,
   registerCustomerToken,
   requestNotificationPermission
 };
