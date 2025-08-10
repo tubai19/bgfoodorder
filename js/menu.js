@@ -11,91 +11,63 @@ import {
   isCategoryAvailableForOrderType
 } from './main.js';
 
-// Menu-specific DOM elements
+// Initialize IDB wrapper
+const idb = window.idb || {};
+
+// Menu DOM elements
 const MenuElements = {
-  tabsDiv: null,
-  container: null,
-  searchInput: null,
-  mobileCartDrawer: null,
-  closeCartBtn: null,
-  mobileClearCartBtn: null,
-  cartList: null,
-  cartTotal: null,
-  quantityFooter: null,
-  quantityItemName: null,
-  quantityVariantPrice: null,
-  quantityDisplay: null,
-  cancelBtn: null,
-  addToCartBtn: null,
-  minusBtn: null,
-  plusBtn: null
+  tabsDiv: document.getElementById("tabs"),
+  container: document.getElementById("menuContainer"),
+  searchInput: document.getElementById("searchInput"),
+  mobileCartDrawer: document.getElementById("mobileCartDrawer"),
+  closeCartBtn: document.getElementById("closeCartBtn"),
+  mobileClearCartBtn: document.getElementById("mobileClearCartBtn"),
+  cartList: document.getElementById("cartItems"),
+  cartTotal: document.getElementById("cartTotalAmount"),
+  quantityFooter: document.getElementById("quantityFooter"),
+  quantityItemName: document.getElementById("quantityItemName"),
+  quantityVariantPrice: document.getElementById("quantityVariantPrice"),
+  quantityDisplay: document.querySelector('.quantity-controls .quantity'),
+  cancelBtn: document.querySelector('.quantity-footer .cancel-btn'),
+  addToCartBtn: document.querySelector('.quantity-footer .add-to-cart-btn'),
+  minusBtn: document.querySelector('.quantity-footer .minus'),
+  plusBtn: document.querySelector('.quantity-footer .plus')
 };
 
 // Menu data
 const fullMenu = {};
-
-// Current item being modified
 let currentItem = null;
 let currentVariant = null;
 let currentPrice = null;
 let currentQuantity = 1;
 
-// Initialize menu DOM elements
-function initMenuDOMElements() {
-  MenuElements.tabsDiv = document.getElementById("tabs");
-  MenuElements.container = document.getElementById("menuContainer");
-  MenuElements.searchInput = document.getElementById("searchInput");
-  MenuElements.mobileCartDrawer = document.getElementById("mobileCartDrawer");
-  MenuElements.closeCartBtn = document.getElementById("closeCartBtn");
-  MenuElements.mobileClearCartBtn = document.getElementById("mobileClearCartBtn");
-  MenuElements.cartList = document.getElementById("cartItems");
-  MenuElements.cartTotal = document.getElementById("cartTotalAmount");
-  
-  // Quantity footer elements
-  MenuElements.quantityFooter = document.getElementById('quantityFooter');
-  MenuElements.quantityItemName = document.getElementById('quantityItemName');
-  MenuElements.quantityVariantPrice = document.getElementById('quantityVariantPrice');
-  MenuElements.quantityDisplay = document.querySelector('.quantity-controls .quantity');
-  MenuElements.cancelBtn = document.querySelector('.quantity-footer .cancel-btn');
-  MenuElements.addToCartBtn = document.querySelector('.quantity-footer .add-to-cart-btn');
-  MenuElements.minusBtn = document.querySelector('.quantity-footer .minus');
-  MenuElements.plusBtn = document.querySelector('.quantity-footer .plus');
-  
-  // Initialize event listeners
-  if (MenuElements.cancelBtn) MenuElements.cancelBtn.addEventListener('click', hideQuantityFooter);
-  if (MenuElements.addToCartBtn) MenuElements.addToCartBtn.addEventListener('click', addFromFooter);
-  if (MenuElements.minusBtn) MenuElements.minusBtn.addEventListener('click', decreaseQuantity);
-  if (MenuElements.plusBtn) MenuElements.plusBtn.addEventListener('click', increaseQuantity);
+// Initialize menu
+async function initMenuPage() {
+  await initApp();
+  setupEventListeners();
+  await loadMenuFromFirestore();
+  updateCart();
 }
 
-// Load menu from Firestore with proper error handling
+// Load menu from Firestore
 async function loadMenuFromFirestore() {
   try {
     const menuCollection = collection(db, "menu");
     const snapshot = await getDocs(menuCollection);
     
-    // Clear existing menu data
+    // Clear existing data
     Object.keys(fullMenu).forEach(key => delete fullMenu[key]);
     
-    // Process each document
     snapshot.forEach(doc => {
-      try {
-        if (doc.exists()) {
-          const category = doc.id;
-          // Only add categories that are defined in AppState
-          if (AppState.MENU_CATEGORIES[category]) {
-            fullMenu[category] = doc.data().items;
-          }
-        }
-      } catch (docError) {
-        console.error(`Error processing document ${doc.id}:`, docError);
+      if (doc.exists() && AppState.MENU_CATEGORIES[doc.id]) {
+        fullMenu[doc.id] = doc.data().items;
       }
     });
     
     initializeTabs();
   } catch (error) {
-    console.error("Error loading menu:", error);
-    showNotification("Failed to load menu. Please refresh the page.");
+    console.error("Menu load error:", error);
+    showNotification("Failed to load menu. Please refresh.");
   }
 }
 
@@ -107,18 +79,19 @@ function initializeTabs() {
   
   Object.keys(fullMenu).forEach(category => {
     const tabBtn = document.createElement("button");
-    tabBtn.textContent = `${getCategoryIcon(category)} ${category}`;
+    tabBtn.innerHTML = `${getCategoryIcon(category)} ${category}`;
     tabBtn.dataset.category = category;
     tabBtn.addEventListener('click', () => {
-      if (MenuElements.searchInput) MenuElements.searchInput.value = '';
+      MenuElements.searchInput.value = '';
       renderCategory(category);
-      MenuElements.container.scrollIntoView({ behavior: 'smooth' });
-      document.querySelectorAll('#tabs button').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('#tabs button').forEach(btn => 
+        btn.classList.remove('active'));
       tabBtn.classList.add('active');
     });
     MenuElements.tabsDiv.appendChild(tabBtn);
   });
   
+  // Activate first tab
   const firstCategory = Object.keys(fullMenu)[0];
   if (firstCategory) {
     MenuElements.tabsDiv.querySelector('button').classList.add('active');
@@ -126,7 +99,7 @@ function initializeTabs() {
   }
 }
 
-// Render menu items for a category
+// Render category items
 function renderCategory(category, searchTerm = '') {
   if (!MenuElements.container || !fullMenu[category]) return;
   
@@ -148,7 +121,7 @@ function renderCategory(category, searchTerm = '') {
   });
 
   if (filteredItems.length === 0) {
-    MenuElements.container.innerHTML = '<div class="no-results">No items found matching your search.</div>';
+    MenuElements.container.innerHTML = '<div class="no-results">No matching items found</div>';
     return;
   }
 
@@ -156,26 +129,17 @@ function renderCategory(category, searchTerm = '') {
   itemsContainer.className = "menu-items";
   MenuElements.container.appendChild(itemsContainer);
 
-  filteredItems.forEach(item => {
-    try {
-      createMenuItem(item, itemsContainer, category);
-    } catch (itemError) {
-      console.error("Error creating menu item:", itemError);
-    }
-  });
+  filteredItems.forEach(item => createMenuItem(item, itemsContainer, category));
 }
 
-// Create a single menu item element
+// Create menu item element
 function createMenuItem(item, container, category) {
-  if (!item || !item.name || !item.variants) {
-    console.warn("Invalid menu item:", item);
-    return;
-  }
+  if (!item?.name || !item?.variants) return;
 
   const itemDiv = document.createElement("div");
   itemDiv.className = "menu-item";
   
-  // Check if item is available for current order type
+  // Check availability
   const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
   if (orderType && !isCategoryAvailableForOrderType(category, orderType)) {
     itemDiv.classList.add("disabled-item");
@@ -192,13 +156,14 @@ function createMenuItem(item, container, category) {
   const title = document.createElement("div");
   title.className = "menu-item-name";
   title.textContent = item.name;
+  itemDetails.appendChild(title);
   
   // Bengali name if available
   if (item.nameBn) {
-    const bn = document.createElement("div");
-    bn.className = "menu-item-name-bn";
-    bn.textContent = item.nameBn;
-    itemDetails.appendChild(bn);
+    const bnName = document.createElement("div");
+    bnName.className = "menu-item-name-bn";
+    bnName.textContent = item.nameBn;
+    itemDetails.appendChild(bnName);
   }
   
   // Description
@@ -227,10 +192,8 @@ function createMenuItem(item, container, category) {
     const label = document.createElement("label");
     label.htmlFor = input.id;
     label.textContent = `${variant} - ₹${price}`;
-    label.style.cursor = "pointer";
     
-    variantOption.appendChild(input);
-    variantOption.appendChild(label);
+    variantOption.append(input, label);
     variantDiv.appendChild(variantOption);
   });
   
@@ -243,16 +206,10 @@ function createMenuItem(item, container, category) {
   const addBtn = document.createElement("button");
   addBtn.className = "add-to-cart";
   addBtn.innerHTML = '<i class="fas fa-cart-plus"></i> Add';
-  addBtn.addEventListener('click', () => {
-    showQuantityFooter(item);
-  });
+  addBtn.addEventListener('click', () => showQuantityFooter(item));
 
   // Assemble item
-  itemDetails.appendChild(title);
-  itemDetails.appendChild(variantDiv);
-  itemDetails.appendChild(priceDiv);
-  itemDetails.appendChild(addBtn);
-  
+  itemDetails.append(variantDiv, priceDiv, addBtn);
   itemDiv.appendChild(itemDetails);
   container.appendChild(itemDiv);
   
@@ -274,7 +231,7 @@ function showQuantityFooter(item) {
   
   currentItem = item;
   currentVariant = selectedVariantInput.value;
-  currentPrice = parseInt(selectedVariantInput.dataset.price);
+  currentPrice = parseFloat(selectedVariantInput.dataset.price);
   currentQuantity = 1;
   
   MenuElements.quantityItemName.textContent = item.name;
@@ -306,213 +263,146 @@ function addFromFooter() {
   if (currentItem) {
     addToOrder(currentItem.name, currentVariant, currentPrice, currentQuantity);
     hideQuantityFooter();
-    showNotification(`${currentQuantity > 1 ? currentQuantity + 'x ' : ''}${currentItem.name} (${currentVariant}) added to cart!`);
+    showNotification(`${currentQuantity > 1 ? currentQuantity + 'x ' : ''}${currentItem.name} added to cart!`);
     if ('vibrate' in navigator) navigator.vibrate(30);
-    
-    // Show the cart drawer after adding an item
-    MenuElements.mobileCartDrawer.classList.add('active');
-    document.getElementById('cartOverlay').classList.add('active');
   }
 }
 
-// Add item to order with validation
+// Cart management
 function addToOrder(name, variant, price, quantity = 1) {
-  if (!name || !variant || !price || !quantity) {
-    console.error("Invalid item data:", {name, variant, price, quantity});
-    return;
-  }
+  if (!name || !variant || !price || !quantity) return;
 
-  try {
-    const existingItemIndex = AppState.selectedItems.findIndex(
-      item => item.name === name && item.variant === variant
-    );
-    
-    if (existingItemIndex !== -1) {
-      AppState.selectedItems[existingItemIndex].quantity += quantity;
-    } else {
-      AppState.selectedItems.push({ name, variant, price, quantity });
-    }
-    
-    updateCart();
-    saveCartToStorage();
-  } catch (error) {
-    console.error("Error adding to order:", error);
-    showNotification("Failed to add item to cart");
+  const existingItemIndex = AppState.selectedItems.findIndex(
+    item => item.name === name && item.variant === variant
+  );
+  
+  if (existingItemIndex !== -1) {
+    AppState.selectedItems[existingItemIndex].quantity += quantity;
+  } else {
+    AppState.selectedItems.push({ name, variant, price, quantity });
   }
+  
+  updateCart();
+  saveCartToStorage();
 }
 
-// Update cart display with validation
 function updateCart() {
   if (!MenuElements.cartList) return;
   
-  try {
-    MenuElements.cartList.innerHTML = "";
+  MenuElements.cartList.innerHTML = "";
+  
+  if (AppState.selectedItems.length === 0) {
+    MenuElements.cartList.innerHTML = '<li class="empty-cart">Your cart is empty</li>';
+    updateCartDisplays(0, 0);
+    return;
+  }
+  
+  let itemCount = 0;
+  const subtotal = AppState.selectedItems.reduce((sum, item) => {
+    itemCount += item.quantity || 1;
+    return sum + (item.price * (item.quantity || 1));
+  }, 0);
+  
+  AppState.selectedItems.forEach((item, index) => {
+    const li = document.createElement("li");
+    li.className = "cart-item";
     
-    if (AppState.selectedItems.length === 0) {
-      const emptyCart = document.createElement("li");
-      emptyCart.className = "empty-cart";
-      emptyCart.textContent = "Your cart is empty";
-      MenuElements.cartList.appendChild(emptyCart);
-      
-      // Update all total displays
-      if (document.getElementById('cartTotalAmount')) {
-        document.getElementById('cartTotalAmount').textContent = '0';
-      }
-      if (document.getElementById('totalItemCount')) {
-        document.getElementById('totalItemCount').textContent = '0';
-      }
-      if (document.getElementById('cartItemCount')) {
-        document.getElementById('cartItemCount').textContent = '0';
-      }
-      
-      const totalDisplay = document.querySelector('.mobile-total-display');
-      if (totalDisplay) {
-        totalDisplay.querySelector('.total-items').textContent = '0 items';
-        totalDisplay.querySelector('.total-amount').textContent = '₹0';
-      }
-      
-      return;
-    }
+    li.innerHTML = `
+      <span class="cart-item-name">${item.name} (${item.variant}) x ${item.quantity}</span>
+      <span class="cart-item-price">₹${item.price * item.quantity}</span>
+      <button class="cart-item-remove" data-index="${index}">
+        <i class="fas fa-trash"></i>
+      </button>
+    `;
     
-    let itemCount = 0;
-    const subtotal = AppState.selectedItems.reduce((sum, item) => {
-      itemCount += item.quantity || 1;
-      return sum + (item.price * (item.quantity || 1));
-    }, 0);
-    
-    AppState.selectedItems.forEach((item, index) => {
-      const li = document.createElement("li");
-      li.className = "cart-item";
-      
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "cart-item-name";
-      nameSpan.textContent = `${item.name} (${item.variant}) x ${item.quantity}`;
-      
-      const priceSpan = document.createElement("span");
-      priceSpan.className = "cart-item-price";
-      priceSpan.textContent = `₹${item.price * item.quantity}`;
-      
-      const controlsDiv = document.createElement("div");
-      controlsDiv.className = "cart-item-controls";
-      
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "cart-item-remove";
-      removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
-      removeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        AppState.selectedItems.splice(index, 1);
-        updateCart();
-        showNotification("Item removed from cart");
-        saveCartToStorage();
-      });
-      
-      controlsDiv.appendChild(removeBtn);
-      li.appendChild(nameSpan);
-      li.appendChild(priceSpan);
-      li.appendChild(controlsDiv);
-      MenuElements.cartList.appendChild(li);
-    });
+    MenuElements.cartList.appendChild(li);
+  });
 
-    // Update all total displays
-    if (document.getElementById('cartTotalAmount')) {
-      document.getElementById('cartTotalAmount').textContent = subtotal;
-    }
-    if (document.getElementById('totalItemCount')) {
-      document.getElementById('totalItemCount').textContent = itemCount;
-    }
-    if (document.getElementById('cartItemCount')) {
-      document.getElementById('cartItemCount').textContent = itemCount;
-    }
-    
-    const totalDisplay = document.querySelector('.mobile-total-display');
-    if (totalDisplay) {
-      const itemsText = itemCount === 1 ? '1 item' : `${itemCount} items`;
-      totalDisplay.querySelector('.total-items').textContent = itemsText;
-      totalDisplay.querySelector('.total-amount').textContent = `₹${subtotal}`;
-    }
+  updateCartDisplays(itemCount, subtotal);
+}
 
-    updateCartBadge();
-    
-    if (MenuElements.mobileClearCartBtn) {
-      MenuElements.mobileClearCartBtn.disabled = AppState.selectedItems.length === 0;
-    }
-    
-    if (document.getElementById('mobileCheckoutBtn')) {
-      document.getElementById('mobileCheckoutBtn').style.display = 
-        AppState.selectedItems.length > 0 ? 'block' : 'none';
-    }
-  } catch (error) {
-    console.error("Error updating cart:", error);
-    showNotification("Error updating cart display");
+function updateCartDisplays(itemCount, subtotal) {
+  // Update all cart displays
+  document.getElementById('cartTotalAmount').textContent = subtotal.toFixed(2);
+  document.getElementById('totalItemCount').textContent = itemCount;
+  document.getElementById('cartItemCount').textContent = itemCount;
+  
+  const totalDisplay = document.querySelector('.mobile-total-display');
+  if (totalDisplay) {
+    totalDisplay.querySelector('.total-items').textContent = 
+      `${itemCount} ${itemCount === 1 ? 'item' : 'items'}`;
+    totalDisplay.querySelector('.total-amount').textContent = `₹${subtotal.toFixed(2)}`;
+  }
+
+  updateCartBadge();
+  
+  if (MenuElements.mobileClearCartBtn) {
+    MenuElements.mobileClearCartBtn.disabled = AppState.selectedItems.length === 0;
+  }
+  
+  if (document.getElementById('mobileCheckoutBtn')) {
+    document.getElementById('mobileCheckoutBtn').style.display = 
+      AppState.selectedItems.length > 0 ? 'block' : 'none';
   }
 }
 
-// Initialize the menu page
-function initMenuPage() {
-  try {
-    initMenuDOMElements();
-    updateCart();
-    loadMenuFromFirestore();
-    
-    // Cart button event listener
-    document.getElementById('mobileCartBtn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      MenuElements.mobileCartDrawer.classList.toggle('active');
-      document.getElementById('cartOverlay').classList.toggle('active');
-    });
-    
-    // Overlay click handler
-    document.getElementById('cartOverlay').addEventListener('click', () => {
+// Event listeners
+function setupEventListeners() {
+  // Cart toggle
+  document.getElementById('mobileCartBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    MenuElements.mobileCartDrawer.classList.toggle('active');
+    document.getElementById('cartOverlay').classList.toggle('active');
+  });
+  
+  // Overlay click
+  document.getElementById('cartOverlay').addEventListener('click', () => {
+    MenuElements.mobileCartDrawer.classList.remove('active');
+    document.getElementById('cartOverlay').classList.remove('active');
+  });
+  
+  // Close cart
+  if (MenuElements.closeCartBtn) {
+    MenuElements.closeCartBtn.addEventListener('click', () => {
       MenuElements.mobileCartDrawer.classList.remove('active');
       document.getElementById('cartOverlay').classList.remove('active');
     });
-    
-    if (MenuElements.closeCartBtn) {
-      MenuElements.closeCartBtn.addEventListener('click', () => {
-        MenuElements.mobileCartDrawer.classList.remove('active');
-        document.getElementById('cartOverlay').classList.remove('active');
-      });
-    }
-    
-    if (MenuElements.mobileClearCartBtn) {
-      MenuElements.mobileClearCartBtn.addEventListener('click', () => {
-        if (AppState.selectedItems.length > 0 && confirm('Are you sure you want to clear your cart?')) {
-          AppState.selectedItems.length = 0;
-          updateCart();
-          showNotification('Cart cleared');
-          saveCartToStorage();
-          if ('vibrate' in navigator) navigator.vibrate(50);
-        }
-      });
-    }
-    
-    if (MenuElements.searchInput) {
-      MenuElements.searchInput.addEventListener('input', (e) => {
-        const activeTab = document.querySelector('#tabs button.active');
-        if (activeTab) renderCategory(activeTab.dataset.category, e.target.value);
-      });
-    }
-
-    // Update menu items when order type changes
-    document.querySelectorAll('input[name="orderType"]').forEach(radio => {
-      radio.addEventListener('change', () => {
-        const activeTab = document.querySelector('#tabs button.active');
-        if (activeTab) renderCategory(activeTab.dataset.category);
-      });
-    });
-  } catch (error) {
-    console.error("Error initializing menu page:", error);
-    showNotification("Failed to initialize menu");
   }
+  
+  // Clear cart
+  if (MenuElements.mobileClearCartBtn) {
+    MenuElements.mobileClearCartBtn.addEventListener('click', () => {
+      if (AppState.selectedItems.length > 0 && confirm('Clear your cart?')) {
+        AppState.selectedItems = [];
+        updateCart();
+        showNotification('Cart cleared');
+        saveCartToStorage();
+      }
+    });
+  }
+  
+  // Search
+  if (MenuElements.searchInput) {
+    MenuElements.searchInput.addEventListener('input', (e) => {
+      const activeTab = document.querySelector('#tabs button.active');
+      if (activeTab) renderCategory(activeTab.dataset.category, e.target.value);
+    });
+  }
+
+  // Order type change
+  document.querySelectorAll('input[name="orderType"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const activeTab = document.querySelector('#tabs button.active');
+      if (activeTab) renderCategory(activeTab.dataset.category);
+    });
+  });
+  
+  // Quantity controls
+  if (MenuElements.cancelBtn) MenuElements.cancelBtn.addEventListener('click', hideQuantityFooter);
+  if (MenuElements.addToCartBtn) MenuElements.addToCartBtn.addEventListener('click', addFromFooter);
+  if (MenuElements.minusBtn) MenuElements.minusBtn.addEventListener('click', decreaseQuantity);
+  if (MenuElements.plusBtn) MenuElements.plusBtn.addEventListener('click', increaseQuantity);
 }
 
-// Start the application
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    initApp();
-    initMenuPage();
-  } catch (error) {
-    console.error("Failed to initialize application:", error);
-    showNotification("Failed to load application");
-  }
-});
+// Initialize
+document.addEventListener('DOMContentLoaded', initMenuPage);
