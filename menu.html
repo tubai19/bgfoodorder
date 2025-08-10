@@ -9,47 +9,51 @@
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
+  
+  <!-- Preload critical resources -->
+  <link rel="preload" href="/js/main.js" as="script">
+  <link rel="preload" href="/css/styles.css" as="style">
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
     <div class="logo-container">
-      <a href="index.html" class="back-button"><i class="fas fa-arrow-left"></i></a>
+      <a href="index.html" class="back-button" aria-label="Go back"><i class="fas fa-arrow-left"></i></a>
       <div class="logo">Our Menu</div>
-      <div class="mobile-cart-icon" id="mobileCartBtn">
+      <div class="mobile-cart-icon" id="mobileCartBtn" aria-label="Cart" role="button">
         <i class="fas fa-shopping-cart"></i>
-        <span class="cart-badge">0</span>
+        <span class="cart-badge" aria-live="polite">0</span>
       </div>
     </div>
   </header>
 
   <div id="statusBanner" class="status-banner">
     <div id="shopStatusBanner" class="status-item">
-      <i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span>
+      <i class="fas fa-store" aria-hidden="true"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span>
     </div>
     <div id="deliveryStatusBanner" class="status-item">
-      <i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span>
+      <i class="fas fa-truck" aria-hidden="true"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span>
     </div>
   </div>
 
   <div class="mobile-container">
     <div id="mobileSearchContainer">
-      <i class="fas fa-search"></i>
-      <input type="text" id="searchInput" placeholder="Search menu items..." class="mobile-search">
+      <i class="fas fa-search" aria-hidden="true"></i>
+      <input type="text" id="searchInput" placeholder="Search menu items..." class="mobile-search" aria-label="Search menu">
     </div>
     
-    <div id="tabs" class="mobile-category-nav"></div>
+    <div id="tabs" class="mobile-category-nav" role="tablist"></div>
     
     <div id="menuContainer" class="mobile-menu-container"></div>
   </div>
 
   <!-- Cart Drawer -->
-  <div id="mobileCartDrawer" class="mobile-cart-drawer">
+  <div id="mobileCartDrawer" class="mobile-cart-drawer" aria-modal="true">
     <div class="drawer-header">
       <h3>Your Order <span class="cart-count">(<span id="cartItemCount">0</span>)</span></h3>
-      <button class="close-drawer" id="closeCartBtn">&times;</button>
+      <button class="close-drawer" id="closeCartBtn" aria-label="Close cart">&times;</button>
     </div>
     <div class="drawer-content">
-      <ul id="cartItems" class="mobile-cart-items">
+      <ul id="cartItems" class="mobile-cart-items" role="list">
         <!-- Cart items will be inserted here dynamically -->
       </ul>
       <div class="mobile-total-display">
@@ -58,8 +62,8 @@
       </div>
     </div>
     <div class="drawer-footer">
-      <button id="mobileClearCartBtn" class="mobile-clear-btn"><i class="fas fa-trash"></i> Clear</button>
-      <a href="checkout.html" id="mobileCheckoutBtn" class="mobile-checkout-btn"><i class="fas fa-shopping-bag"></i> Checkout</a>
+      <button id="mobileClearCartBtn" class="mobile-clear-btn"><i class="fas fa-trash" aria-hidden="true"></i> Clear</button>
+      <a href="checkout.html" id="mobileCheckoutBtn" class="mobile-checkout-btn"><i class="fas fa-shopping-bag" aria-hidden="true"></i> Checkout</a>
     </div>
   </div>
 
@@ -75,9 +79,9 @@
       </div>
       <div class="quantity-controls-container">
         <div class="quantity-controls">
-          <button class="quantity-btn minus">−</button>
-          <span class="quantity">1</span>
-          <button class="quantity-btn plus">+</button>
+          <button class="quantity-btn minus" aria-label="Decrease quantity">−</button>
+          <span class="quantity" aria-live="polite">1</span>
+          <button class="quantity-btn plus" aria-label="Increase quantity">+</button>
         </div>
       </div>
       <div class="quantity-footer-actions">
@@ -99,34 +103,51 @@
   </footer>
 
   <div class="mobile-notification" id="notification">
-    <i class="fas fa-check-circle"></i>
+    <i class="fas fa-check-circle" aria-hidden="true"></i>
     <span id="notificationText">Item added to cart!</span>
   </div>
 
-  <script type="module" src="/js/main.js"></script>
-  <script type="module" src="/js/menu.js"></script>
+  <!-- Screen reader notifications -->
+  <div id="a11y-notification" aria-live="polite" class="sr-only"></div>
 
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then(registration => {
-          console.log('ServiceWorker registration successful with scope:', registration.scope);
-        })
-        .catch(err => {
-          console.log('ServiceWorker registration failed:', err);
-        });
+  <!-- JS -->
+  <script src="/js/idb.js" defer></script>
+  <script type="module" src="/js/main.js" defer></script>
+  <script type="module" src="/js/menu.js" defer></script>
+
+  <script>
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => {
+            console.log('ServiceWorker registered:', reg.scope);
+            reg.sync.register('submit-order');
+          })
+          .catch(err => console.error('ServiceWorker failed:', err));
+      });
+    }
+
+    // Offline detection
+    window.addEventListener('online', () => {
+      document.querySelector('.offline-indicator')?.style.display = 'none';
     });
-  }
 
-  window.addEventListener('online', () => {
-    document.querySelector('.offline-indicator')?.style.display = 'none';
-  });
+    window.addEventListener('offline', () => {
+      document.querySelector('.offline-indicator')?.style.display = 'block';
+    });
 
-  window.addEventListener('offline', () => {
-    document.querySelector('.offline-indicator')?.style.display = 'block';
-  });
-</script>
-
+    // Error logging
+    window.addEventListener('error', (e) => {
+      fetch('/api/log-error', {
+        method: 'POST',
+        body: JSON.stringify({
+          error: e.message,
+          stack: e.error?.stack,
+          url: window.location.href
+        })
+      });
+    });
+  </script>
 </body>
 </html>

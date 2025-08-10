@@ -1,37 +1,10 @@
-// sw.js - Service Worker with Firebase Messaging (ES Module)
-const VERSION = '1.0.4';
-const CACHE_NAME = `bake-and-grill-${VERSION}`;
-const API_CACHE_NAME = `${CACHE_NAME}-api`;
-const OFFLINE_URL = 'offline.html';
-const CACHE_TIMEOUT = 5000;
+// sw.js - Unified Service Worker (PWA + FCM)
 
-const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/menu.html',
-  '/checkout.html',
-  '/offline.html',
-  '/css/styles.css',
-  '/js/main.js',
-  '/js/menu.js',
-  '/js/checkout.js',
-  '/js/leaflet.js',
-  '/js/Control.Geocoder.js',
-  '/js/jspdf.umd.min.js',
-  '/js/jspdf.plugin.autotable.min.js',
-  '/css/fontawesome.min.css',
-  '/css/leaflet.css',
-  '/webfonts/fa-solid-900.woff2',
-  '/webfonts/fa-brands-400.woff2',
-  '/images/android-chrome-192x192.png',
-  '/images/android-chrome-512x512.png'
-];
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
-// Import Firebase as ES modules
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js';
-import { getMessaging } from 'https://www.gstatic.com/firebasejs/9.6.10/firebase-messaging-compat.js';
-
-const firebaseApp = initializeApp({
+// Firebase configuration
+firebase.initializeApp({
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
   authDomain: "bakeandgrill-44c25.firebaseapp.com",
   projectId: "bakeandgrill-44c25",
@@ -41,181 +14,174 @@ const firebaseApp = initializeApp({
   measurementId: "G-SLG2R88J72"
 });
 
-const messaging = getMessaging(firebaseApp);
-const displayedNotifications = new Set();
+const messaging = firebase.messaging();
 
-// Background message handler
+// Handle background messages
 messaging.onBackgroundMessage((payload) => {
-  console.log('[sw.js] Received background message:', payload);
-  handlePushNotification(payload);
+  console.log('[SW] Received background message: ', payload);
+  
+  const notificationTitle = payload.notification?.title || 'New message from Bake & Grill';
+  const notificationOptions = {
+    body: payload.notification?.body || 'You have a new update',
+    icon: payload.notification?.icon || '/icons/icon-192x192.png',
+    data: payload.data || {}
+  };
+
+  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Install event - cache app shell
+// PWA Caching Configuration
+const CACHE_VERSION = 'v3';
+const CACHE_NAME = `bake-grill-cache-${CACHE_VERSION}`;
+const OFFLINE_URL = '/offline.html';
+
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/menu.html',
+  '/checkout.html',
+  '/css/styles.css',
+  '/css/fontawesome.min.css',
+  '/js/main.js',
+  '/js/checkout.js',
+  '/js/menu.js',
+  '/js/idb.js',
+  '/favicon.png',
+  '/manifest.json',
+  OFFLINE_URL
+];
+
+// Install event - Cache all static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('ServiceWorker: Caching app shell');
-        return cache.addAll(PRECACHE_URLS);
-      })
+      .then((cache) => cache.addAll(ASSETS))
       .then(() => self.skipWaiting())
-      .catch((error) => {
-        console.error('ServiceWorker: Installation failed:', error);
-      })
   );
 });
 
-// Activate event - clean old caches
+// Activate event - Clean up old caches
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME, API_CACHE_NAME];
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
+    caches.keys().then((keys) => 
       Promise.all(
-        cacheNames.map((name) => {
-          if (!cacheWhitelist.includes(name)) {
-            console.log('ServiceWorker: Deleting old cache', name);
-            return caches.delete(name);
-          }
-        })
+        keys.map((key) => 
+          key !== CACHE_NAME ? caches.delete(key) : null
+        )
       )
     ).then(() => self.clients.claim())
   );
 });
 
-// Fetch event handler
+// Fetch event - Network first with cache fallback
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') return;
+  
+  // Skip Firebase-related requests
+  if (event.request.url.includes('firestore.googleapis.com') || 
+      event.request.url.includes('firebasestorage.googleapis.com')) {
     return;
   }
 
-  // Handle navigation requests
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
-    );
-    return;
-  }
-
-  // API requests
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(networkFirstThenCache(event.request, API_CACHE_NAME));
-    return;
-  }
-
-  // Static assets
-  event.respondWith(cacheFirstThenNetwork(event.request));
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // Cache successful responses
+        if (response && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, responseToCache));
+        }
+        return response;
+      })
+      .catch(() => {
+        // Return cached version or offline page
+        return caches.match(event.request)
+          .then((response) => response || caches.match(OFFLINE_URL));
+      })
+  );
 });
 
-// Cache strategies
-async function cacheFirstThenNetwork(request) {
+// Sync event - Handle background sync for failed orders
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'submit-order') {
+    event.waitUntil(retryFailedOrders());
+  }
+});
+
+// Background sync handler
+async function retryFailedOrders() {
   try {
-    const cache = await caches.open(CACHE_NAME);
-    const cachedResponse = await cache.match(request);
+    const db = await openDB('syncQueue', 1);
+    const orders = await db.getAll('pendingOrders');
     
-    if (cachedResponse) return cachedResponse;
-    
-    const networkResponse = await fetchWithTimeout(request);
-    if (networkResponse?.ok) {
-      await cache.put(request, networkResponse.clone());
+    for (const order of orders) {
+      try {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(order)
+        });
+        
+        if (response.ok) {
+          await db.delete('pendingOrders', order.id);
+        }
+      } catch (error) {
+        console.error('Sync failed for order:', order.id, error);
+      }
     }
-    return networkResponse || caches.match(OFFLINE_URL);
   } catch (error) {
-    return caches.match(OFFLINE_URL);
+    console.error('Error accessing sync queue:', error);
   }
 }
 
-async function networkFirstThenCache(request, cacheName = API_CACHE_NAME) {
-  try {
-    const networkResponse = await fetchWithTimeout(request);
-    if (networkResponse?.ok) {
-      const cache = await caches.open(cacheName);
-      await cache.put(request, networkResponse.clone());
-    }
-    return networkResponse;
-  } catch (error) {
-    const cache = await caches.open(cacheName);
-    const cachedResponse = await cache.match(request);
-    return cachedResponse || (request.url.includes('/api/') 
-      ? new Response(JSON.stringify({ error: 'You are offline' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' }
-      })
-      : caches.match(OFFLINE_URL));
-  }
-}
-
-async function fetchWithTimeout(request) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CACHE_TIMEOUT);
-  
-  try {
-    return await fetch(request, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// Notification handlers
-function handlePushNotification(payload) {
-  const notificationId = payload.data?.orderId 
-    ? `${payload.data.orderId}-${payload.data.status || Date.now()}` 
-    : `notification-${Date.now()}`;
-
-  if (displayedNotifications.has(notificationId)) return;
-  displayedNotifications.add(notificationId);
-  if (displayedNotifications.size > 100) displayedNotifications.clear();
-
-  const notificationTitle = payload.notification?.title || 
-    payload.data?.title || 'Order Update';
-  
-  const notificationBody = payload.notification?.body || 
-    payload.data?.body || 'Your order status has changed';
-
-  const notificationOptions = {
-    body: notificationBody,
-    icon: '/images/android-chrome-192x192.png',
-    badge: '/images/android-chrome-192x192.png',
-    data: {
-      url: payload.data?.url || '/',
-      orderId: payload.data?.orderId,
-      status: payload.data?.status,
-      ...payload.data
-    },
-    tag: notificationId,
-    vibrate: [200, 100, 200]
-  };
-
-  return self.registration.showNotification(notificationTitle, notificationOptions)
-    .catch((error) => console.error('Failed to show notification:', error));
-}
-
+// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  
+  const urlToOpen = event.notification.data?.url || '/';
   
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((windowClients) => {
-        const matchingClient = windowClients.find((client) => client.url === targetUrl);
-        return matchingClient ? matchingClient.focus() : clients.openWindow(targetUrl);
-      })
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then((clientList) => {
+      // Focus on existing tab if already open
+      for (const client of clientList) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      
+      // Open new tab if none exists
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
   );
 });
 
-self.addEventListener('pushsubscriptionchange', (event) => {
-  event.waitUntil(
-    messaging.getToken()
-      .then((newToken) => {
-        console.log('Push subscription renewed:', newToken);
-        return fetch('/api/update-subscription', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            oldToken: event.oldSubscription.endpoint,
-            newToken: newToken
-          })
-        });
-      })
-      .catch((error) => console.error('Error renewing push subscription:', error))
-  );
-});
+// Helper function for IndexedDB
+function openDB(name, version) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(name, version);
+    
+    request.onerror = (event) => {
+      reject('Database error: ' + event.target.errorCode);
+    };
+    
+    request.onsuccess = (event) => {
+      resolve(event.target.result);
+    };
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('pendingOrders')) {
+        db.createObjectStore('pendingOrders', { keyPath: 'id' });
+      }
+    };
+  });
+}
