@@ -1,144 +1,140 @@
-// sw.js - Unified Service Worker (PWA + FCM)
-
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
-
-// Firebase configuration
-firebase.initializeApp({
-  apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
-  authDomain: "bakeandgrill-44c25.firebaseapp.com",
-  projectId: "bakeandgrill-44c25",
-  storageBucket: "bakeandgrill-44c25.appspot.com",
-  messagingSenderId: "713279633359",
-  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
-  measurementId: "G-SLG2R88J72"
-});
-
-const messaging = firebase.messaging();
-
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] Received background message: ', payload);
-  
-  const notificationTitle = payload.notification?.title || 'New message from Bake & Grill';
-  const notificationOptions = {
-    body: payload.notification?.body || 'You have a new update',
-    icon: payload.notification?.icon || '/icons/icon-192x192.png',
-    data: payload.data || {}
-  };
-
-  return self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// PWA Caching Configuration
-const CACHE_VERSION = 'v3';
-const CACHE_NAME = `bake-grill-cache-${CACHE_VERSION}`;
+// sw.js - Service Worker with PWA and FCM support
+const CACHE_VERSION = 'v4';
+const CACHE_NAME = `bake-grill-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
-
-const ASSETS = [
+const CACHEABLE_ASSETS = [
   '/',
   '/index.html',
   '/menu.html',
   '/checkout.html',
+  '/offline.html',
   '/css/styles.css',
   '/css/fontawesome.min.css',
   '/js/main.js',
-  '/js/checkout.js',
   '/js/menu.js',
+  '/js/checkout.js',
   '/js/idb.js',
   '/favicon.png',
-  '/manifest.json',
-  OFFLINE_URL
+  '/manifest.json'
 ];
 
-// Install event - Cache all static assets
+// Install - Cache assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
+      .then(cache => {
+        console.log('[SW] Caching core assets');
+        return cache.addAll(CACHEABLE_ASSETS);
+      })
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate event - Clean up old caches
+// Activate - Clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => 
-      Promise.all(
-        keys.map((key) => 
-          key !== CACHE_NAME ? caches.delete(key) : null
-        )
-      )
-    ).then(() => self.clients.claim())
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cache => {
+          if (cache !== CACHE_NAME) {
+            console.log('[SW] Removing old cache:', cache);
+            return caches.delete(cache);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
-// Fetch event - Network first with cache fallback
+// Fetch - Network first with cache fallback
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') return;
-  
-  // Skip Firebase-related requests
-  if (event.request.url.includes('firestore.googleapis.com') || 
-      event.request.url.includes('firebasestorage.googleapis.com')) {
+  // Skip non-GET and external requests
+  if (event.request.method !== 'GET' || 
+      !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
+  // API requests - Network only
+  if (event.request.url.includes('/api/')) {
+    return;
+  }
+
+  // Navigation requests - Network first with offline fallback
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => caches.match(OFFLINE_URL))
+    );
+    return;
+  }
+
+  // Static assets - Cache first with network fallback
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Cache successful responses
-        if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => cache.put(event.request, responseToCache));
-        }
-        return response;
-      })
-      .catch(() => {
-        // Return cached version or offline page
-        return caches.match(event.request)
-          .then((response) => response || caches.match(OFFLINE_URL));
+    caches.match(event.request)
+      .then(cachedResponse => {
+        return cachedResponse || fetch(event.request)
+          .then(networkResponse => {
+            // Cache successful responses
+            if (networkResponse && networkResponse.status === 200) {
+              const clone = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+            }
+            return networkResponse;
+          });
       })
   );
 });
 
-// Sync event - Handle background sync for failed orders
+// Background Sync
 self.addEventListener('sync', (event) => {
   if (event.tag === 'submit-order') {
     event.waitUntil(retryFailedOrders());
   }
 });
 
-// Background sync handler
 async function retryFailedOrders() {
   try {
-    const db = await openDB('syncQueue', 1);
-    const orders = await db.getAll('pendingOrders');
-    
-    for (const order of orders) {
+    const cache = await caches.open(CACHE_NAME);
+    const response = await cache.match('/api/pending-orders');
+    if (!response) return;
+
+    const pendingOrders = await response.json();
+    for (const order of pendingOrders) {
       try {
-        const response = await fetch('/api/orders', {
+        const result = await fetch('/api/orders', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(order)
         });
-        
-        if (response.ok) {
-          await db.delete('pendingOrders', order.id);
+        if (result.ok) {
+          // Remove from pending
+          pendingOrders.splice(pendingOrders.indexOf(order), 1);
         }
-      } catch (error) {
-        console.error('Sync failed for order:', order.id, error);
+      } catch (err) {
+        console.error('[SW] Order sync failed:', err);
       }
     }
-  } catch (error) {
-    console.error('Error accessing sync queue:', error);
+    
+    // Update pending orders cache
+    await cache.put('/api/pending-orders', new Response(JSON.stringify(pendingOrders)));
+  } catch (err) {
+    console.error('[SW] Sync error:', err);
   }
 }
 
-// Notification click handler
+// Push Notifications
+self.addEventListener('push', (event) => {
+  const payload = event.data?.json() || {};
+  const title = payload.notification?.title || 'Bake & Grill';
+  const options = {
+    body: payload.notification?.body || 'You have a new update',
+    icon: payload.notification?.icon || '/icons/icon-192x192.png',
+    data: payload.data || {}
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
@@ -148,8 +144,8 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({
       type: 'window',
       includeUncontrolled: true
-    }).then((clientList) => {
-      // Focus on existing tab if already open
+    }).then(clientList => {
+      // Focus on existing tab if open
       for (const client of clientList) {
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
@@ -163,25 +159,3 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
-
-// Helper function for IndexedDB
-function openDB(name, version) {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(name, version);
-    
-    request.onerror = (event) => {
-      reject('Database error: ' + event.target.errorCode);
-    };
-    
-    request.onsuccess = (event) => {
-      resolve(event.target.result);
-    };
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains('pendingOrders')) {
-        db.createObjectStore('pendingOrders', { keyPath: 'id' });
-      }
-    };
-  });
-}
