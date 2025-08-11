@@ -53,17 +53,23 @@ async function initMenuPage() {
 async function loadMenuFromFirestore() {
   try {
     console.log("Loading menu from Firestore...");
-    const querySnapshot = await getDocs(collection(AppState.db, "menu"));
+    const categoriesSnapshot = await getDocs(collection(AppState.db, "menu"));
     
     Object.keys(fullMenu).forEach(key => delete fullMenu[key]);
     
-    querySnapshot.forEach((doc) => {
-      const category = doc.id;
+    // Process each category
+    for (const categoryDoc of categoriesSnapshot.docs) {
+      const category = categoryDoc.id;
       if (AppState.MENU_CATEGORIES[category]) {
-        fullMenu[category] = doc.data().items || [];
+        // Get items from the subcollection
+        const itemsSnapshot = await getDocs(
+          collection(AppState.db, "menu", category, "items")
+        );
+        
+        fullMenu[category] = itemsSnapshot.docs.map(doc => doc.data());
         console.log(`Loaded ${fullMenu[category].length} items for ${category}`);
       }
-    });
+    }
     
     if (Object.keys(fullMenu).length === 0) {
       console.warn("No menu categories found in Firestore");
