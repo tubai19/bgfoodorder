@@ -24,7 +24,19 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[SW] Caching core assets');
-        return cache.addAll(CACHEABLE_ASSETS);
+        return cache.addAll(CACHEABLE_ASSETS)
+          .catch(err => {
+            console.error('Failed to cache some assets:', err);
+            // Cache whatever we can
+            return Promise.all(
+              CACHEABLE_ASSETS.map(url => {
+                return cache.add(url).catch(e => {
+                  console.error(`Failed to cache ${url}`, e);
+                  return Promise.resolve();
+                });
+              })
+            );
+          });
       })
       .then(() => self.skipWaiting())
   );
@@ -56,7 +68,7 @@ self.addEventListener('fetch', (event) => {
 
   // API requests - Network only
   if (event.request.url.includes('/api/')) {
-    return;
+    return event.respondWith(fetch(event.request));
   }
 
   // Navigation requests - Network first with offline fallback
@@ -80,6 +92,12 @@ self.addEventListener('fetch', (event) => {
               caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
             }
             return networkResponse;
+          })
+          .catch(() => {
+            // If both fail, show offline page for HTML requests
+            if (event.request.headers.get('accept').includes('text/html')) {
+              return caches.match(OFFLINE_URL);
+            }
           });
       })
   );
@@ -88,6 +106,7 @@ self.addEventListener('fetch', (event) => {
 // Background Sync
 self.addEventListener('sync', (event) => {
   if (event.tag === 'submit-order') {
+    console.log('[SW] Background sync triggered for orders');
     event.waitUntil(retryFailedOrders());
   }
 });
@@ -96,27 +115,51 @@ async function retryFailedOrders() {
   try {
     const cache = await caches.open(CACHE_NAME);
     const response = await cache.match('/api/pending-orders');
-    if (!response) return;
+    if (!response) {
+      console.log('[SW] No pending orders found');
+      return;
+    }
 
     const pendingOrders = await response.json();
-    for (const order of pendingOrders) {
-      try {
-        const result = await fetch('/api/orders', {
+    if (!pendingOrders || !pendingOrders.length) {
+      console.log('[SW] No orders to sync');
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      pendingOrders.map(order => {
+        return fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(order)
+        }).then(result => {
+          if (result.ok) {
+            return { status: 'success', order };
+          }
+          return { status: 'failed', order };
         });
-        if (result.ok) {
-          // Remove from pending
-          pendingOrders.splice(pendingOrders.indexOf(order), 1);
-        }
-      } catch (err) {
-        console.error('[SW] Order sync failed:', err);
-      }
+      })
+    );
+
+    // Filter out successfully synced orders
+    const successfulOrders = results
+      .filter(r => r.value?.status === 'success')
+      .map(r => r.value.order);
+
+    if (successfulOrders.length > 0) {
+      console.log(`[SW] Successfully synced ${successfulOrders.length} orders`);
+      
+      // Update pending orders by removing successful ones
+      const updatedPendingOrders = pendingOrders.filter(order => 
+        !successfulOrders.some(so => so.id === order.id)
+      );
+      
+      // Update pending orders cache
+      await cache.put(
+        '/api/pending-orders',
+        new Response(JSON.stringify(updatedPendingOrders))
+      );
     }
-    
-    // Update pending orders cache
-    await cache.put('/api/pending-orders', new Response(JSON.stringify(pendingOrders)));
   } catch (err) {
     console.error('[SW] Sync error:', err);
   }
@@ -124,7 +167,13 @@ async function retryFailedOrders() {
 
 // Push Notifications
 self.addEventListener('push', (event) => {
-  const payload = event.data?.json() || {};
+  let payload;
+  try {
+    payload = event.data?.json();
+  } catch (e) {
+    payload = { notification: { title: 'Bake & Grill', body: 'You have a new update' } };
+  }
+
   const title = payload.notification?.title || 'Bake & Grill';
   const options = {
     body: payload.notification?.body || 'You have a new update',

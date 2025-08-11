@@ -122,7 +122,13 @@
         try {
           const registration = await navigator.serviceWorker.register('/sw.js');
           console.log('ServiceWorker registered:', registration.scope);
-          await registration.sync.register('submit-order');
+          
+          // Only register sync if available
+          if ('sync' in registration) {
+            await registration.sync.register('submit-order').catch(err => {
+              console.log('Background sync registration failed:', err);
+            });
+          }
         } catch (err) {
           console.error('ServiceWorker registration failed:', err);
         }
@@ -149,13 +155,14 @@
         timestamp: new Date().toISOString()
       };
       
-      if (navigator.onLine) {
-        fetch('/api/log-error', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(errorData)
-        }).catch(console.error);
+      // Log to console regardless
+      console.error('Application error:', errorData);
+      
+      if (window.idb) {
+        // Store in IndexedDB if available
+        idb.logError(errorData).catch(console.error);
       } else {
+        // Fallback to localStorage
         const errors = JSON.parse(localStorage.getItem('pendingErrors') || '[]');
         errors.push(errorData);
         localStorage.setItem('pendingErrors', JSON.stringify(errors));
