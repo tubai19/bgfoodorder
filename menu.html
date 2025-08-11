@@ -162,21 +162,39 @@
   <!-- Scripts -->
   <script src="/js/idb.js"></script>
   
-  <!-- Firebase Services -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage.js"></script>
+  <!-- Firebase Services - Updated to compat versions -->
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
   
   <!-- Google Analytics/Tag Manager -->
-  <script src="https://www.googletagmanager.com/gtag/js?id=G-SLG2R88J72" async></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SLG2R88J72"></script>
   
-  <!-- Font Awesome Kit -->
-  <script src="https://kit.fontawesome.com/your-actual-code-here.js" crossorigin="anonymous"></script>
+  <!-- Font Awesome Kit - Replace with your actual kit code -->
+  <script src="https://kit.fontawesome.com/YOUR_ACTUAL_KIT_CODE.js" crossorigin="anonymous"></script>
   
   <!-- Application Scripts -->
-  <script type="module" src="/js/main.js"></script>
-  <script type="module" src="/js/menu.js"></script>
+  <script type="module" src="/js/main.js" nonce="08e44295-49aa-40c6-b156-c7670d2756da"></script>
+  <script type="module" src="/js/menu.js" nonce="08e44295-49aa-40c6-b156-c7670d2756da"></script>
+
+  <!-- Initialize Firebase -->
+  <script nonce="08e44295-49aa-40c6-b156-c7670d2756da">
+    // Your Firebase configuration
+    const firebaseConfig = {
+  apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
+  authDomain: "bakeandgrill-44c25.firebaseapp.com",
+  projectId: "bakeandgrill-44c25",
+  storageBucket: "bakeandgrill-44c25.appspot.com",
+  messagingSenderId: "713279633359",
+  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
+  measurementId: "G-SLG2R88J72"
+
+    };
+    
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+  </script>
 </body>
 </html>
