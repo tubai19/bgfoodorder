@@ -35,7 +35,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // Application state
-const AppState = {
+export const AppState = {
   selectedItems: [],
   RESTAURANT_LOCATION: { lat: 22.3908, lng: 88.2189 },
   MAX_DELIVERY_DISTANCE: 8,
@@ -58,7 +58,8 @@ const AppState = {
   FeatureFlags: {
     FCM_ENABLED: true,
     OFFLINE_MODE: true
-  }
+  },
+  domElements: {}
 };
 
 // Initialize DOM elements
@@ -157,8 +158,8 @@ async function updateStatusDisplay() {
     }
   } catch (error) {
     console.error("Status update error:", error);
-    shopStatusText.textContent = 'Shop: Status Unknown';
-    deliveryStatusText.textContent = 'Delivery: Status Unknown';
+    if (shopStatusText) shopStatusText.textContent = 'Shop: Status Unknown';
+    if (deliveryStatusText) deliveryStatusText.textContent = 'Delivery: Status Unknown';
   }
 }
 
@@ -281,7 +282,6 @@ async function initApp() {
 export { 
   db,
   app,
-  AppState,
   initApp,
   saveCartToStorage,
   showNotification,

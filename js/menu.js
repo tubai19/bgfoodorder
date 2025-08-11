@@ -323,9 +323,15 @@ function updateCart() {
 
 function updateCartDisplays(itemCount, subtotal) {
   // Update all cart displays
-  document.getElementById('cartTotalAmount').textContent = subtotal.toFixed(2);
-  document.getElementById('totalItemCount').textContent = itemCount;
-  document.getElementById('cartItemCount').textContent = itemCount;
+  if (MenuElements.cartTotal) {
+    MenuElements.cartTotal.textContent = subtotal.toFixed(2);
+  }
+  
+  const totalItemCount = document.getElementById('totalItemCount');
+  const cartItemCount = document.getElementById('cartItemCount');
+  
+  if (totalItemCount) totalItemCount.textContent = itemCount;
+  if (cartItemCount) cartItemCount.textContent = itemCount;
   
   const totalDisplay = document.querySelector('.mobile-total-display');
   if (totalDisplay) {
@@ -349,17 +355,23 @@ function updateCartDisplays(itemCount, subtotal) {
 // Event listeners
 function setupEventListeners() {
   // Cart toggle
-  document.getElementById('mobileCartBtn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    MenuElements.mobileCartDrawer.classList.toggle('active');
-    document.getElementById('cartOverlay').classList.toggle('active');
-  });
+  const mobileCartBtn = document.getElementById('mobileCartBtn');
+  if (mobileCartBtn) {
+    mobileCartBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      MenuElements.mobileCartDrawer.classList.toggle('active');
+      document.getElementById('cartOverlay').classList.toggle('active');
+    });
+  }
   
   // Overlay click
-  document.getElementById('cartOverlay').addEventListener('click', () => {
-    MenuElements.mobileCartDrawer.classList.remove('active');
-    document.getElementById('cartOverlay').classList.remove('active');
-  });
+  const cartOverlay = document.getElementById('cartOverlay');
+  if (cartOverlay) {
+    cartOverlay.addEventListener('click', () => {
+      MenuElements.mobileCartDrawer.classList.remove('active');
+      cartOverlay.classList.remove('active');
+    });
+  }
   
   // Close cart
   if (MenuElements.closeCartBtn) {
