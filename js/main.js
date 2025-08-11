@@ -1,25 +1,4 @@
-// main.js - Core application module
-import { initializeApp } from "firebase/app";
-import { 
-  getFirestore,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  getDocs,
-  onSnapshot,
-  serverTimestamp,
-  query,
-  where
-} from "firebase/firestore";
-import { 
-  getMessaging,
-  getToken,
-  onMessage,
-  isSupported as isMessagingSupported
-} from "firebase/messaging";
-
-// Firebase config
+// Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
   authDomain: "bakeandgrill-44c25.firebaseapp.com",
@@ -31,11 +10,12 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const messaging = firebase.messaging.isSupported() ? firebase.messaging() : null;
 
 // Application state
-export const AppState = {
+const AppState = {
   selectedItems: [],
   RESTAURANT_LOCATION: { lat: 22.3908, lng: 88.2189 },
   MAX_DELIVERY_DISTANCE: 8,
@@ -79,22 +59,14 @@ function initDOMElements() {
 
 // Firebase Messaging
 async function initializeFirebaseMessaging() {
-  if (!AppState.FeatureFlags.FCM_ENABLED) return null;
+  if (!AppState.FeatureFlags.FCM_ENABLED || !messaging) return null;
   
   try {
-    const isSupported = await isMessagingSupported();
-    if (!isSupported) return null;
-
-    const messaging = getMessaging(app);
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return null;
 
-    const registration = await navigator.serviceWorker.ready;
-    if (!registration) return null;
-
-    const token = await getToken(messaging, {
-      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY',
-      serviceWorkerRegistration: registration
+    const token = await messaging.getToken({
+      vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY'
     });
 
     if (token) {
@@ -109,11 +81,10 @@ async function initializeFirebaseMessaging() {
 }
 
 function setupMessageHandler() {
-  if (!AppState.FeatureFlags.FCM_ENABLED) return;
+  if (!AppState.FeatureFlags.FCM_ENABLED || !messaging) return;
   
   try {
-    const messaging = getMessaging(app);
-    onMessage(messaging, (payload) => {
+    messaging.onMessage((payload) => {
       const notificationText = payload.notification?.body || 'New update from Bake & Grill';
       showNotification(notificationText);
     });
@@ -134,8 +105,8 @@ async function updateStatusDisplay() {
   if (!shopStatusText || !deliveryStatusText) return;
 
   try {
-    const docSnap = await getDoc(doc(db, 'publicStatus', 'current'));
-    if (docSnap.exists()) {
+    const docSnap = await db.collection('publicStatus').doc('current').get();
+    if (docSnap.exists) {
       AppState.currentStatus = docSnap.data();
     }
 
@@ -165,7 +136,8 @@ async function updateStatusDisplay() {
 
 function setupStatusListener() {
   try {
-    return onSnapshot(doc(db, 'publicStatus', 'current'), updateStatusDisplay);
+    return db.collection('publicStatus').doc('current')
+      .onSnapshot(updateStatusDisplay);
   } catch (error) {
     console.error("Status listener error:", error);
     return null;
@@ -261,12 +233,10 @@ async function initApp() {
     await updateStatusDisplay();
     setupStatusListener();
     
-    if (await isMessagingSupported()) {
-      setupMessageHandler();
-      if (Notification.permission === 'granted') {
-        await initializeFirebaseMessaging();
-      }
+    if (Notification.permission === 'granted') {
+      await initializeFirebaseMessaging();
     }
+    setupMessageHandler();
 
     // Global error handler
     window.addEventListener('error', (e) => {
@@ -279,23 +249,16 @@ async function initApp() {
 }
 
 // Exports
-export { 
-  db,
-  app,
-  initApp,
-  saveCartToStorage,
-  showNotification,
-  calculateHaversineDistance,
-  calculateDeliveryChargeByDistance,
-  getCategoryIcon,
-  isCategoryAvailableForOrderType,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  getDocs,
-  onSnapshot,
-  serverTimestamp,
-  query,
-  where
-};
+window.AppState = AppState;
+window.db = db;
+window.app = app;
+window.initApp = initApp;
+window.saveCartToStorage = saveCartToStorage;
+window.showNotification = showNotification;
+window.calculateHaversineDistance = calculateHaversineDistance;
+window.calculateDeliveryChargeByDistance = calculateDeliveryChargeByDistance;
+window.getCategoryIcon = getCategoryIcon;
+window.isCategoryAvailableForOrderType = isCategoryAvailableForOrderType;
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', initApp);
