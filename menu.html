@@ -4,109 +4,75 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Menu - Bake & Grill</title>
-  <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites.">
+  <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
   
-  <!-- Comprehensive CSP for Firebase and Google Services -->
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 
-      https://www.gstatic.com 
-      https://*.firebase.com 
-      https://*.firebaseio.com 
-      https://apis.google.com 
-      https://www.google.com 
-      https://www.google-analytics.com 
-      https://ssl.google-analytics.com 
-      https://tagmanager.google.com 
-      https://www.googletagmanager.com 
-      https://*.googleapis.com 
-      https://maps.googleapis.com 
-      https://kit.fontawesome.com 
-      https://static.cloudflareinsights.com
-      'nonce-08e44295-49aa-40c6-b156-c7670d2756da' 
-      'unsafe-eval';
-    style-src 'self' 
-      'unsafe-inline' 
-      https://kit.fontawesome.com 
-      https://fonts.googleapis.com;
-    img-src 'self' 
-      data: 
-      https://* 
-      http://* 
-      blob:;
-    font-src 'self' 
-      https://kit.fontawesome.com 
-      https://fonts.gstatic.com;
-    connect-src 'self' 
-      https://* 
-      wss://* 
-      ws://* 
-      http://localhost 
-      http://127.0.0.1 
-      https://www.googleapis.com 
-      https://*.googleapis.com 
-      https://*.firebaseio.com 
-      https://*.firebasedatabase.app 
-      https://*.firebaseapp.com 
-      https://*.firebase.com 
-      https://*.google.com
-      https://identitytoolkit.googleapis.com 
-      https://*.cloudfunctions.net
-      https://securetoken.googleapis.com 
-      https://www.google-analytics.com 
-      https://*.firebaseio.com 
-      https://*.firebasedatabase.app
-      https://stats.g.doubleclick.net;
-    frame-src 
-      https://*.google.com 
-      https://*.firebaseapp.com 
-      https://*.firebase.com 
-      https://*.googleapis.com;
-    object-src 'none';
-    media-src *;
-  ">
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bakeandgrill.com/menu.html">
+  <meta property="og:title" content="Menu - Bake & Grill">
+  <meta property="og:description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
+  <meta property="og:image" content="https://bakeandgrill.com/images/menu-share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://bakeandgrill.com/menu.html">
+  <meta property="twitter:title" content="Menu - Bake & Grill">
+  <meta property="twitter:description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
+  <meta property="twitter:image" content="https://bakeandgrill.com/images/menu-share.jpg">
 
-  <!-- CSS -->
-  <link rel="stylesheet" href="/css/fontawesome.min.css">
-  <link rel="stylesheet" href="/css/styles.css">
-  
-  <!-- Preload Font Awesome -->
-  <link rel="preconnect" href="https://kit.fontawesome.com">
+  <!-- Favicons and CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="mobile-view">
+  
   <header class="mobile-header">
     <div class="logo-container">
-      <a href="index.html" class="back-button" aria-label="Go back"><i class="fas fa-arrow-left"></i></a>
+      <a href="index.html" class="back-button"><i class="fas fa-arrow-left"></i></a>
       <div class="logo">Our Menu</div>
-      <div class="mobile-cart-icon" id="mobileCartBtn" aria-label="Cart" role="button">
+      <div class="mobile-cart-icon" id="mobileCartBtn">
         <i class="fas fa-shopping-cart"></i>
-        <span class="cart-badge" aria-live="polite">0</span>
+        <span class="cart-badge">0</span>
       </div>
     </div>
   </header>
 
   <div id="statusBanner" class="status-banner">
-    <div id="shopStatusBanner" class="status-item"><i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span></div>
-    <div id="deliveryStatusBanner" class="status-item"><i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span></div>
+    <div id="shopStatusBanner" class="status-item">
+      <i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span>
+    </div>
+    <div id="deliveryStatusBanner" class="status-item">
+      <i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span>
+    </div>
   </div>
 
   <div class="mobile-container">
     <div id="mobileSearchContainer">
       <i class="fas fa-search"></i>
-      <input type="text" id="searchInput" placeholder="Search menu items..." class="mobile-search" aria-label="Search menu">
+      <input type="text" id="searchInput" placeholder="Search pizzas, burgers, sandwiches..." class="mobile-search">
     </div>
-    <div id="tabs" class="mobile-category-nav" role="tablist"></div>
+    
+    <div id="tabs" class="mobile-category-nav"></div>
+    
+    <div id="deliveryRestriction" class="mobile-delivery-restriction" style="display:none;">
+      <i class="fas fa-exclamation-triangle"></i> Delivery not available to your location (beyond 8km). Please choose pickup.
+    </div>
+
     <div id="menuContainer" class="mobile-menu-container"></div>
   </div>
 
   <!-- Cart Drawer -->
   <div id="mobileCartDrawer" class="mobile-cart-drawer">
     <div class="drawer-header">
-      <h3>Your Order (<span id="cartItemCount">0</span>)</h3>
+      <h3>Your Order <span class="cart-count">(<span id="cartItemCount">0</span>)</span></h3>
       <button class="close-drawer" id="closeCartBtn">&times;</button>
     </div>
     <div class="drawer-content">
-      <ul id="cartItems" class="mobile-cart-items"></ul>
+      <ul id="cartItems" class="mobile-cart-items">
+        <!-- Cart items will be inserted here dynamically -->
+      </ul>
       <div class="mobile-total-display">
         <span class="total-items"><span id="totalItemCount">0</span> items</span>
         <span class="total-amount">₹<span id="cartTotalAmount">0</span></span>
@@ -118,21 +84,20 @@
     </div>
   </div>
 
+  <!-- Cart Overlay -->
   <div id="cartOverlay" class="cart-overlay"></div>
 
   <!-- Quantity Footer -->
   <div id="quantityFooter" class="quantity-footer">
     <div class="quantity-footer-content">
       <div class="quantity-footer-header">
-        <h4 id="quantityItemName" class="truncate">Item Name</h4>
+        <h4 id="quantityItemName">Item Name</h4>
         <p id="quantityVariantPrice">Variant - ₹0</p>
       </div>
-      <div class="quantity-controls-container">
-        <div class="quantity-controls">
-          <button class="quantity-btn minus">−</button>
-          <span class="quantity">1</span>
-          <button class="quantity-btn plus">+</button>
-        </div>
+      <div class="quantity-controls">
+        <button class="quantity-btn minus">−</button>
+        <span class="quantity">1</span>
+        <button class="quantity-btn plus">+</button>
       </div>
       <div class="quantity-footer-actions">
         <button class="cancel-btn">Cancel</button>
@@ -157,44 +122,7 @@
     <span id="notificationText">Item added to cart!</span>
   </div>
 
-  <div id="a11y-notification" aria-live="polite" class="sr-only"></div>
-
-  <!-- Scripts -->
-  <script src="/js/idb.js"></script>
-  
-  <!-- Firebase Services - Updated to compat versions -->
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
-  
-  <!-- Google Analytics/Tag Manager -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SLG2R88J72"></script>
-  
-  <!-- Font Awesome Kit - Replace with your actual kit code -->
-  <script src="https://kit.fontawesome.com/YOUR_ACTUAL_KIT_CODE.js" crossorigin="anonymous"></script>
-  
-  <!-- Application Scripts -->
-  <script type="module" src="/js/main.js" nonce="08e44295-49aa-40c6-b156-c7670d2756da"></script>
-  <script type="module" src="/js/menu.js" nonce="08e44295-49aa-40c6-b156-c7670d2756da"></script>
-
-  <!-- Initialize Firebase -->
-  <script nonce="08e44295-49aa-40c6-b156-c7670d2756da">
-    // Your Firebase configuration
-    const firebaseConfig = {
-  apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
-  authDomain: "bakeandgrill-44c25.firebaseapp.com",
-  projectId: "bakeandgrill-44c25",
-  storageBucket: "bakeandgrill-44c25.appspot.com",
-  messagingSenderId: "713279633359",
-  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
-  measurementId: "G-SLG2R88J72"
-
-    };
-    
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-  </script>
+  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/menu.js"></script>
 </body>
 </html>
