@@ -23,6 +23,11 @@
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -135,17 +140,17 @@
     <span id="notificationText">Notification message</span>
   </div>
 
-  <script type="module" src="/js/main.js"></script>
+  <script src="/js/main.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', {
-          type: 'module'
-        }).then(registration => {
-          console.log('ServiceWorker registered with scope:', registration.scope);
-        }).catch(err => {
-          console.log('ServiceWorker registration failed:', err);
-        });
+        navigator.serviceWorker.register('/sw.js')
+          .then(registration => {
+            console.log('ServiceWorker registered with scope:', registration.scope);
+          })
+          .catch(err => {
+            console.log('ServiceWorker registration failed:', err);
+          });
       });
     }
 

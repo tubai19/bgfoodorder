@@ -10,9 +10,9 @@
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
   
-  <!-- Preload critical resources -->
-  <link rel="preload" href="/js/main.js" as="script">
-  <link rel="preload" href="/css/styles.css" as="style">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -112,8 +112,8 @@
 
   <!-- JS -->
   <script src="/js/idb.js"></script>
-  <script type="module" src="/js/main.js"></script>
-  <script type="module" src="/js/menu.js"></script>
+  <script src="/js/main.js"></script>
+  <script src="/js/menu.js"></script>
 
   <script>
     // Service Worker Registration

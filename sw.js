@@ -1,4 +1,3 @@
-// sw.js - Service Worker with PWA and FCM support
 const CACHE_VERSION = 'v4';
 const CACHE_NAME = `bake-grill-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
@@ -24,19 +23,17 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[SW] Caching core assets');
-        return cache.addAll(CACHEABLE_ASSETS)
-          .catch(err => {
-            console.error('Failed to cache some assets:', err);
-            // Cache whatever we can
-            return Promise.all(
-              CACHEABLE_ASSETS.map(url => {
-                return cache.add(url).catch(e => {
-                  console.error(`Failed to cache ${url}`, e);
-                  return Promise.resolve();
-                });
+        return Promise.all(
+          CACHEABLE_ASSETS.map(url => {
+            return fetch(url)
+              .then(response => {
+                if (response.ok) return cache.put(url, response);
               })
-            );
-          });
+              .catch(err => {
+                console.error(`Failed to cache ${url}`, err);
+              });
+          })
+        );
       })
       .then(() => self.skipWaiting())
   );

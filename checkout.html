@@ -14,65 +14,16 @@
     gtag('config', 'G-SLG2R88J72');
   </script>
   
-  <!-- Content Security Policy -->
-  <meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src 'self' 
-    https://bakeandgrillorder.shop 
-    https://firestore.googleapis.com 
-    https://unpkg.com 
-    https://cdnjs.cloudflare.com 
-    https://www.gstatic.com
-    https://www.googletagmanager.com
-    https://www.google-analytics.com
-    https://static.cloudflareinsights.com
-    https://googleads.g.doubleclick.net
-    'unsafe-inline' 'unsafe-eval';
-  style-src 'self' 'unsafe-inline' 
-    https://fonts.googleapis.com
-    https://tagmanager.google.com
-    https://unpkg.com/leaflet@1.7.1/dist/leaflet.css;
-  img-src 'self' data: 
-    https://*.tile.openstreetmap.org
-    https://www.google-analytics.com
-    https://www.googletagmanager.com
-    https://stats.g.doubleclick.net
-    https://unpkg.com/leaflet@1.7.1/dist/images/
-    https://firebaseinstallations.googleapis.com
-    https://www.google.com
-    https://www.google.co.in;
-  font-src 'self' 
-    https://fonts.gstatic.com
-    https://fonts.googleapis.com;
-  connect-src 'self' 
-    https://bakeandgrillorder.shop 
-    https://firestore.googleapis.com 
-    https://api.openrouteservice.org 
-    https://nominatim.openstreetmap.org
-    https://www.google-analytics.com
-    https://region1.google-analytics.com
-    https://stats.g.doubleclick.net
-    https://td.doubleclick.net
-    https://www.google.com
-    https://googleads.g.doubleclick.net
-    https://firebaseinstallations.googleapis.com;
-  worker-src 'self' blob:;
-  frame-src 
-    https://www.googletagmanager.com
-    https://td.doubleclick.net;
-">
-  
-  <!-- Preconnect to improve performance -->
-  <link rel="preconnect" href="https://firestore.googleapis.com">
-  <link rel="preconnect" href="https://api.openrouteservice.org">
-  <link rel="preconnect" href="https://nominatim.openstreetmap.org">
-  <link rel="preconnect" href="https://www.googletagmanager.com">
-  
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -225,13 +176,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   
-  <script type="module" src="/js/main.js"></script>
-  <script type="module" src="/js/checkout.js"></script>
+  <script src="/js/main.js"></script>
+  <script src="/js/checkout.js"></script>
 
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+      navigator.serviceWorker.register('/sw.js')
         .then(registration => {
           console.log('ServiceWorker registration successful with scope:', registration.scope);
         })
