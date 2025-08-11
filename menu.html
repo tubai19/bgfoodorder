@@ -5,10 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Menu - Bake & Grill</title>
   <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites.">
+  
+  <!-- Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://kit.fontawesome.com;
+    style-src 'self' 'unsafe-inline' https://kit.fontawesome.com;
+    img-src 'self' data:;
+    font-src 'self' https://kit.fontawesome.com;
+    connect-src 'self';
+    frame-src 'none';
+    object-src 'none';
+  ">
 
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
+  
+  <!-- Preload Font Awesome -->
+  <link rel="preconnect" href="https://kit.fontawesome.com">
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -100,5 +115,8 @@
   <script src="/js/idb.js"></script>
   <script type="module" src="/js/main.js"></script>
   <script type="module" src="/js/menu.js"></script>
+  
+  <!-- Font Awesome Kit (if needed) -->
+  <script src="https://kit.fontawesome.com/your-code.js" crossorigin="anonymous"></script>
 </body>
 </html>
