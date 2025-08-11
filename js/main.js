@@ -29,7 +29,30 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const messaging = await isSupported() ? getMessaging(app) : null;
+let messaging = null;
+
+// Check IndexedDB support before initializing messaging
+async function checkAndInitializeMessaging() {
+  try {
+    // Test IndexedDB support first
+    const testDB = indexedDB.open('testDB');
+    await new Promise((resolve, reject) => {
+      testDB.onsuccess = resolve;
+      testDB.onerror = reject;
+    });
+    
+    if (await isSupported()) {
+      messaging = getMessaging(app);
+      return messaging;
+    }
+    return null;
+  } catch (error) {
+    console.warn('IndexedDB not available, disabling Firebase Messaging:', error);
+    return null;
+  }
+}
+
+messaging = await checkAndInitializeMessaging();
 
 // Application state
 const AppState = {
@@ -157,8 +180,9 @@ function setupStatusListener() {
 
 async function getCartFromStorage() {
   try {
-    if (AppState.FeatureFlags.OFFLINE_MODE && window.idb) {
-      return await idb.getCart() || [];
+    if (AppState.FeatureFlags.OFFLINE_MODE && window.idb && window.idb.isSupported) {
+      const cart = await idb.getCart();
+      return cart || [];
     }
     return JSON.parse(localStorage.getItem('cartItems')) || [];
   } catch (error) {
@@ -169,7 +193,7 @@ async function getCartFromStorage() {
 
 async function saveCartToStorage() {
   try {
-    if (AppState.FeatureFlags.OFFLINE_MODE && window.idb) {
+    if (AppState.FeatureFlags.OFFLINE_MODE && window.idb && window.idb.isSupported) {
       await idb.saveCart(AppState.selectedItems);
     }
     localStorage.setItem('cartItems', JSON.stringify(AppState.selectedItems));
@@ -246,9 +270,23 @@ async function initApp() {
     window.addEventListener('error', (e) => {
       console.error('Global error:', e.error);
       showNotification('An error occurred');
+      if (window.idb && window.idb.isSupported) {
+        idb.logError({
+          error: e.error?.toString(),
+          timestamp: new Date().toISOString(),
+          stack: e.error?.stack
+        });
+      }
     });
   } catch (error) {
     console.error('App init error:', error);
+    if (window.idb && window.idb.isSupported) {
+      idb.logError({
+        error: error.toString(),
+        timestamp: new Date().toISOString(),
+        stack: error.stack
+      });
+    }
   }
 }
 

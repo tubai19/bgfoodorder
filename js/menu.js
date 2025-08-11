@@ -9,9 +9,6 @@ import {
   collection
 } from '/js/main.js';
 
-// IndexedDB wrapper (still from global idb.js, must load before this script)
-const idbWrapper = window.idb || {};
-
 // Menu DOM elements
 const MenuElements = {
   tabsDiv: document.getElementById("tabs"),
@@ -72,18 +69,30 @@ async function loadMenuFromFirestore() {
       console.warn("No menu categories found in Firestore");
       showNotification("Menu is currently unavailable");
     } else {
+      // Try to cache in IDB if available
+      if (window.idb && window.idb.isSupported) {
+        try {
+          await idb.saveMenu(fullMenu);
+        } catch (idbError) {
+          console.warn("Failed to cache menu in IDB:", idbError);
+        }
+      }
       initializeTabs();
     }
   } catch (error) {
     console.error("Menu load error:", error);
     showNotification("Failed to load menu. Please check your connection.");
     
-    if (idbWrapper) {
+    // Try to load from IDB if available
+    if (window.idb && window.idb.isSupported) {
       try {
-        const cachedMenu = await idbWrapper.getMenu();
+        const cachedMenu = await idb.getMenu();
         if (cachedMenu) {
           Object.assign(fullMenu, cachedMenu);
+          showNotification("Showing cached menu (offline mode)");
           initializeTabs();
+        } else {
+          showNotification("Menu not available offline");
         }
       } catch (idbError) {
         console.error("IDB cache error:", idbError);
@@ -417,6 +426,17 @@ function setupEventListeners() {
   if (MenuElements.addToCartBtn) MenuElements.addToCartBtn.addEventListener('click', addFromFooter);
   if (MenuElements.minusBtn) MenuElements.minusBtn.addEventListener('click', decreaseQuantity);
   if (MenuElements.plusBtn) MenuElements.plusBtn.addEventListener('click', increaseQuantity);
+
+  // Handle cart item removal
+  MenuElements.cartList.addEventListener('click', (e) => {
+    if (e.target.closest('.cart-item-remove')) {
+      const index = parseInt(e.target.closest('.cart-item-remove').dataset.index);
+      AppState.selectedItems.splice(index, 1);
+      updateCart();
+      saveCartToStorage();
+      showNotification('Item removed from cart');
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', initMenuPage);
