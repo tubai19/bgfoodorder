@@ -1,16 +1,3 @@
-import { 
-  db,
-  AppState,
-  initApp,
-  updateCartBadge,
-  showNotification,
-  saveCartToStorage,
-  collection,
-  getDocs,
-  getCategoryIcon,
-  isCategoryAvailableForOrderType
-} from './main.js';
-
 // Initialize IDB wrapper
 const idb = window.idb || {};
 
@@ -41,8 +28,16 @@ let currentVariant = null;
 let currentPrice = null;
 let currentQuantity = 1;
 
+// Show loading state
+function showLoading() {
+  if (MenuElements.container) {
+    MenuElements.container.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading menu...</div>';
+  }
+}
+
 // Initialize menu
 async function initMenuPage() {
+  showLoading();
   await initApp();
   setupEventListeners();
   await loadMenuFromFirestore();
@@ -52,22 +47,42 @@ async function initMenuPage() {
 // Load menu from Firestore
 async function loadMenuFromFirestore() {
   try {
-    const menuCollection = collection(db, "menu");
-    const snapshot = await getDocs(menuCollection);
+    console.log("Loading menu from Firestore...");
+    const querySnapshot = await firebase.firestore().collection("menu").get();
     
     // Clear existing data
     Object.keys(fullMenu).forEach(key => delete fullMenu[key]);
     
-    snapshot.forEach(doc => {
-      if (doc.exists() && AppState.MENU_CATEGORIES[doc.id]) {
-        fullMenu[doc.id] = doc.data().items;
+    querySnapshot.forEach((doc) => {
+      const category = doc.id;
+      if (AppState.MENU_CATEGORIES[category]) {
+        fullMenu[category] = doc.data().items || [];
+        console.log(`Loaded ${fullMenu[category].length} items for ${category}`);
       }
     });
     
-    initializeTabs();
+    if (Object.keys(fullMenu).length === 0) {
+      console.warn("No menu categories found in Firestore");
+      showNotification("Menu is currently unavailable");
+    } else {
+      initializeTabs();
+    }
   } catch (error) {
     console.error("Menu load error:", error);
-    showNotification("Failed to load menu. Please refresh.");
+    showNotification("Failed to load menu. Please check your connection.");
+    
+    // Fallback to cached data if available
+    if (window.idb) {
+      try {
+        const cachedMenu = await idb.getMenu();
+        if (cachedMenu) {
+          Object.assign(fullMenu, cachedMenu);
+          initializeTabs();
+        }
+      } catch (idbError) {
+        console.error("IDB cache error:", idbError);
+      }
+    }
   }
 }
 
@@ -91,11 +106,14 @@ function initializeTabs() {
     MenuElements.tabsDiv.appendChild(tabBtn);
   });
   
-  // Activate first tab
+  // Activate first tab if available
   const firstCategory = Object.keys(fullMenu)[0];
   if (firstCategory) {
-    MenuElements.tabsDiv.querySelector('button').classList.add('active');
-    renderCategory(firstCategory);
+    const firstTab = MenuElements.tabsDiv.querySelector('button');
+    if (firstTab) {
+      firstTab.classList.add('active');
+      renderCategory(firstCategory);
+    }
   }
 }
 
