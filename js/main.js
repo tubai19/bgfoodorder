@@ -1,3 +1,8 @@
+// Import Firebase Modular SDK
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
+import { getFirestore, doc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging.js";
+
 // Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
@@ -10,9 +15,9 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const messaging = firebase.messaging.isSupported() ? firebase.messaging() : null;
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const messaging = await isSupported() ? getMessaging(app) : null;
 
 // Application state
 const AppState = {
@@ -65,7 +70,7 @@ async function initializeFirebaseMessaging() {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return null;
 
-    const token = await messaging.getToken({
+    const token = await getToken(messaging, {
       vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY'
     });
 
@@ -84,7 +89,7 @@ function setupMessageHandler() {
   if (!AppState.FeatureFlags.FCM_ENABLED || !messaging) return;
   
   try {
-    messaging.onMessage((payload) => {
+    onMessage(messaging, (payload) => {
       const notificationText = payload.notification?.body || 'New update from Bake & Grill';
       showNotification(notificationText);
     });
@@ -95,18 +100,13 @@ function setupMessageHandler() {
 
 // Shop status
 async function updateStatusDisplay() {
-  const { 
-    shopStatusText, 
-    deliveryStatusText,
-    shopStatusBanner,
-    deliveryStatusBanner
-  } = AppState.domElements;
+  const { shopStatusText, deliveryStatusText, shopStatusBanner, deliveryStatusBanner } = AppState.domElements;
 
   if (!shopStatusText || !deliveryStatusText) return;
 
   try {
-    const docSnap = await db.collection('publicStatus').doc('current').get();
-    if (docSnap.exists) {
+    const docSnap = await getDoc(doc(db, 'publicStatus', 'current'));
+    if (docSnap.exists()) {
       AppState.currentStatus = docSnap.data();
     }
 
@@ -136,15 +136,13 @@ async function updateStatusDisplay() {
 
 function setupStatusListener() {
   try {
-    return db.collection('publicStatus').doc('current')
-      .onSnapshot(updateStatusDisplay);
+    return onSnapshot(doc(db, 'publicStatus', 'current'), updateStatusDisplay);
   } catch (error) {
     console.error("Status listener error:", error);
     return null;
   }
 }
 
-// Cart management
 async function getCartFromStorage() {
   try {
     if (AppState.FeatureFlags.OFFLINE_MODE && window.idb) {
@@ -175,26 +173,22 @@ function updateCartBadge() {
   AppState.domElements.cartBadge.textContent = itemCount > 0 ? itemCount : '';
 }
 
-// UI Helpers
 function showNotification(message) {
   if (!message) return;
   
   const { notification, notificationText, a11yNotification } = AppState.domElements;
   
-  // Visual notification
   if (notification && notificationText) {
     notificationText.textContent = message;
     notification.style.display = 'block';
     setTimeout(() => notification.style.display = 'none', 3000);
   }
   
-  // Screen reader notification
   if (a11yNotification) {
     a11yNotification.textContent = message;
   }
 }
 
-// Utility functions
 function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -223,7 +217,6 @@ function isCategoryAvailableForOrderType(category, orderType) {
     AppState.MENU_CATEGORIES[category]?.availableForDelivery !== false;
 }
 
-// Initialize application
 async function initApp() {
   try {
     initDOMElements();
@@ -238,7 +231,6 @@ async function initApp() {
     }
     setupMessageHandler();
 
-    // Global error handler
     window.addEventListener('error', (e) => {
       console.error('Global error:', e.error);
       showNotification('An error occurred');
@@ -248,17 +240,17 @@ async function initApp() {
   }
 }
 
-// Exports
-window.AppState = AppState;
-window.db = db;
-window.app = app;
-window.initApp = initApp;
-window.saveCartToStorage = saveCartToStorage;
-window.showNotification = showNotification;
-window.calculateHaversineDistance = calculateHaversineDistance;
-window.calculateDeliveryChargeByDistance = calculateDeliveryChargeByDistance;
-window.getCategoryIcon = getCategoryIcon;
-window.isCategoryAvailableForOrderType = isCategoryAvailableForOrderType;
-
-// Initialize the app
 document.addEventListener('DOMContentLoaded', initApp);
+
+// Export for menu.js
+export {
+  AppState,
+  db,
+  initApp,
+  saveCartToStorage,
+  showNotification,
+  calculateHaversineDistance,
+  calculateDeliveryChargeByDistance,
+  getCategoryIcon,
+  isCategoryAvailableForOrderType
+};
