@@ -23,11 +23,6 @@
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
-  
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -72,34 +67,13 @@
     <div class="featured-categories">
       <h2>Our Menu Categories</h2>
       <div class="category-grid">
-        <a href="menu.html#Veg-Pizzas" class="category-card">
-          <div class="category-icon">🍕</div>
-          <h3>Veg Pizzas</h3>
-        </a>
-        <a href="menu.html#Non-Veg-Pizzas" class="category-card">
-          <div class="category-icon">🍗</div>
-          <h3>Non-Veg Pizzas</h3>
-        </a>
-        <a href="menu.html#Burgers" class="category-card">
-          <div class="category-icon">🍔</div>
-          <h3>Burgers</h3>
-        </a>
-        <a href="menu.html#Sandwiches" class="category-card">
-          <div class="category-icon">🥪</div>
-          <h3>Sandwiches</h3>
-        </a>
-        <a href="menu.html#Quick-Bites" class="category-card">
-          <div class="category-icon">🍟</div>
-          <h3>Quick Bites</h3>
-        </a>
-        <a href="menu.html#Dips" class="category-card">
-          <div class="category-icon">🥫</div>
-          <h3>Dips</h3>
-        </a>
-        <a href="menu.html#Combos" class="category-card">
-          <div class="category-icon">🎁</div>
-          <h3>Combos</h3>
-        </a>
+        <a href="menu.html#Veg-Pizzas" class="category-card"><div class="category-icon">🍕</div><h3>Veg Pizzas</h3></a>
+        <a href="menu.html#Non-Veg-Pizzas" class="category-card"><div class="category-icon">🍗</div><h3>Non-Veg Pizzas</h3></a>
+        <a href="menu.html#Burgers" class="category-card"><div class="category-icon">🍔</div><h3>Burgers</h3></a>
+        <a href="menu.html#Sandwiches" class="category-card"><div class="category-icon">🥪</div><h3>Sandwiches</h3></a>
+        <a href="menu.html#Quick-Bites" class="category-card"><div class="category-icon">🍟</div><h3>Quick Bites</h3></a>
+        <a href="menu.html#Dips" class="category-card"><div class="category-icon">🥫</div><h3>Dips</h3></a>
+        <a href="menu.html#Combos" class="category-card"><div class="category-icon">🎁</div><h3>Combos</h3></a>
       </div>
     </div>
 
@@ -140,27 +114,19 @@
     <span id="notificationText">Notification message</span>
   </div>
 
-  <script src="/js/main.js"></script>
+  <!-- ES Module entry point -->
+  <script type="module" src="/js/main.js"></script>
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
-          .then(registration => {
-            console.log('ServiceWorker registered with scope:', registration.scope);
-          })
-          .catch(err => {
-            console.log('ServiceWorker registration failed:', err);
-          });
+          .then(registration => console.log('ServiceWorker registered with scope:', registration.scope))
+          .catch(err => console.log('ServiceWorker registration failed:', err));
       });
     }
-
-    window.addEventListener('online', () => {
-      document.querySelector('.offline-indicator').style.display = 'none';
-    });
-
-    window.addEventListener('offline', () => {
-      document.querySelector('.offline-indicator').style.display = 'block';
-    });
+    window.addEventListener('online', () => document.querySelector('.offline-indicator').style.display = 'none');
+    window.addEventListener('offline', () => document.querySelector('.offline-indicator').style.display = 'block');
   </script>
 </body>
 </html>

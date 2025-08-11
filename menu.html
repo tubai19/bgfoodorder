@@ -5,14 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Menu - Bake & Grill</title>
   <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites.">
-  
+
   <!-- CSS -->
   <link rel="stylesheet" href="/css/fontawesome.min.css">
   <link rel="stylesheet" href="/css/styles.css">
-  
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
 </head>
 <body class="mobile-view">
   <header class="mobile-header">
@@ -27,47 +23,38 @@
   </header>
 
   <div id="statusBanner" class="status-banner">
-    <div id="shopStatusBanner" class="status-item">
-      <i class="fas fa-store" aria-hidden="true"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span>
-    </div>
-    <div id="deliveryStatusBanner" class="status-item">
-      <i class="fas fa-truck" aria-hidden="true"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span>
-    </div>
+    <div id="shopStatusBanner" class="status-item"><i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span></div>
+    <div id="deliveryStatusBanner" class="status-item"><i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span></div>
   </div>
 
   <div class="mobile-container">
     <div id="mobileSearchContainer">
-      <i class="fas fa-search" aria-hidden="true"></i>
+      <i class="fas fa-search"></i>
       <input type="text" id="searchInput" placeholder="Search menu items..." class="mobile-search" aria-label="Search menu">
     </div>
-    
     <div id="tabs" class="mobile-category-nav" role="tablist"></div>
-    
     <div id="menuContainer" class="mobile-menu-container"></div>
   </div>
 
   <!-- Cart Drawer -->
-  <div id="mobileCartDrawer" class="mobile-cart-drawer" aria-modal="true">
+  <div id="mobileCartDrawer" class="mobile-cart-drawer">
     <div class="drawer-header">
-      <h3>Your Order <span class="cart-count">(<span id="cartItemCount">0</span>)</span></h3>
-      <button class="close-drawer" id="closeCartBtn" aria-label="Close cart">&times;</button>
+      <h3>Your Order (<span id="cartItemCount">0</span>)</h3>
+      <button class="close-drawer" id="closeCartBtn">&times;</button>
     </div>
     <div class="drawer-content">
-      <ul id="cartItems" class="mobile-cart-items" role="list">
-        <!-- Cart items will be inserted here dynamically -->
-      </ul>
+      <ul id="cartItems" class="mobile-cart-items"></ul>
       <div class="mobile-total-display">
         <span class="total-items"><span id="totalItemCount">0</span> items</span>
         <span class="total-amount">₹<span id="cartTotalAmount">0</span></span>
       </div>
     </div>
     <div class="drawer-footer">
-      <button id="mobileClearCartBtn" class="mobile-clear-btn"><i class="fas fa-trash" aria-hidden="true"></i> Clear</button>
-      <a href="checkout.html" id="mobileCheckoutBtn" class="mobile-checkout-btn"><i class="fas fa-shopping-bag" aria-hidden="true"></i> Checkout</a>
+      <button id="mobileClearCartBtn" class="mobile-clear-btn"><i class="fas fa-trash"></i> Clear</button>
+      <a href="checkout.html" id="mobileCheckoutBtn" class="mobile-checkout-btn"><i class="fas fa-shopping-bag"></i> Checkout</a>
     </div>
   </div>
 
-  <!-- Cart Overlay -->
   <div id="cartOverlay" class="cart-overlay"></div>
 
   <!-- Quantity Footer -->
@@ -79,9 +66,9 @@
       </div>
       <div class="quantity-controls-container">
         <div class="quantity-controls">
-          <button class="quantity-btn minus" aria-label="Decrease quantity">−</button>
-          <span class="quantity" aria-live="polite">1</span>
-          <button class="quantity-btn plus" aria-label="Increase quantity">+</button>
+          <button class="quantity-btn minus">−</button>
+          <span class="quantity">1</span>
+          <button class="quantity-btn plus">+</button>
         </div>
       </div>
       <div class="quantity-footer-actions">
@@ -103,71 +90,15 @@
   </footer>
 
   <div class="mobile-notification" id="notification">
-    <i class="fas fa-check-circle" aria-hidden="true"></i>
+    <i class="fas fa-check-circle"></i>
     <span id="notificationText">Item added to cart!</span>
   </div>
 
-  <!-- Screen reader notifications -->
   <div id="a11y-notification" aria-live="polite" class="sr-only"></div>
 
-  <!-- JS -->
+  <!-- IndexedDB Helper -->
   <script src="/js/idb.js"></script>
-  <script src="/js/main.js"></script>
-  <script src="/js/menu.js"></script>
-
-  <script>
-    // Service Worker Registration
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          console.log('ServiceWorker registered:', registration.scope);
-          
-          // Only register sync if available
-          if ('sync' in registration) {
-            await registration.sync.register('submit-order').catch(err => {
-              console.log('Background sync registration failed:', err);
-            });
-          }
-        } catch (err) {
-          console.error('ServiceWorker registration failed:', err);
-        }
-      });
-    }
-
-    // Offline detection
-    const updateOnlineStatus = () => {
-      const indicator = document.querySelector('.offline-indicator');
-      if (indicator) {
-        indicator.style.display = navigator.onLine ? 'none' : 'block';
-      }
-    };
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
-    updateOnlineStatus();
-
-    // Error logging
-    window.addEventListener('error', (e) => {
-      const errorData = {
-        error: e.message,
-        stack: e.error?.stack,
-        url: window.location.href,
-        timestamp: new Date().toISOString()
-      };
-      
-      // Log to console regardless
-      console.error('Application error:', errorData);
-      
-      if (window.idb) {
-        // Store in IndexedDB if available
-        idb.logError(errorData).catch(console.error);
-      } else {
-        // Fallback to localStorage
-        const errors = JSON.parse(localStorage.getItem('pendingErrors') || '[]');
-        errors.push(errorData);
-        localStorage.setItem('pendingErrors', JSON.stringify(errors));
-      }
-    });
-  </script>
+  <!-- ES Modules -->
+  <script type="module" src="/js/menu.js"></script>
 </body>
 </html>
