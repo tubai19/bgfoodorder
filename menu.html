@@ -6,16 +6,64 @@
   <title>Menu - Bake & Grill</title>
   <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites.">
   
-  <!-- Content Security Policy -->
+  <!-- Comprehensive CSP for Firebase and Google Services -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' https://kit.fontawesome.com;
-    style-src 'self' 'unsafe-inline' https://kit.fontawesome.com;
-    img-src 'self' data:;
-    font-src 'self' https://kit.fontawesome.com;
-    connect-src 'self';
-    frame-src 'none';
+    script-src 'self' 
+      https://www.gstatic.com 
+      https://*.firebase.com 
+      https://*.firebaseio.com 
+      https://apis.google.com 
+      https://www.google.com 
+      https://www.google-analytics.com 
+      https://ssl.google-analytics.com 
+      https://tagmanager.google.com 
+      https://www.googletagmanager.com 
+      https://*.googleapis.com 
+      https://maps.googleapis.com 
+      https://kit.fontawesome.com 
+      https://static.cloudflareinsights.com
+      'nonce-08e44295-49aa-40c6-b156-c7670d2756da' 
+      'unsafe-eval';
+    style-src 'self' 
+      'unsafe-inline' 
+      https://kit.fontawesome.com 
+      https://fonts.googleapis.com;
+    img-src 'self' 
+      data: 
+      https://* 
+      http://* 
+      blob:;
+    font-src 'self' 
+      https://kit.fontawesome.com 
+      https://fonts.gstatic.com;
+    connect-src 'self' 
+      https://* 
+      wss://* 
+      ws://* 
+      http://localhost 
+      http://127.0.0.1 
+      https://www.googleapis.com 
+      https://*.googleapis.com 
+      https://*.firebaseio.com 
+      https://*.firebasedatabase.app 
+      https://*.firebaseapp.com 
+      https://*.firebase.com 
+      https://*.google.com
+      https://identitytoolkit.googleapis.com 
+      https://*.cloudfunctions.net
+      https://securetoken.googleapis.com 
+      https://www.google-analytics.com 
+      https://*.firebaseio.com 
+      https://*.firebasedatabase.app
+      https://stats.g.doubleclick.net;
+    frame-src 
+      https://*.google.com 
+      https://*.firebaseapp.com 
+      https://*.firebase.com 
+      https://*.googleapis.com;
     object-src 'none';
+    media-src *;
   ">
 
   <!-- CSS -->
@@ -113,10 +161,22 @@
 
   <!-- Scripts -->
   <script src="/js/idb.js"></script>
+  
+  <!-- Firebase Services -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage.js"></script>
+  
+  <!-- Google Analytics/Tag Manager -->
+  <script src="https://www.googletagmanager.com/gtag/js?id=G-SLG2R88J72" async></script>
+  
+  <!-- Font Awesome Kit -->
+  <script src="https://kit.fontawesome.com/your-actual-code-here.js" crossorigin="anonymous"></script>
+  
+  <!-- Application Scripts -->
   <script type="module" src="/js/main.js"></script>
   <script type="module" src="/js/menu.js"></script>
-  
-  <!-- Font Awesome Kit (if needed) -->
-  <script src="https://kit.fontawesome.com/your-code.js" crossorigin="anonymous"></script>
 </body>
 </html>
