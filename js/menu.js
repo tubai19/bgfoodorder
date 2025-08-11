@@ -4,8 +4,10 @@ import {
   saveCartToStorage,
   showNotification,
   getCategoryIcon,
-  isCategoryAvailableForOrderType
-} from './main.js';
+  isCategoryAvailableForOrderType,
+  getDocs,
+  collection
+} from '/js/main.js';
 
 // IndexedDB wrapper (still from global idb.js, must load before this script)
 const idbWrapper = window.idb || {};
@@ -54,7 +56,7 @@ async function initMenuPage() {
 async function loadMenuFromFirestore() {
   try {
     console.log("Loading menu from Firestore...");
-    const querySnapshot = await AppState.db.collection("menu").get();
+    const querySnapshot = await getDocs(collection(AppState.db, "menu"));
     
     Object.keys(fullMenu).forEach(key => delete fullMenu[key]);
     

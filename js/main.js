@@ -1,7 +1,19 @@
 // Import Firebase Modular SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
-import { getFirestore, doc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
-import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging.js";
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  onSnapshot, 
+  collection,
+  getDocs 
+} from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
+import { 
+  getMessaging, 
+  getToken, 
+  onMessage, 
+  isSupported 
+} from "https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging.js";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -252,5 +264,7 @@ export {
   calculateHaversineDistance,
   calculateDeliveryChargeByDistance,
   getCategoryIcon,
-  isCategoryAvailableForOrderType
+  isCategoryAvailableForOrderType,
+  getDocs,
+  collection
 };
