@@ -20,7 +20,7 @@ let menuData = {};
 const categoryIcons = {
   'Veg-Pizzas': '🍕',
   'Paneer-Specials': '🧀',
-  'Non-Veg-Pizzas': '🍗',
+  'Non-Veg Pizzas': '🍗',
   'Burgers': '🍔',
   'Sandwiches': '🥪',
   'Quick-Bites': '🍟',
