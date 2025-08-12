@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Menu - Bake & Grill</title>
+  <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
+  
+  <!-- Favicons and CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="mobile-view">
+  
+  <header class="mobile-header">
+    <div class="logo-container">
+      <a href="index.html" class="back-button"><i class="fas fa-arrow-left"></i></a>
+      <div class="logo">Our Menu</div>
+      <button id="mobileCartBtn" class="mobile-cart-icon">
+        <i class="fas fa-shopping-cart"></i>
+        <span class="cart-badge">0</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="statusBanner" class="status-banner">
+    <div id="shopStatusBanner" class="status-item">
+      <i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span>
+    </div>
+    <div id="deliveryStatusBanner" class="status-item">
+      <i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span>
+    </div>
+  </div>
+
+  <div class="mobile-container">
+    <div id="mobileSearchContainer">
+      <i class="fas fa-search"></i>
+      <input type="text" id="searchInput" placeholder="Search pizzas, burgers, sandwiches..." class="mobile-search">
+    </div>
+    
+    <div id="tabs" class="mobile-category-nav"></div>
+    
+    <div id="deliveryRestriction" class="mobile-delivery-restriction" style="display:none;">
+      <i class="fas fa-exclamation-triangle"></i> Delivery not available to your location (beyond 8km). Please choose pickup.
+    </div>
+
+    <div id="menuContainer" class="mobile-menu-container"></div>
+  </div>
+
+  <!-- Cart Drawer -->
+  <div id="mobileCartDrawer" class="mobile-cart-drawer">
+    <div class="drawer-header">
+      <h3>Your Order <span class="cart-count">(0)</span></h3>
+      <button class="close-drawer" id="closeCartBtn">&times;</button>
+    </div>
+    <div class="drawer-content">
+      <ul id="cartItems" class="mobile-cart-items"></ul>
+      <div id="cartTotal" class="mobile-cart-total">Total: ₹0</div>
+    </div>
+    <div class="drawer-footer">
+      <button id="mobileClearCartBtn" class="mobile-clear-btn"><i class="fas fa-trash"></i> Clear</button>
+      <a href="checkout.html" id="mobileCheckoutBtn" class="mobile-checkout-btn"><i class="fas fa-shopping-bag"></i> Checkout</a>
+    </div>
+  </div>
+
+  <!-- Overlay -->
+  <div id="cartOverlay" class="cart-overlay"></div>
+
+  <footer class="mobile-footer">
+    <div class="footer-content">
+      <div class="footer-nav">
+        <a href="index.html">Home</a>
+        <a href="menu.html">Menu</a>
+        <a href="checkout.html">Checkout</a>
+      </div>
+      <p>&copy; 2025 Bake & Grill. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <div class="mobile-notification" id="notification">
+    <i class="fas fa-check-circle"></i>
+    <span id="notificationText">Item added to cart!</span>
+  </div>
+
+  <!-- Scripts in correct order -->
+  <script type="module" src="js/shared.js"></script>
+  <script type="module" src="js/menu.js"></script>
+</body>
+</html>
