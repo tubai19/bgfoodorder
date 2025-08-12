@@ -28,6 +28,9 @@ const DELIVERY_CHARGES = {
   between6and8km: 30
 };
 const MIN_DELIVERY_ORDER = 200;
+const SHOP_PHONE = '918240266267';
+const SHOP_NAME = 'Bake & Grill';
+const SHOP_ADDRESS = '123 Main Street, Kolkata, West Bengal';
 
 // DOM Elements
 const elements = {
@@ -52,7 +55,8 @@ const elements = {
   confirmOrderBtn: document.getElementById('confirmOrderBtn'),
   cancelOrderBtn: document.getElementById('cancelOrderBtn'),
   closeModal: document.querySelector('.close-modal'),
-  orderHistoryList: document.getElementById('orderHistoryList')
+  orderHistoryList: document.getElementById('orderHistoryList'),
+  paymentMethodRadios: document.querySelectorAll('input[name="paymentMethod"]')
 };
 
 // Variables
@@ -67,6 +71,7 @@ let deliveryCharge = 0;
 // =======================
 async function saveOrderToFirestore() {
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'Cash on Delivery';
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + deliveryCharge;
   const phoneNumber = elements.phoneNumber.value;
@@ -76,6 +81,7 @@ async function saveOrderToFirestore() {
       customerName: elements.customerName.value,
       phoneNumber,
       orderType,
+      paymentMethod,
       items: [...cart],
       subtotal,
       deliveryCharge: orderType === 'Delivery' ? deliveryCharge : 0,
@@ -431,55 +437,81 @@ function handlePlaceOrder(e) {
 
 async function confirmOrder() {
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'Cash on Delivery';
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + deliveryCharge;
 
   const orderId = await saveOrderToFirestore();
   if (!orderId) return;
 
-  let orderDetails = `*New Order from Bake & Grill*%0A%0A`;
-  orderDetails += `*Order ID:* ${orderId}%0A`;
-  orderDetails += `*Name:* ${elements.customerName.value}%0A`;
-  orderDetails += `*Phone:* ${elements.phoneNumber.value}%0A`;
-  orderDetails += `*Order Type:* ${orderType}%0A`;
-
+  // Enhanced WhatsApp message with better formatting
+  let whatsappMessage = `*🍕 NEW ORDER - ${SHOP_NAME.toUpperCase()} 🍕*%0A%0A`;
+  
+  // Order header
+  whatsappMessage += `📋 *Order #${orderId.substring(0, 6).toUpperCase()}*%0A`;
+  whatsappMessage += `⏰ ${new Date().toLocaleString()}%0A%0A`;
+  
+  // Customer details
+  whatsappMessage += `👤 *Customer Details*%0A`;
+  whatsappMessage += `▸ Name: ${elements.customerName.value}%0A`;
+  whatsappMessage += `▸ Phone: ${elements.phoneNumber.value}%0A`;
+  whatsappMessage += `▸ Order Type: ${orderType}%0A`;
+  whatsappMessage += `▸ Payment: ${paymentMethod}%0A`;
+  
   if (orderType === 'Delivery') {
-    orderDetails += `*Delivery Address:* ${elements.manualDeliveryAddress.value || 'Current location'}%0A`;
-    orderDetails += `*Distance:* ${deliveryDistance.toFixed(1)} km%0A`;
+    whatsappMessage += `▸ Address: ${elements.manualDeliveryAddress.value || 'Current location'}%0A`;
+    whatsappMessage += `▸ Distance: ${deliveryDistance.toFixed(1)} km%0A`;
+    
+    // Add delivery estimate
+    const estimate = deliveryDistance <= 4 ? '30-45 mins' : 
+                     deliveryDistance <= 6 ? '45-60 mins' : '60-75 mins';
+    whatsappMessage += `▸ Estimated Delivery: ${estimate}%0A`;
   }
-
-  orderDetails += `%0A*Order Items:*%0A`;
+  whatsappMessage += `%0A`;
+  
+  // Order items
+  whatsappMessage += `🛒 *Order Items* (${cart.length})%0A`;
   cart.forEach(item => {
-    orderDetails += `- ${item.name}${item.variant ? ` (${item.variant})` : ''} x${item.quantity} - ${formatPrice(item.price * item.quantity)}%0A`;
+    whatsappMessage += `▸ ${item.name}${item.variant ? ` (${item.variant})` : ''} x${item.quantity} - ${formatPrice(item.price * item.quantity)}%0A`;
   });
-
-  orderDetails += `%0A*Subtotal:* ${formatPrice(subtotal)}%0A`;
+  whatsappMessage += `%0A`;
+  
+  // Pricing summary
+  whatsappMessage += `💰 *Order Summary*%0A`;
+  whatsappMessage += `▸ Subtotal: ${formatPrice(subtotal)}%0A`;
   if (orderType === 'Delivery') {
-    orderDetails += `*Delivery Charge:* ${formatPrice(deliveryCharge)}%0A`;
+    whatsappMessage += `▸ Delivery Charge: ${formatPrice(deliveryCharge)}%0A`;
   }
-  orderDetails += `*Total:* ${formatPrice(total)}%0A%0A`;
-
+  whatsappMessage += `*▸ TOTAL: ${formatPrice(total)}*%0A%0A`;
+  
+  // Special instructions
   if (elements.orderNotes.value.trim()) {
-    orderDetails += `*Special Instructions:*%0A${elements.orderNotes.value}%0A%0A`;
+    whatsappMessage += `📝 *Special Instructions*%0A${elements.orderNotes.value}%0A%0A`;
   }
 
+  // Combo notice if applicable
   const hasCombo = cart.some(item => item.category === 'Combos');
-  if (hasCombo) {
-    orderDetails += `Note: Combo items must be picked up from our location.%0A%0A`;
+  if (hasCombo && orderType === 'Delivery') {
+    whatsappMessage += `⚠️ *Note:* Combo items must be picked up from our location.%0A%0A`;
   }
 
-  orderDetails += `Thank you for your order! We'll confirm shortly. For any changes, call 8240266267`;
+  // Closing message
+  whatsappMessage += `Thank you for your order!%0A`;
+  whatsappMessage += `For any changes, please call ${SHOP_PHONE}%0A%0A`;
+  whatsappMessage += `📍 *${SHOP_NAME}*%0A`;
+  whatsappMessage += `${SHOP_ADDRESS}`;
 
+  // Save to history
   saveOrderToHistory();
 
-  const whatsappUrl = `https://wa.me/918240266267?text=${orderDetails}`;
+  // Open WhatsApp
+  const whatsappUrl = `https://wa.me/${SHOP_PHONE}?text=${whatsappMessage}`;
   window.open(whatsappUrl, '_blank');
 
+  // Clear cart and redirect
   cart.length = 0;
   saveCart();
-
   elements.orderConfirmationModal.style.display = 'none';
-
   showNotification('Order placed successfully! Thank you for your order. We will contact you shortly.');
   setTimeout(() => window.location.href = 'index.html', 3000);
 }
@@ -487,6 +519,7 @@ async function confirmOrder() {
 function saveOrderToHistory() {
   const orders = JSON.parse(localStorage.getItem('orderHistory')) || [];
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'Cash on Delivery';
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + deliveryCharge;
 
@@ -498,6 +531,7 @@ function saveOrderToHistory() {
       phone: elements.phoneNumber.value
     },
     type: orderType,
+    paymentMethod,
     items: [...cart],
     subtotal: subtotal,
     deliveryCharge: orderType === 'Delivery' ? deliveryCharge : 0,
@@ -552,6 +586,7 @@ function renderOrderHistory(orders) {
       <div class="order-history-details">
         <div><strong>Status:</strong> <span class="status-${order.status}">${order.status}</span></div>
         <div><strong>Type:</strong> ${order.orderType}</div>
+        <div><strong>Payment:</strong> ${order.paymentMethod || 'Cash on Delivery'}</div>
         ${order.orderType === 'Delivery' ? `<div><strong>Distance:</strong> ${order.deliveryDistance?.toFixed(1) || 'N/A'} km</div>` : ''}
         <div class="order-total"><strong>Total:</strong> ${formatPrice(order.total)}</div>
       </div>
