@@ -1,6 +1,15 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+import { 
+  getFirestore, 
+  serverTimestamp,  // Add this import
+  doc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  getMessaging, 
+  getToken, 
+  onMessage 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
@@ -64,6 +73,37 @@ function updateCartCount() {
   }
 }
 
+// Request notification permission
+async function requestNotificationPermission(phoneNumber) {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const token = await getToken(messaging, { 
+        vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY' 
+      });
+      
+      if (token) {
+        // Use modular v9 syntax
+        await setDoc(doc(db, 'fcmTokens', token), {
+          token,
+          phoneNumber,
+          createdAt: serverTimestamp()  // Use imported serverTimestamp
+        });
+      }
+      return token;
+    }
+  } catch (error) {
+    console.error('Notification permission error:', error);
+    return null;
+  }
+}
+
+// Handle incoming messages
+onMessage(messaging, (payload) => {
+  console.log('Message received:', payload);
+  showNotification(payload.notification?.body || 'You have a new update');
+});
+
 // Initialize cart count on page load
 document.addEventListener('DOMContentLoaded', updateCartCount);
 
@@ -75,5 +115,6 @@ export {
   formatPrice, 
   cart, 
   saveCart, 
-  updateCartCount
+  updateCartCount,
+  requestNotificationPermission
 };

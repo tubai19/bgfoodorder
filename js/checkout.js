@@ -1,4 +1,23 @@
-import { db, cart, saveCart, updateCartCount, showNotification, formatPrice } from './shared.js';
+import { 
+  db, 
+  cart, 
+  saveCart, 
+  updateCartCount, 
+  showNotification, 
+  formatPrice, 
+  requestNotificationPermission 
+} from './shared.js';
+
+// Import Firebase v9 modular functions
+import { 
+  collection, 
+  addDoc, 
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // Constants
 const SHOP_LOCATION = { lat: 22.3908, lng: 88.2189 };
@@ -50,23 +69,28 @@ async function saveOrderToFirestore() {
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + deliveryCharge;
+  const phoneNumber = elements.phoneNumber.value;
 
   try {
-    const orderRef = await db.collection('orders').add({
+    const orderRef = await addDoc(collection(db, 'orders'), {
       customerName: elements.customerName.value,
-      phoneNumber: elements.phoneNumber.value,
+      phoneNumber,
       orderType,
       items: [...cart],
       subtotal,
       deliveryCharge: orderType === 'Delivery' ? deliveryCharge : 0,
       total,
       status: 'pending',
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      timestamp: serverTimestamp(),
       ...(orderType === 'Delivery' && {
         deliveryAddress: elements.manualDeliveryAddress.value || 'Current location',
         deliveryDistance
       })
     });
+
+    // Request notification permission after order
+    await requestNotificationPermission(phoneNumber);
+    
     return orderRef.id;
   } catch (error) {
     console.error('Error saving order:', error);
@@ -150,19 +174,19 @@ function handleOrderTypeChange() {
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
 
   if (orderType === 'Pickup') {
-    deliveryDistanceDisplay.style.display = 'none';
-    deliveryChargeDisplay.textContent = '';
+    elements.deliveryDistanceDisplay.style.display = 'none';
+    elements.deliveryChargeDisplay.textContent = '';
   } else {
     if (userLocation) {
-      deliveryDistanceDisplay.style.display = 'block';
+      elements.deliveryDistanceDisplay.style.display = 'block';
       calculateDeliveryCharge();
     }
   }
 }
 
 function handleShareLocation() {
-  currentLocStatusMsg.textContent = 'Getting your location...';
-  currentLocStatusMsg.style.color = '#333';
+  elements.currentLocStatusMsg.textContent = 'Getting your location...';
+  elements.currentLocStatusMsg.style.color = '#333';
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -180,32 +204,32 @@ function handleShareLocation() {
         );
 
         if (deliveryDistance > DELIVERY_RADIUS) {
-          currentLocStatusMsg.textContent = 'Delivery not available to your location (beyond 8km). Please choose pickup.';
-          currentLocStatusMsg.style.color = 'red';
+          elements.currentLocStatusMsg.textContent = 'Delivery not available to your location (beyond 8km). Please choose pickup.';
+          elements.currentLocStatusMsg.style.color = 'red';
           document.querySelector('input[value="Delivery"]').disabled = true;
           document.querySelector('input[value="Pickup"]').checked = true;
-          deliveryDistanceDisplay.style.display = 'none';
+          elements.deliveryDistanceDisplay.style.display = 'none';
         } else {
-          currentLocStatusMsg.textContent = 'Location found!';
-          currentLocStatusMsg.style.color = 'green';
-          distanceText.textContent = `Distance: ${deliveryDistance.toFixed(1)} km`;
-          deliveryDistanceDisplay.style.display = 'block';
+          elements.currentLocStatusMsg.textContent = 'Location found!';
+          elements.currentLocStatusMsg.style.color = 'green';
+          elements.distanceText.textContent = `Distance: ${deliveryDistance.toFixed(1)} km`;
+          elements.deliveryDistanceDisplay.style.display = 'block';
           calculateDeliveryCharge();
         }
 
-        deliveryShowManualLocBtn.style.display = 'block';
+        elements.deliveryShowManualLocBtn.style.display = 'block';
       },
       error => {
         console.error('Error getting location:', error);
-        currentLocStatusMsg.textContent = 'Could not get your location. Please enter manually.';
-        currentLocStatusMsg.style.color = 'red';
-        deliveryShowManualLocBtn.style.display = 'block';
+        elements.currentLocStatusMsg.textContent = 'Could not get your location. Please enter manually.';
+        elements.currentLocStatusMsg.style.color = 'red';
+        elements.deliveryShowManualLocBtn.style.display = 'block';
       }
     );
   } else {
-    currentLocStatusMsg.textContent = 'Geolocation is not supported by your browser. Please enter manually.';
-    currentLocStatusMsg.style.color = 'red';
-    deliveryShowManualLocBtn.style.display = 'block';
+    elements.currentLocStatusMsg.textContent = 'Geolocation is not supported by your browser. Please enter manually.';
+    elements.currentLocStatusMsg.style.color = 'red';
+    elements.deliveryShowManualLocBtn.style.display = 'block';
   }
 }
 
@@ -226,7 +250,7 @@ function initMap() {
     })
       .on('markgeocode', function (e) {
         const { center, name } = e.geocode;
-        manualDeliveryAddress.value = name;
+        elements.manualDeliveryAddress.value = name;
         userLocation = { lat: center.lat, lng: center.lng };
         updateMapMarker();
         calculateDistanceAndCharge();
@@ -257,11 +281,11 @@ function reverseGeocode(lat, lng) {
     .then(response => response.json())
     .then(data => {
       const address = data.display_name || 'Selected location';
-      manualDeliveryAddress.value = address;
+      elements.manualDeliveryAddress.value = address;
     })
     .catch(error => {
       console.error('Reverse geocoding error:', error);
-      manualDeliveryAddress.value = 'Selected location';
+      elements.manualDeliveryAddress.value = 'Selected location';
     });
 }
 
@@ -274,16 +298,16 @@ function calculateDistanceAndCharge() {
   );
 
   if (deliveryDistance > DELIVERY_RADIUS) {
-    currentLocStatusMsg.textContent = 'Delivery not available to your location (beyond 8km). Please choose pickup.';
-    currentLocStatusMsg.style.color = 'red';
+    elements.currentLocStatusMsg.textContent = 'Delivery not available to your location (beyond 8km). Please choose pickup.';
+    elements.currentLocStatusMsg.style.color = 'red';
     document.querySelector('input[value="Delivery"]').disabled = true;
     document.querySelector('input[value="Pickup"]').checked = true;
-    deliveryDistanceDisplay.style.display = 'none';
+    elements.deliveryDistanceDisplay.style.display = 'none';
   } else {
-    currentLocStatusMsg.textContent = 'Location set!';
-    currentLocStatusMsg.style.color = 'green';
-    distanceText.textContent = `Distance: ${deliveryDistance.toFixed(1)} km`;
-    deliveryDistanceDisplay.style.display = 'block';
+    elements.currentLocStatusMsg.textContent = 'Location set!';
+    elements.currentLocStatusMsg.style.color = 'green';
+    elements.distanceText.textContent = `Distance: ${deliveryDistance.toFixed(1)} km`;
+    elements.deliveryDistanceDisplay.style.display = 'block';
     calculateDeliveryCharge();
   }
 }
@@ -305,7 +329,7 @@ function calculateDeliveryCharge() {
 
   if (orderType === 'Pickup') {
     deliveryCharge = 0;
-    deliveryChargeDisplay.textContent = '';
+    elements.deliveryChargeDisplay.textContent = '';
     return;
   }
 
@@ -315,27 +339,27 @@ function calculateDeliveryCharge() {
 
   if (subtotal >= 500) {
     deliveryCharge = 0;
-    deliveryChargeDisplay.textContent = '🎉 Free delivery (order above ₹500)';
-    deliveryChargeDisplay.style.color = 'green';
+    elements.deliveryChargeDisplay.textContent = '🎉 Free delivery (order above ₹500)';
+    elements.deliveryChargeDisplay.style.color = 'green';
     return;
   }
 
   if (deliveryDistance <= 4) {
     deliveryCharge = DELIVERY_CHARGES.under4km;
-    deliveryChargeDisplay.textContent = '🚚 Free delivery (within 4km)';
-    deliveryChargeDisplay.style.color = 'green';
+    elements.deliveryChargeDisplay.textContent = '🚚 Free delivery (within 4km)';
+    elements.deliveryChargeDisplay.style.color = 'green';
   } else if (deliveryDistance <= 6) {
     deliveryCharge = DELIVERY_CHARGES.between4and6km;
-    deliveryChargeDisplay.textContent = `Delivery charge: ₹${deliveryCharge}`;
-    deliveryChargeDisplay.style.color = 'orange';
+    elements.deliveryChargeDisplay.textContent = `Delivery charge: ₹${deliveryCharge}`;
+    elements.deliveryChargeDisplay.style.color = 'orange';
   } else if (deliveryDistance <= 8) {
     deliveryCharge = DELIVERY_CHARGES.between6and8km;
-    deliveryChargeDisplay.textContent = `Delivery charge: ₹${deliveryCharge}`;
-    deliveryChargeDisplay.style.color = 'orange';
+    elements.deliveryChargeDisplay.textContent = `Delivery charge: ₹${deliveryCharge}`;
+    elements.deliveryChargeDisplay.style.color = 'orange';
   } else {
     deliveryCharge = 0;
-    deliveryChargeDisplay.textContent = 'Delivery not available beyond 8km';
-    deliveryChargeDisplay.style.color = 'red';
+    elements.deliveryChargeDisplay.textContent = 'Delivery not available beyond 8km';
+    elements.deliveryChargeDisplay.style.color = 'red';
   }
 }
 
@@ -476,4 +500,71 @@ function saveOrderToHistory() {
     type: orderType,
     items: [...cart],
     subtotal: subtotal,
-    deliveryCharge: orderType === 'Delivery' ?
+    deliveryCharge: orderType === 'Delivery' ? deliveryCharge : 0,
+    total: total,
+    status: 'pending'
+  };
+
+  orders.unshift(newOrder);
+  localStorage.setItem('orderHistory', JSON.stringify(orders));
+}
+
+function loadOrderHistory() {
+  const phoneNumber = elements.phoneNumber.value;
+  if (!phoneNumber) return;
+
+  // First check localStorage
+  const orders = JSON.parse(localStorage.getItem('orderHistory')) || [];
+  
+  if (orders.length === 0) {
+    elements.orderHistoryList.innerHTML = '<p class="no-orders">No past orders found</p>';
+  } else {
+    renderOrderHistory(orders);
+  }
+  
+  // Then listen for Firestore updates
+  const q = query(
+    collection(db, 'orders'),
+    where('phoneNumber', '==', phoneNumber),
+    orderBy('timestamp', 'desc')
+  );
+  
+  onSnapshot(q, (snapshot) => {
+    const firestoreOrders = [];
+    snapshot.forEach(doc => {
+      const order = doc.data();
+      order.id = doc.id;
+      firestoreOrders.push(order);
+    });
+    
+    renderOrderHistory(firestoreOrders);
+    localStorage.setItem('orderHistory', JSON.stringify(firestoreOrders));
+  });
+}
+
+function renderOrderHistory(orders) {
+  elements.orderHistoryList.innerHTML = orders.map(order => `
+    <div class="order-history-item" data-order-id="${order.id}">
+      <div class="order-history-header">
+        <span class="order-number">Order #${order.id.substring(0, 6)}</span>
+        <span class="order-date">${new Date(order.timestamp?.toDate?.() || order.timestamp).toLocaleString()}</span>
+      </div>
+      <div class="order-history-details">
+        <div><strong>Status:</strong> <span class="status-${order.status}">${order.status}</span></div>
+        <div><strong>Type:</strong> ${order.orderType}</div>
+        ${order.orderType === 'Delivery' ? `<div><strong>Distance:</strong> ${order.deliveryDistance?.toFixed(1) || 'N/A'} km</div>` : ''}
+        <div class="order-total"><strong>Total:</strong> ${formatPrice(order.total)}</div>
+      </div>
+      <div class="order-items">
+        <ul>
+          ${order.items.slice(0, 3).map(item => `
+            <li>${item.name}${item.variant ? ` (${item.variant})` : ''} x${item.quantity}</li>
+          `).join('')}
+          ${order.items.length > 3 ? `<li>+${order.items.length - 3} more items</li>` : ''}
+        </ul>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', initCheckout);

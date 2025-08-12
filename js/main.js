@@ -1,4 +1,4 @@
-import { showNotification, updateCartCount } from './shared.js';
+import { db, showNotification, updateCartCount, requestNotificationPermission } from './shared.js';
 
 // Common functionality across all pages
 function initCommon() {
@@ -40,33 +40,42 @@ function initCommon() {
 
 // Check shop status with improved time handling
 function checkShopStatus() {
+  // First check local time as fallback
   const now = new Date();
   const hours = now.getHours();
   const minutes = now.getMinutes();
   const currentTime = hours + minutes / 60;
   
-  const shopOpenTime = 16; // 4 PM
-  const shopCloseTime = 22; // 10 PM
-  
   const shopStatusBanner = document.getElementById('shopStatusBanner');
   const shopStatusText = document.getElementById('shopStatusText');
-  const deliveryStatusText = document.getElementById('deliveryStatusText');
   
-  if (shopStatusBanner && shopStatusText) {
-    if (currentTime >= shopOpenTime && currentTime < shopCloseTime) {
-      shopStatusText.textContent = 'Shop: Open (4PM-10PM)';
-      shopStatusBanner.classList.add('open');
-      shopStatusBanner.classList.remove('closed');
-    } else {
-      shopStatusText.textContent = 'Shop: Closed (Opens at 4PM)';
-      shopStatusBanner.classList.add('closed');
-      shopStatusBanner.classList.remove('open');
-    }
-  }
-  
-  if (deliveryStatusText) {
-    deliveryStatusText.textContent = 'Delivery: Available (8km radius)';
-  }
+  // Then check Firebase for actual status
+  db.collection('settings').doc('shop')
+    .onSnapshot(doc => {
+      if (doc.exists) {
+        const settings = doc.data();
+        const isOpen = settings.isOpen;
+        const openingTime = parseTime(settings.openingTime);
+        const closingTime = parseTime(settings.closingTime);
+        
+        if (shopStatusBanner && shopStatusText) {
+          if (isOpen && currentTime >= openingTime && currentTime < closingTime) {
+            shopStatusText.textContent = `Shop: Open (${settings.openingTime}-${settings.closingTime})`;
+            shopStatusBanner.classList.add('open');
+            shopStatusBanner.classList.remove('closed');
+          } else {
+            shopStatusText.textContent = `Shop: Closed (Opens at ${settings.openingTime})`;
+            shopStatusBanner.classList.add('closed');
+            shopStatusBanner.classList.remove('open');
+          }
+        }
+      }
+    });
+}
+
+function parseTime(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours + minutes / 60;
 }
 
 // Initialize when DOM is loaded
