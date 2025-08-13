@@ -27,7 +27,6 @@
             <li class="active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
             <li data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</li>
             <li data-section="notifications"><i class="fas fa-bell"></i> Notifications</li>
-            <li data-section="analytics"><i class="fas fa-chart-bar"></i> Analytics</li>
             <li data-section="settings"><i class="fas fa-cog"></i> Settings</li>
           </ul>
         </nav>
@@ -52,6 +51,10 @@
               <h3>Active Users</h3>
               <p id="activeUsers">0</p>
             </div>
+            <div class="stat-card">
+              <h3>Notification Reach</h3>
+              <p id="notificationReach">0%</p>
+            </div>
           </div>
           <div class="chart-container">
             <canvas id="salesChart"></canvas>
@@ -69,6 +72,7 @@
                 <option value="preparing">Preparing</option>
                 <option value="delivering">Out for Delivery</option>
                 <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
               <input type="text" id="orderSearch" placeholder="Search orders...">
             </div>
@@ -81,8 +85,22 @@
         <!-- Notifications Section -->
         <section id="notificationsSection" class="content-section" style="display:none;">
           <div class="section-header">
-            <h2><i class="fas fa-bell"></i> Send Notification</h2>
+            <h2><i class="fas fa-bell"></i> Customer Notifications</h2>
           </div>
+          
+          <div class="notification-preferences">
+            <h3><i class="fas fa-cog"></i> Default Notification Preferences</h3>
+            <div class="preference-option">
+              <input type="checkbox" id="defaultStatusUpdates" checked>
+              <label for="defaultStatusUpdates">Order status updates</label>
+            </div>
+            <div class="preference-option">
+              <input type="checkbox" id="defaultSpecialOffers" checked>
+              <label for="defaultSpecialOffers">Special offers</label>
+            </div>
+            <button id="savePreferencesBtn" class="btn primary-btn"><i class="fas fa-save"></i> Save Defaults</button>
+          </div>
+          
           <form id="notificationForm" class="admin-form">
             <div class="form-group">
               <label for="notificationTitle">Title</label>
@@ -92,41 +110,33 @@
               <label for="notificationBody">Message</label>
               <textarea id="notificationBody" placeholder="Notification message" required></textarea>
             </div>
-            <button type="submit" class="btn primary-btn"><i class="fas fa-paper-plane"></i> Send Notification</button>
-          </form>
-          <div class="notification-status">
-            FCM Status: <span id="fcmStatus">Initializing...</span>
-          </div>
-        </section>
-
-        <!-- Analytics Section -->
-        <section id="analyticsSection" class="content-section" style="display:none;">
-          <div class="section-header">
-            <h2><i class="fas fa-chart-bar"></i> Sales Analytics</h2>
-            <div class="date-filters">
-              <select id="timePeriod">
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
+            <div class="form-group">
+              <label for="notificationType">Notification Type</label>
+              <select id="notificationType">
+                <option value="general">General Announcement</option>
+                <option value="promotion">Special Offer</option>
+                <option value="status_update">Status Update</option>
               </select>
             </div>
+            <button type="submit" class="btn primary-btn"><i class="fas fa-paper-plane"></i> Send Notification</button>
+          </form>
+          
+          <div class="notification-history">
+            <h3><i class="fas fa-history"></i> Recent Notifications</h3>
+            <div id="notificationsList" class="notifications-list">
+              <div class="loading">Loading notifications...</div>
+            </div>
           </div>
-          <div class="analytics-grid">
-            <div class="analytics-card">
-              <h3>Sales Trend</h3>
-              <canvas id="salesTrendChart"></canvas>
-            </div>
-            <div class="analytics-card">
-              <h3>Top Items</h3>
-              <canvas id="topItemsChart"></canvas>
-            </div>
+          
+          <div class="notification-status">
+            FCM Status: <span id="fcmStatus">Initializing...</span>
           </div>
         </section>
 
         <!-- Settings Section -->
         <section id="settingsSection" class="content-section" style="display:none;">
           <div class="section-header">
-            <h2><i class="fas fa-cog"></i> Settings</h2>
+            <h2><i class="fas fa-cog"></i> Shop Settings</h2>
           </div>
           <form id="settingsForm" class="admin-form">
             <div class="form-group toggle-group">
@@ -137,6 +147,7 @@
               </label>
               <span id="shopStatusText">Closed</span>
             </div>
+            
             <div class="form-group">
               <label>Business Hours</label>
               <div class="time-inputs">
@@ -145,6 +156,39 @@
                 <input type="time" id="closingTime">
               </div>
             </div>
+            
+            <div class="form-group">
+              <label for="deliveryRadius">Delivery Radius (km)</label>
+              <input type="number" id="deliveryRadius" min="1" max="20" value="8">
+            </div>
+            
+            <div class="form-group">
+              <label for="minDeliveryOrder">Minimum Delivery Order (₹)</label>
+              <input type="number" id="minDeliveryOrder" min="0" value="200">
+            </div>
+            
+            <div class="form-group">
+              <label>Delivery Charges</label>
+              <div class="delivery-charge-grid">
+                <div class="charge-item">
+                  <label>Under 4km</label>
+                  <input type="number" id="chargeUnder4km" min="0" value="0">
+                </div>
+                <div class="charge-item">
+                  <label>4-6km</label>
+                  <input type="number" id="charge4to6km" min="0" value="20">
+                </div>
+                <div class="charge-item">
+                  <label>6-8km</label>
+                  <input type="number" id="charge6to8km" min="0" value="30">
+                </div>
+                <div class="charge-item">
+                  <label>Free above (₹)</label>
+                  <input type="number" id="freeDeliveryThreshold" min="0" value="500">
+                </div>
+              </div>
+            </div>
+            
             <button type="submit" class="btn primary-btn"><i class="fas fa-save"></i> Save Settings</button>
           </form>
         </section>

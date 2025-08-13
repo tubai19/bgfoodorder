@@ -1,4 +1,4 @@
-// Firebase Configuration (should be moved to environment variables in production)
+// Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
   authDomain: "bakeandgrill-44c25.firebaseapp.com",
@@ -30,40 +30,55 @@ const elements = {
   notificationForm: document.getElementById('notificationForm'),
   notificationTitle: document.getElementById('notificationTitle'),
   notificationBody: document.getElementById('notificationBody'),
+  notificationType: document.getElementById('notificationType'),
   fcmStatus: document.getElementById('fcmStatus'),
   settingsForm: document.getElementById('settingsForm'),
   shopStatusToggle: document.getElementById('shopStatusToggle'),
   shopStatusText: document.getElementById('shopStatusText'),
   openingTime: document.getElementById('openingTime'),
   closingTime: document.getElementById('closingTime'),
+  deliveryRadius: document.getElementById('deliveryRadius'),
+  minDeliveryOrder: document.getElementById('minDeliveryOrder'),
+  chargeUnder4km: document.getElementById('chargeUnder4km'),
+  charge4to6km: document.getElementById('charge4to6km'),
+  charge6to8km: document.getElementById('charge6to8km'),
+  freeDeliveryThreshold: document.getElementById('freeDeliveryThreshold'),
   todayOrders: document.getElementById('todayOrders'),
   todayRevenue: document.getElementById('todayRevenue'),
   activeUsers: document.getElementById('activeUsers'),
+  notificationReach: document.getElementById('notificationReach'),
   orderDetailModal: document.getElementById('orderDetailModal'),
   orderDetailContent: document.getElementById('orderDetailContent'),
   closeModalButtons: document.querySelectorAll('.close-modal, .cancel-btn'),
-  timePeriod: document.getElementById('timePeriod')
+  notificationsList: document.getElementById('notificationsList'),
+  defaultStatusUpdates: document.getElementById('defaultStatusUpdates'),
+  defaultSpecialOffers: document.getElementById('defaultSpecialOffers'),
+  savePreferencesBtn: document.getElementById('savePreferencesBtn')
 };
 
 // Global State
 const state = {
   currentUser: null,
   orders: [],
+  notifications: [],
   salesChart: null,
-  topItemsChart: null,
   fcmToken: null,
   lastOrderId: null,
-  debounceTimer: null
+  debounceTimer: null,
+  defaultPreferences: {
+    statusUpdates: true,
+    specialOffers: true
+  }
 };
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function() {
-  // Check authentication state
   auth.onAuthStateChanged(user => {
     if (user && user.email === "suvradeep.pal93@gmail.com") {
       state.currentUser = user;
       setupRealtimeListeners();
       loadDashboardData();
+      loadDefaultPreferences();
       initializeMessaging();
       updateCurrentTime();
       setInterval(updateCurrentTime, 1000);
@@ -72,7 +87,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
   });
 
-  // Setup event listeners
   setupEventListeners();
 });
 
@@ -85,53 +99,46 @@ function setupEventListeners() {
       showSection(section);
       elements.navItems.forEach(navItem => navItem.classList.remove('active'));
       item.classList.add('active');
+      
+      // Load section-specific data
+      if (section === 'notifications') {
+        loadNotifications();
+      } else if (section === 'analytics') {
+        loadAnalyticsData();
+      }
     });
   });
 
   // Order filter
-  if (elements.orderFilter && elements.orderSearch) {
-    elements.orderFilter.addEventListener('change', filterOrders);
-    elements.orderSearch.addEventListener('input', () => {
-      clearTimeout(state.debounceTimer);
-      state.debounceTimer = setTimeout(filterOrders, 300);
-    });
-  }
+  elements.orderFilter.addEventListener('change', filterOrders);
+  elements.orderSearch.addEventListener('input', () => {
+    clearTimeout(state.debounceTimer);
+    state.debounceTimer = setTimeout(filterOrders, 300);
+  });
 
   // Notification form
-  if (elements.notificationForm) {
-    elements.notificationForm.addEventListener('submit', sendNotification);
-  }
+  elements.notificationForm.addEventListener('submit', sendNotification);
 
   // Settings form
-  if (elements.settingsForm) {
-    elements.settingsForm.addEventListener('submit', saveSettings);
-  }
+  elements.settingsForm.addEventListener('submit', saveSettings);
+
+  // Save preferences
+  elements.savePreferencesBtn.addEventListener('click', saveDefaultPreferences);
 
   // Logout button
-  if (elements.logoutBtn) {
-    elements.logoutBtn.addEventListener('click', handleLogout);
-  }
+  elements.logoutBtn.addEventListener('click', handleLogout);
 
   // Shop status toggle
-  if (elements.shopStatusToggle) {
-    elements.shopStatusToggle.addEventListener('change', function() {
-      elements.shopStatusText.textContent = this.checked ? 'Open' : 'Closed';
-    });
-  }
+  elements.shopStatusToggle.addEventListener('change', function() {
+    elements.shopStatusText.textContent = this.checked ? 'Open' : 'Closed';
+  });
 
   // Modal controls
-  if (elements.closeModalButtons) {
-    elements.closeModalButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        hideModal(elements.orderDetailModal);
-      });
+  elements.closeModalButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      hideModal(elements.orderDetailModal);
     });
-  }
-
-  // Time period selector for analytics
-  if (elements.timePeriod) {
-    elements.timePeriod.addEventListener('change', loadAnalyticsData);
-  }
+  });
 
   // Click outside modal to close
   window.addEventListener('click', (e) => {
@@ -147,11 +154,6 @@ function showSection(sectionId) {
     section.style.display = 'none';
   });
   document.getElementById(`${sectionId}Section`).style.display = 'block';
-
-  // Load data when section is shown
-  if (sectionId === 'analytics') {
-    loadAnalyticsData();
-  }
 }
 
 function updateCurrentTime() {
@@ -223,7 +225,20 @@ function setupRealtimeListeners() {
         elements.shopStatusText.textContent = settings.isOpen ? 'Open' : 'Closed';
         elements.openingTime.value = settings.openingTime || '10:00';
         elements.closingTime.value = settings.closingTime || '22:00';
+        elements.deliveryRadius.value = settings.deliveryRadius || 8;
+        elements.minDeliveryOrder.value = settings.minDeliveryOrder || 200;
+        elements.chargeUnder4km.value = settings.deliveryCharges?.under4km || 0;
+        elements.charge4to6km.value = settings.deliveryCharges?.between4and6km || 20;
+        elements.charge6to8km.value = settings.deliveryCharges?.between6and8km || 30;
+        elements.freeDeliveryThreshold.value = settings.deliveryCharges?.freeThreshold || 500;
       }
+    });
+
+  // Active users count
+  db.collection('fcmTokens')
+    .onSnapshot(snapshot => {
+      elements.activeUsers.textContent = snapshot.size;
+      calculateNotificationReach();
     });
 }
 
@@ -250,332 +265,97 @@ function loadDashboardData() {
       showNotification('Failed to load dashboard data', 'error');
     });
 
-  // Active users count
-  db.collection('fcmTokens')
-    .get()
-    .then(snapshot => {
-      elements.activeUsers.textContent = snapshot.size;
-    })
-    .catch(error => {
-      console.error("Error loading active users:", error);
+  calculateNotificationReach();
+}
+
+function calculateNotificationReach() {
+  db.collection('fcmTokens').get().then(snapshot => {
+    const totalUsers = snapshot.size;
+    if (totalUsers === 0) {
+      elements.notificationReach.textContent = '0%';
+      return;
+    }
+    
+    db.collection('fcmTokens')
+      .where('preferences.specialOffers', '==', true)
+      .get()
+      .then(activeSnapshot => {
+        const reach = (activeSnapshot.size / totalUsers * 100).toFixed(0);
+        elements.notificationReach.textContent = `${reach}%`;
+      });
+  });
+}
+
+function loadDefaultPreferences() {
+  db.collection('settings').doc('notificationPreferences').get()
+    .then(doc => {
+      if (doc.exists) {
+        state.defaultPreferences = doc.data();
+        elements.defaultStatusUpdates.checked = state.defaultPreferences.statusUpdates !== false;
+        elements.defaultSpecialOffers.checked = state.defaultPreferences.specialOffers !== false;
+      }
     });
 }
 
-function loadAnalyticsData() {
-  // Destroy existing charts if they exist
-  if (state.salesChart) {
-    state.salesChart.destroy();
-  }
-  if (state.topItemsChart) {
-    state.topItemsChart.destroy();
-  }
-
-  // Get data for the selected time period
-  const timePeriod = elements.timePeriod.value;
-  let startDate = new Date();
+function saveDefaultPreferences() {
+  const preferences = {
+    statusUpdates: elements.defaultStatusUpdates.checked,
+    specialOffers: elements.defaultSpecialOffers.checked,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
   
-  switch(timePeriod) {
-    case 'week':
-      startDate.setDate(startDate.getDate() - 7);
-      break;
-    case 'month':
-      startDate.setMonth(startDate.getMonth() - 1);
-      break;
-    default: // today
-      startDate.setHours(0, 0, 0, 0);
-  }
+  db.collection('settings').doc('notificationPreferences').set(preferences)
+    .then(() => {
+      showNotification('Default preferences saved');
+      state.defaultPreferences = preferences;
+    })
+    .catch(error => {
+      console.error("Error saving preferences:", error);
+      showNotification('Failed to save preferences', 'error');
+    });
+}
 
-  db.collection('orders')
-    .where('timestamp', '>=', startDate)
+function loadNotifications() {
+  elements.notificationsList.innerHTML = '<div class="loading">Loading notifications...</div>';
+  
+  db.collection('notifications')
+    .orderBy('timestamp', 'desc')
+    .limit(20)
     .get()
     .then(snapshot => {
-      const orders = [];
-      let itemCounts = {};
+      state.notifications = [];
+      elements.notificationsList.innerHTML = '';
+      
+      if (snapshot.empty) {
+        elements.notificationsList.innerHTML = '<div class="no-notifications">No notifications found</div>';
+        return;
+      }
       
       snapshot.forEach(doc => {
-        const order = doc.data();
-        orders.push(order);
-        
-        // Count items
-        order.items.forEach(item => {
-          if (!itemCounts[item.name]) {
-            itemCounts[item.name] = 0;
-          }
-          itemCounts[item.name] += item.quantity;
-        });
+        const notification = doc.data();
+        notification.id = doc.id;
+        state.notifications.push(notification);
+        renderNotification(notification);
       });
-
-      // Prepare data for sales trend chart
-      const days = [];
-      const salesByDay = [];
-      const date = new Date(startDate);
-      const today = new Date();
-      
-      while (date <= today) {
-        const dayStr = date.toLocaleDateString('en-IN', { weekday: 'short' });
-        days.push(dayStr);
-        
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
-        
-        const dayOrders = orders.filter(order => {
-          const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp);
-          return orderDate >= dayStart && orderDate <= dayEnd;
-        });
-        
-        const dayTotal = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-        salesByDay.push(dayTotal);
-        
-        date.setDate(date.getDate() + 1);
-      }
-
-      // Top items data
-      const topItems = Object.entries(itemCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-      
-      const topItemNames = topItems.map(item => item[0]);
-      const topItemCounts = topItems.map(item => item[1]);
-
-      // Create charts
-      createSalesChart(days, salesByDay);
-      createTopItemsChart(topItemNames, topItemCounts);
     })
     .catch(error => {
-      console.error("Error loading analytics data:", error);
-      showNotification('Failed to load analytics data', 'error');
+      console.error("Error loading notifications:", error);
+      elements.notificationsList.innerHTML = '<div class="error">Failed to load notifications</div>';
     });
 }
 
-function createSalesChart(labels, data) {
-  const salesCtx = document.getElementById('salesTrendChart').getContext('2d');
-  state.salesChart = new Chart(salesCtx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Daily Sales (₹)',
-        data: data,
-        borderColor: 'rgba(230, 57, 70, 1)',
-        backgroundColor: 'rgba(230, 57, 70, 0.1)',
-        borderWidth: 2,
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
-    }
-  });
-}
-
-function createTopItemsChart(labels, data) {
-  const itemsCtx = document.getElementById('topItemsChart').getContext('2d');
-  state.topItemsChart = new Chart(itemsCtx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Items Sold',
-        data: data,
-        backgroundColor: 'rgba(42, 157, 143, 0.8)',
-        borderColor: 'rgba(42, 157, 143, 1)',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
-    }
-  });
-}
-
-function filterOrders() {
-  const statusFilter = elements.orderFilter.value;
-  const searchTerm = elements.orderSearch.value.toLowerCase();
-  
-  const filteredOrders = state.orders.filter(order => {
-    const statusMatch = statusFilter === 'all' || order.status === statusFilter;
-    const searchMatch = !searchTerm || 
-      (order.customerName && order.customerName.toLowerCase().includes(searchTerm)) || 
-      order.id.toLowerCase().includes(searchTerm);
-    
-    return statusMatch && searchMatch;
-  });
-
-  elements.ordersListContainer.innerHTML = '';
-  
-  if (filteredOrders.length === 0) {
-    elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders match your criteria</div>';
-    return;
-  }
-
-  filteredOrders.forEach(order => renderOrderCard(order));
-}
-
-// Rendering Functions
-function renderOrderCard(order) {
-  const orderCard = document.createElement('div');
-  orderCard.className = 'order-card';
-  orderCard.dataset.orderId = order.id;
-  
-  // Highlight new orders
-  if (order.id === state.lastOrderId) {
-    orderCard.classList.add('new-order');
-    setTimeout(() => {
-      orderCard.classList.remove('new-order');
-    }, 5000);
-  }
-  
-  // Status info
-  const statusInfo = getStatusInfo(order.status);
-  
-  // Format date and phone
-  const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp);
-  const phoneNumber = order.phoneNumber || 'N/A';
-  
-  orderCard.innerHTML = `
-    <div class="order-header">
-      <span class="order-id">#${order.id.substring(0, 6)}</span>
-      <span class="order-status ${statusInfo.class}">${statusInfo.text}</span>
-      <span class="order-time">${orderDate.toLocaleTimeString()}</span>
-    </div>
-    <div class="order-body">
-      <div class="customer-info">
-        <span><i class="fas fa-user"></i> ${order.customerName || 'Customer'}</span>
-        <span><i class="fas fa-phone"></i> ${phoneNumber}</span>
-        <span><i class="fas fa-${order.orderType === 'Delivery' ? 'truck' : 'walking'}"></i> ${order.orderType}</span>
-      </div>
-      <div class="order-items">
-        ${order.items.map((item, index) => `
-          <div class="order-item">
-            <span>${index + 1}. ${item.name} (${item.variant}) x ${item.quantity}</span>
-            <span>₹${(item.price * item.quantity).toFixed(2)}</span>
-          </div>
-        `).join('')}
-      </div>
-      <div class="order-total">
-        <span>Total: ₹${order.total.toFixed(2)}</span>
-      </div>
-    </div>
-    <div class="order-footer">
-      <button class="btn details-btn" data-order-id="${order.id}"><i class="fas fa-info-circle"></i> Details</button>
-      <select class="status-select" data-order-id="${order.id}">
-        <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Pending</option>
-        <option value="preparing" ${order.status === 'preparing' ? 'selected' : ''}>Preparing</option>
-        <option value="delivering" ${order.status === 'delivering' ? 'selected' : ''}>Out for Delivery</option>
-        <option value="completed" ${order.status === 'completed' ? 'selected' : ''}>Completed</option>
-      </select>
+function renderNotification(notification) {
+  const notificationElement = document.createElement('div');
+  notificationElement.className = 'notification-item';
+  notificationElement.innerHTML = `
+    <h4>${notification.title}</h4>
+    <p>${notification.body}</p>
+    <div class="notification-meta">
+      <span><i class="fas fa-clock"></i> ${notification.timestamp?.toDate().toLocaleString() || 'Just now'}</span>
+      <span><i class="fas fa-tag"></i> ${notification.type || 'general'}</span>
     </div>
   `;
-  
-  // Add click event for details
-  orderCard.querySelector('.details-btn').addEventListener('click', () => {
-    showOrderDetails(order);
-  });
-  
-  // Add event listener for status change
-  orderCard.querySelector('.status-select').addEventListener('change', (e) => {
-    updateOrderStatus(e.target.dataset.orderId, e.target.value);
-  });
-  
-  elements.ordersListContainer.appendChild(orderCard);
-}
-
-function showOrderDetails(order) {
-  const orderDate = order.timestamp?.toDate ? order.timestamp.toDate() : new Date(order.timestamp);
-  
-  elements.orderDetailContent.innerHTML = `
-    <div class="order-detail-section">
-      <h4>Order Information</h4>
-      <div class="detail-grid">
-        <div><strong>Order ID:</strong> ${order.id}</div>
-        <div><strong>Date:</strong> ${orderDate.toLocaleString()}</div>
-        <div><strong>Status:</strong> <span class="status-badge ${order.status}">${order.status}</span></div>
-        <div><strong>Type:</strong> ${order.orderType}</div>
-      </div>
-    </div>
-    
-    <div class="order-detail-section">
-      <h4>Customer Information</h4>
-      <div class="detail-grid">
-        <div><strong>Name:</strong> ${order.customerName || 'N/A'}</div>
-        <div><strong>Phone:</strong> ${order.phoneNumber || 'N/A'}</div>
-        ${order.orderType === 'Delivery' ? `
-          <div><strong>Address:</strong> ${order.deliveryAddress || 'N/A'}</div>
-          <div><strong>Distance:</strong> ${order.deliveryDistance ? order.deliveryDistance + ' km' : 'N/A'}</div>
-        ` : ''}
-      </div>
-    </div>
-    
-    <div class="order-detail-section">
-      <h4>Order Items</h4>
-      <table class="order-items-table">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Variant</th>
-            <th>Qty</th>
-            <th>Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${order.items.map(item => `
-            <tr>
-              <td>${item.name}</td>
-              <td>${item.variant}</td>
-              <td>${item.quantity}</td>
-              <td>₹${(item.price * item.quantity).toFixed(2)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-    
-    <div class="order-detail-section">
-      <h4>Order Summary</h4>
-      <div class="summary-grid">
-        <div><strong>Subtotal:</strong> ₹${order.subtotal.toFixed(2)}</div>
-        ${order.deliveryCharge ? `<div><strong>Delivery Fee:</strong> ₹${order.deliveryCharge.toFixed(2)}</div>` : ''}
-        <div><strong>Total:</strong> ₹${order.total.toFixed(2)}</div>
-      </div>
-    </div>
-    
-    <div class="order-actions">
-      <button class="btn cancel-order-btn" data-order-id="${order.id}">
-        <i class="fas fa-times"></i> Cancel Order
-      </button>
-      <button class="btn print-order-btn" data-order-id="${order.id}">
-        <i class="fas fa-print"></i> Print Receipt
-      </button>
-    </div>
-  `;
-  
-  // Add event listener for cancel order button
-  const cancelBtn = elements.orderDetailContent.querySelector('.cancel-order-btn');
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-      if (confirm('Are you sure you want to cancel this order?')) {
-        updateOrderStatus(order.id, 'cancelled');
-        hideModal(elements.orderDetailModal);
-      }
-    });
-  }
-  
-  showModal(elements.orderDetailModal);
+  elements.notificationsList.appendChild(notificationElement);
 }
 
 // Notification Functions
@@ -603,6 +383,11 @@ async function initializeMessaging() {
       state.fcmToken = token;
       elements.fcmStatus.textContent = 'Ready to send notifications';
       await saveAdminToken(token);
+      
+      messaging.onMessage((payload) => {
+        showNotification(payload.notification?.body || 'New message');
+        playNotificationSound();
+      });
     } else {
       elements.fcmStatus.textContent = 'No token available';
     }
@@ -629,49 +414,89 @@ async function sendNotification(e) {
   
   const title = elements.notificationTitle.value.trim();
   const body = elements.notificationBody.value.trim();
+  const type = elements.notificationType.value;
   
   if (!title || !body) {
-    alert('Please enter both title and message');
+    showNotification('Please enter both title and message', 'error');
     return;
   }
   
   try {
-    // Send to all admin devices
+    // Save to admin notifications
     await db.collection('adminNotifications').add({
       title,
       body,
+      type,
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       sentBy: state.currentUser.email
     });
     
-    // Send to all users
-    await db.collection('notifications').add({
-      title,
-      body,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    // Send to users based on preferences
+    const tokensSnapshot = await db.collection('fcmTokens').get();
+    const batch = db.batch();
+    
+    tokensSnapshot.forEach(doc => {
+      const userPrefs = doc.data().preferences || state.defaultPreferences;
+      const shouldSend = type === 'status_update' ? userPrefs.statusUpdates !== false : 
+                       type === 'promotion' ? userPrefs.specialOffers !== false : true;
+      
+      if (shouldSend) {
+        const notificationRef = db.collection('notifications').doc();
+        batch.set(notificationRef, {
+          title,
+          body,
+          type,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          phoneNumber: doc.data().phoneNumber,
+          sentBy: state.currentUser.email
+        });
+      }
     });
     
-    alert('Notification sent successfully!');
+    await batch.commit();
+    
+    showNotification('Notification sent successfully!');
     elements.notificationForm.reset();
+    loadNotifications();
   } catch (error) {
     console.error('Error sending notification:', error);
-    alert('Failed to send notification');
+    showNotification('Failed to send notification', 'error');
   }
 }
 
 // Order Management Functions
 async function updateOrderStatus(orderId, newStatus) {
   try {
-    await db.collection('orders').doc(orderId).update({
+    const orderRef = db.collection('orders').doc(orderId);
+    await orderRef.update({
       status: newStatus,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     
-    // Send notification to customer if status changed to something other than pending
-    if (newStatus !== 'pending') {
-      const order = state.orders.find(o => o.id === orderId);
-      if (order) {
-        await sendStatusNotification(order.phoneNumber, newStatus);
+    const orderDoc = await orderRef.get();
+    const order = orderDoc.data();
+    
+    if (newStatus !== 'pending' && order.phoneNumber) {
+      const statusMessages = {
+        'preparing': 'Your order is now being prepared',
+        'delivering': 'Your order is out for delivery',
+        'completed': 'Your order has been completed. Thank you!',
+        'cancelled': 'Your order has been cancelled. Contact support for details.'
+      };
+      
+      if (statusMessages[newStatus]) {
+        const prefs = await getNotificationPreferences(order.phoneNumber);
+        
+        if (prefs.statusUpdates !== false) {
+          await db.collection('notifications').add({
+            title: 'Order Update',
+            body: statusMessages[newStatus],
+            phoneNumber: order.phoneNumber,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            orderId: orderId,
+            type: 'status_update'
+          });
+        }
       }
     }
     
@@ -682,25 +507,21 @@ async function updateOrderStatus(orderId, newStatus) {
   }
 }
 
-async function sendStatusNotification(phoneNumber, status) {
+async function getNotificationPreferences(phoneNumber) {
   try {
-    const statusMessages = {
-      'preparing': 'Your order is now being prepared',
-      'delivering': 'Your order is out for delivery',
-      'completed': 'Your order has been completed. Thank you!',
-      'cancelled': 'Your order has been cancelled. Contact support for details.'
-    };
+    const querySnapshot = await db.collection('fcmTokens')
+      .where('phoneNumber', '==', phoneNumber)
+      .limit(1)
+      .get();
     
-    if (statusMessages[status]) {
-      await db.collection('notifications').add({
-        title: 'Order Update',
-        body: statusMessages[status],
-        phoneNumber,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-      });
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return doc.data().preferences || state.defaultPreferences;
     }
+    return state.defaultPreferences;
   } catch (error) {
-    console.error('Error sending status notification:', error);
+    console.error('Error getting preferences:', error);
+    return state.defaultPreferences;
   }
 }
 
@@ -712,11 +533,32 @@ async function saveSettings(e) {
     isOpen: elements.shopStatusToggle.checked,
     openingTime: elements.openingTime.value,
     closingTime: elements.closingTime.value,
+    deliveryRadius: parseInt(elements.deliveryRadius.value),
+    minDeliveryOrder: parseInt(elements.minDeliveryOrder.value),
+    deliveryCharges: {
+      under4km: parseInt(elements.chargeUnder4km.value),
+      between4and6km: parseInt(elements.charge4to6km.value),
+      between6and8km: parseInt(elements.charge6to8km.value),
+      freeThreshold: parseInt(elements.freeDeliveryThreshold.value)
+    },
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   
   try {
     await db.collection('settings').doc('shop').set(settings, { merge: true });
+    
+    // Send shop status update
+    const statusMessage = settings.isOpen 
+      ? `We're now open! (${settings.openingTime}-${settings.closingTime})` 
+      : `We're currently closed. Opens at ${settings.openingTime}`;
+    
+    await db.collection('notifications').add({
+      title: 'Shop Status Update',
+      body: statusMessage,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      type: 'shop_status'
+    });
+    
     showNotification('Settings saved successfully');
   } catch (error) {
     console.error('Error saving settings:', error);
@@ -725,17 +567,6 @@ async function saveSettings(e) {
 }
 
 // Helper Functions
-function getStatusInfo(status) {
-  switch(status) {
-    case 'pending': return { class: 'pending', text: 'Pending' };
-    case 'preparing': return { class: 'preparing', text: 'Preparing' };
-    case 'delivering': return { class: 'delivering', text: 'Out for Delivery' };
-    case 'completed': return { class: 'completed', text: 'Completed' };
-    case 'cancelled': return { class: 'cancelled', text: 'Cancelled' };
-    default: return { class: '', text: status };
-  }
-}
-
 function showNotification(message, type = 'success') {
   const notification = document.createElement('div');
   notification.className = `notification ${type}`;
@@ -756,6 +587,15 @@ function playNotificationSound() {
 
 async function handleLogout() {
   try {
+    if (state.fcmToken) {
+      try {
+        await deleteToken(messaging, state.fcmToken);
+        await db.collection('adminTokens').doc(state.currentUser.uid).delete();
+      } catch (error) {
+        console.error('Error removing token:', error);
+      }
+    }
+    
     await auth.signOut();
     window.location.href = '/admin-login.html';
   } catch (error) {
