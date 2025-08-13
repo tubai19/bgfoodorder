@@ -10,7 +10,6 @@ const firebaseConfig = {
   appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba"
 };
 
-// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
@@ -20,8 +19,9 @@ messaging.onBackgroundMessage((payload) => {
   
   const notificationTitle = payload.notification?.title || 'New Message';
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new message',
-    icon: payload.notification?.icon || '/assets/images/icon-192.png',
+    body: payload.notification?.body || 'You have a new update',
+    icon: '/android-chrome-192x192.png',
+    badge: '/badge.png',
     data: payload.data || {}
   };
 
@@ -32,19 +32,31 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
-  const urlToOpen = new URL(event.notification.data?.url || '/', self.location.origin).href;
-  
+  let url = '/';
+  if (event.notification.data) {
+    if (event.notification.data.orderId) {
+      url = `/checkout.html?orderId=${event.notification.data.orderId}`;
+    } else if (event.notification.data.path) {
+      url = event.notification.data.path;
+    }
+  }
+
   event.waitUntil(
     clients.matchAll({type: 'window'}).then((windowClients) => {
       for (const client of windowClients) {
-        if (client.url === urlToOpen && 'focus' in client) {
+        if (client.url === url && 'focus' in client) {
           return client.focus();
         }
       }
       
       if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
+        return clients.openWindow(url);
       }
     })
   );
+});
+
+// Notification close handler
+self.addEventListener('notificationclose', (event) => {
+  console.log('Notification closed', event.notification);
 });

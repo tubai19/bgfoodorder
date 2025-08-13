@@ -77,6 +77,10 @@
           <i class="fas fa-map-marker-alt"></i> 
           <span id="distanceText">Distance: Calculating...</span>
         </div>
+        <div id="deliveryTimeEstimate" class="mobile-delivery-time" style="display:none;">
+          <i class="fas fa-clock"></i> 
+          <span id="timeEstimateText">Estimated time: Calculating...</span>
+        </div>
       </div>
       
       <div class="mobile-form-input">
@@ -94,6 +98,20 @@
       </div>
       
       <div id="deliveryChargeDisplay" class="mobile-delivery-charge"></div>
+
+      <div class="mobile-form-input">
+        <label><i class="fas fa-bell"></i> Notification Preferences</label>
+        <div class="notification-options">
+          <label class="notification-option">
+            <input type="checkbox" id="notifyStatus" checked>
+            <span>Order status updates</span>
+          </label>
+          <label class="notification-option">
+            <input type="checkbox" id="notifyOffers" checked>
+            <span>Special offers</span>
+          </label>
+        </div>
+      </div>
       
       <div class="mobile-form-input">
         <label for="orderNotes"><i class="fas fa-sticky-note"></i> Special Instructions</label>
@@ -141,7 +159,7 @@
       </div>
       <div class="mobile-modal-buttons">
         <button class="mobile-modal-btn cancel-btn" id="cancelOrderBtn"><i class="fas fa-times"></i> Cancel</button>
-        <button class="mobile-modal-btn confirm-btn" id="confirmOrderBtn"><i class="fab fa-whatsapp"></i> Confirm via WhatsApp</button>
+        <button class="mobile-modal-btn confirm-btn" id="confirmOrderBtn"><i class="fab fa-whatsapp"></i> Confirm & Share via WhatsApp</button>
       </div>
     </div>
   </div>
@@ -162,9 +180,9 @@
     <span id="notificationText">Order placed successfully!</span>
   </div>
 
-   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js" defer></script>
-  <script type="module" src="js/main.js" defer></script>
+  <script type="module" src="js/shared.js" defer></script>
   <script type="module" src="js/checkout.js" defer></script>
 </body>
 </html>
