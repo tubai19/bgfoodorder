@@ -5,10 +5,12 @@ import {
   updateCartCount, 
   showNotification, 
   formatPrice, 
-  requestNotificationPermission 
+  requestNotificationPermission,
+  sendNotificationToUser,
+  updateNotificationPreferences,
+  getNotificationPreferences
 } from './shared.js';
 
-// Import Firebase v9 modular functions
 import { 
   collection, 
   addDoc, 
@@ -27,10 +29,16 @@ const DELIVERY_CHARGES = {
   between4and6km: 20,
   between6and8km: 30
 };
+const DELIVERY_TIME_ESTIMATES = {
+  under4km: '30-45 minutes',
+  between4and6km: '45-60 minutes',
+  between6and8km: '60-75 minutes',
+  pickup: '20-30 minutes'
+};
 const MIN_DELIVERY_ORDER = 200;
 const SHOP_PHONE = '918240266267';
 const SHOP_NAME = 'Bake & Grill';
-const SHOP_ADDRESS = '123 Main Street, Kolkata, West Bengal';
+const SHOP_ADDRESS = 'Sanjua,Bakhrahat,West Bengal 743377';
 
 // DOM Elements
 const elements = {
@@ -56,7 +64,11 @@ const elements = {
   cancelOrderBtn: document.getElementById('cancelOrderBtn'),
   closeModal: document.querySelector('.close-modal'),
   orderHistoryList: document.getElementById('orderHistoryList'),
-  paymentMethodRadios: document.querySelectorAll('input[name="paymentMethod"]')
+  paymentMethodRadios: document.querySelectorAll('input[name="paymentMethod"]'),
+  deliveryTimeEstimate: document.getElementById('deliveryTimeEstimate'),
+  timeEstimateText: document.getElementById('timeEstimateText'),
+  notifyStatus: document.getElementById('notifyStatus'),
+  notifyOffers: document.getElementById('notifyOffers')
 };
 
 // Variables
@@ -66,9 +78,44 @@ let userLocation = null;
 let deliveryDistance = null;
 let deliveryCharge = 0;
 
-// =======================
-// Firestore Save Function
-// =======================
+// Helper Functions
+function getDeliveryEstimate() {
+  const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  
+  if (orderType === 'Pickup') {
+    return DELIVERY_TIME_ESTIMATES.pickup;
+  }
+
+  if (!deliveryDistance) return 'Time estimate unavailable';
+
+  if (deliveryDistance <= 4) {
+    return DELIVERY_TIME_ESTIMATES.under4km;
+  } else if (deliveryDistance <= 6) {
+    return DELIVERY_TIME_ESTIMATES.between4and6km;
+  } else {
+    return DELIVERY_TIME_ESTIMATES.between6and8km;
+  }
+}
+
+function updateDeliveryInfoDisplay() {
+  const orderType = document.querySelector('input[name="orderType"]:checked').value;
+  
+  if (orderType === 'Delivery') {
+    elements.timeEstimateText.textContent = `Estimated delivery: ${getDeliveryEstimate()}`;
+    elements.deliveryTimeEstimate.style.display = 'block';
+  } else {
+    elements.timeEstimateText.textContent = `Estimated pickup: ${getDeliveryEstimate()}`;
+    elements.deliveryTimeEstimate.style.display = 'block';
+  }
+}
+
+function generateOSMUrl(location) {
+  if (!location) return 'Location not shared';
+  return `https://www.openstreetmap.org/?mlat=${location.lat}&mlon=${location.lng}` +
+    `#map=16/${location.lat}/${location.lng}&layers=N`;
+}
+
+// Main Functions
 async function saveOrderToFirestore() {
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
   const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'Cash on Delivery';
@@ -88,15 +135,18 @@ async function saveOrderToFirestore() {
       total,
       status: 'pending',
       timestamp: serverTimestamp(),
+      notificationPreferences: {
+        statusUpdates: elements.notifyStatus.checked,
+        specialOffers: elements.notifyOffers.checked
+      },
       ...(orderType === 'Delivery' && {
         deliveryAddress: elements.manualDeliveryAddress.value || 'Current location',
-        deliveryDistance
+        deliveryDistance,
+        estimatedTime: getDeliveryEstimate(),
+        location: userLocation
       })
     });
 
-    // Request notification permission after order
-    await requestNotificationPermission(phoneNumber);
-    
     return orderRef.id;
   } catch (error) {
     console.error('Error saving order:', error);
@@ -105,10 +155,8 @@ async function saveOrderToFirestore() {
   }
 }
 
-// =======================
 // Checkout Initialisation
-// =======================
-function initCheckout() {
+async function initCheckout() {
   if (!elements.orderForm) return;
 
   if (cart.length === 0) {
@@ -120,6 +168,13 @@ function initCheckout() {
   updateOrderTotal();
   setupEventListeners();
   loadOrderHistory();
+
+  // Load notification preferences if phone number exists
+  if (elements.phoneNumber.value) {
+    const preferences = await getNotificationPreferences(elements.phoneNumber.value);
+    elements.notifyStatus.checked = preferences.statusUpdates;
+    elements.notifyOffers.checked = preferences.specialOffers;
+  }
 }
 
 function updateOrderTotal() {
@@ -131,7 +186,10 @@ function updateOrderTotal() {
 
 function setupEventListeners() {
   elements.orderTypeRadios.forEach(radio => {
-    radio.addEventListener('change', handleOrderTypeChange);
+    radio.addEventListener('change', () => {
+      handleOrderTypeChange();
+      updateDeliveryInfoDisplay();
+    });
   });
 
   if (elements.deliveryShareLocationBtn) {
@@ -173,9 +231,7 @@ function setupEventListeners() {
   });
 }
 
-// =======================
 // Order Type / Location
-// =======================
 function handleOrderTypeChange() {
   const orderType = document.querySelector('input[name="orderType"]:checked').value;
 
@@ -188,6 +244,7 @@ function handleOrderTypeChange() {
       calculateDeliveryCharge();
     }
   }
+  updateDeliveryInfoDisplay();
 }
 
 function handleShareLocation() {
@@ -224,6 +281,7 @@ function handleShareLocation() {
         }
 
         elements.deliveryShowManualLocBtn.style.display = 'block';
+        updateDeliveryInfoDisplay();
       },
       error => {
         console.error('Error getting location:', error);
@@ -316,6 +374,7 @@ function calculateDistanceAndCharge() {
     elements.deliveryDistanceDisplay.style.display = 'block';
     calculateDeliveryCharge();
   }
+  updateDeliveryInfoDisplay();
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -369,9 +428,7 @@ function calculateDeliveryCharge() {
   }
 }
 
-// =======================
 // Order Handling
-// =======================
 function handlePlaceOrder(e) {
   e.preventDefault();
 
@@ -414,7 +471,10 @@ function handlePlaceOrder(e) {
       <p><strong>Name:</strong> ${elements.customerName.value}</p>
       <p><strong>Phone:</strong> ${elements.phoneNumber.value}</p>
       <p><strong>Order Type:</strong> ${orderType}</p>
-      ${orderType === 'Delivery' ? `<p><strong>Delivery Address:</strong> ${elements.manualDeliveryAddress.value || 'Current location'}</p>` : ''}
+      ${orderType === 'Delivery' ? `
+        <p><strong>Delivery Address:</strong> ${elements.manualDeliveryAddress.value || 'Current location'}</p>
+        <p><strong>Estimated Time:</strong> ${getDeliveryEstimate()}</p>
+      ` : ''}
     </div>
     <div class="order-summary-item">
       <h3>Order Items</h3>
@@ -429,6 +489,11 @@ function handlePlaceOrder(e) {
       ${orderType === 'Delivery' ? `<p><strong>Delivery Charge:</strong> ${formatPrice(deliveryCharge)}</p>` : ''}
       <p class="order-total"><strong>Total:</strong> ${formatPrice(total)}</p>
     </div>
+    <div class="order-summary-item">
+      <p><strong>Notification Preferences:</strong></p>
+      <p>Order updates: ${elements.notifyStatus.checked ? '✅ Enabled' : '❌ Disabled'}</p>
+      <p>Special offers: ${elements.notifyOffers.checked ? '✅ Enabled' : '❌ Disabled'}</p>
+    </div>
   `;
 
   elements.orderConfirmationSummary.innerHTML = summaryHTML;
@@ -441,165 +506,91 @@ async function confirmOrder() {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = subtotal + deliveryCharge;
 
+  // Save notification preferences
+  const preferences = {
+    statusUpdates: elements.notifyStatus.checked,
+    specialOffers: elements.notifyOffers.checked
+  };
+  
+  await updateNotificationPreferences(elements.phoneNumber.value, preferences);
+
   const orderId = await saveOrderToFirestore();
   if (!orderId) return;
 
-  // Enhanced WhatsApp message with better formatting
-  let whatsappMessage = `*🍕 NEW ORDER - ${SHOP_NAME.toUpperCase()} 🍕*%0A%0A`;
-  
-  // Order header
-  whatsappMessage += `📋 *Order #${orderId.substring(0, 6).toUpperCase()}*%0A`;
-  whatsappMessage += `⏰ ${new Date().toLocaleString()}%0A%0A`;
-  
-  // Customer details
-  whatsappMessage += `👤 *Customer Details*%0A`;
-  whatsappMessage += `▸ Name: ${elements.customerName.value}%0A`;
-  whatsappMessage += `▸ Phone: ${elements.phoneNumber.value}%0A`;
-  whatsappMessage += `▸ Order Type: ${orderType}%0A`;
-  whatsappMessage += `▸ Payment: ${paymentMethod}%0A`;
-  
+  // Request notification permission with preferences
+  await requestNotificationPermission(elements.phoneNumber.value, preferences);
+
+  // Send initial confirmation notification
+  await sendNotificationToUser(
+    elements.phoneNumber.value,
+    'Order Confirmed',
+    `Your order #${orderId.substring(0, 6)} has been received`,
+    {
+      orderId,
+      type: 'order_confirmation'
+    }
+  );
+
+  // Build WhatsApp message
+  let whatsappMessage = `*🍕 NEW ORDER - ${SHOP_NAME.toUpperCase()}*%0A%0A` +
+    `📋 *Order #${orderId.substring(0, 6).toUpperCase()}*%0A` +
+    `⏰ ${new Date().toLocaleTimeString()}, ${new Date().toLocaleDateString()}%0A%0A` +
+    `👤 *Customer Details*%0A` +
+    `▸ Name: ${elements.customerName.value}%0A` +
+    `▸ Phone: https://wa.me/${elements.phoneNumber.value}%0A` +
+    `▸ Order Type: ${orderType}%0A` +
+    `▸ Estimated Time: ${getDeliveryEstimate()}%0A` +
+    `▸ Payment: ${paymentMethod}%0A`;
+
   if (orderType === 'Delivery') {
-    whatsappMessage += `▸ Address: ${elements.manualDeliveryAddress.value || 'Current location'}%0A`;
-    whatsappMessage += `▸ Distance: ${deliveryDistance.toFixed(1)} km%0A`;
-    
-    // Add delivery estimate
-    const estimate = deliveryDistance <= 4 ? '30-45 mins' : 
-                     deliveryDistance <= 6 ? '45-60 mins' : '60-75 mins';
-    whatsappMessage += `▸ Estimated Delivery: ${estimate}%0A`;
+    whatsappMessage += `▸ Address: ${elements.manualDeliveryAddress.value || 'Current location'}%0A` +
+      `▸ Distance: ${deliveryDistance.toFixed(1)} km%0A` +
+      `▸ Delivery Charge: ${formatPrice(deliveryCharge)}%0A` +
+      `%0A📍 *Location Map*%0A${generateOSMUrl(userLocation)}%0A%0A`;
   }
-  whatsappMessage += `%0A`;
+
+  whatsappMessage += `%0A🛒 *Order Items*%0A` +
+    `${cart.map(item => `▸ ${item.name}${item.variant ? ` (${item.variant})` : ''} x${item.quantity} - ${formatPrice(item.price * item.quantity)}`).join('%0A')}` +
+    `%0A%0A💰 *Order Summary*%0A` +
+    `▸ Subtotal: ${formatPrice(subtotal)}%0A` +
+    (orderType === 'Delivery' ? `▸ Delivery Charge: ${formatPrice(deliveryCharge)}%0A` : '') +
+    `*▸ TOTAL: ${formatPrice(total)}*%0A%0A` +
+    (elements.orderNotes.value.trim() ? `📝 *Special Instructions*%0A${elements.orderNotes.value}%0A%0A` : '') +
+    `Thank you!%0AFor any changes, please call ${SHOP_PHONE}`;
+
+  // Create a hidden link and click it to ensure WhatsApp opens
+  const whatsappLink = document.createElement('a');
+  whatsappLink.href = `https://wa.me/${SHOP_PHONE}?text=${whatsappMessage}`;
+  whatsappLink.target = '_blank';
+  whatsappLink.style.display = 'none';
+  document.body.appendChild(whatsappLink);
+  whatsappLink.click();
   
-  // Order items
-  whatsappMessage += `🛒 *Order Items* (${cart.length})%0A`;
-  cart.forEach(item => {
-    whatsappMessage += `▸ ${item.name}${item.variant ? ` (${item.variant})` : ''} x${item.quantity} - ${formatPrice(item.price * item.quantity)}%0A`;
-  });
-  whatsappMessage += `%0A`;
-  
-  // Pricing summary
-  whatsappMessage += `💰 *Order Summary*%0A`;
-  whatsappMessage += `▸ Subtotal: ${formatPrice(subtotal)}%0A`;
-  if (orderType === 'Delivery') {
-    whatsappMessage += `▸ Delivery Charge: ${formatPrice(deliveryCharge)}%0A`;
-  }
-  whatsappMessage += `*▸ TOTAL: ${formatPrice(total)}*%0A%0A`;
-  
-  // Special instructions
-  if (elements.orderNotes.value.trim()) {
-    whatsappMessage += `📝 *Special Instructions*%0A${elements.orderNotes.value}%0A%0A`;
-  }
-
-  // Combo notice if applicable
-  const hasCombo = cart.some(item => item.category === 'Combos');
-  if (hasCombo && orderType === 'Delivery') {
-    whatsappMessage += `⚠️ *Note:* Combo items must be picked up from our location.%0A%0A`;
-  }
-
-  // Closing message
-  whatsappMessage += `Thank you for your order!%0A`;
-  whatsappMessage += `For any changes, please call ${SHOP_PHONE}%0A%0A`;
-  whatsappMessage += `📍 *${SHOP_NAME}*%0A`;
-  whatsappMessage += `${SHOP_ADDRESS}`;
-
-  // Save to history
-  saveOrderToHistory();
-
-  // Open WhatsApp
-  const whatsappUrl = `https://wa.me/${SHOP_PHONE}?text=${whatsappMessage}`;
-  window.open(whatsappUrl, '_blank');
+  // Check if WhatsApp opened successfully
+  setTimeout(() => {
+    if (!window.open(whatsappLink.href, '_blank')) {
+      showNotification('Please allow pop-ups to share order details via WhatsApp', 'error');
+      // Fallback - show the WhatsApp link as a clickable button
+      elements.orderConfirmationSummary.innerHTML += `
+        <div class="whatsapp-fallback">
+          <p>Could not open WhatsApp automatically. Please click below:</p>
+          <a href="${whatsappLink.href}" target="_blank" class="mobile-order-btn">
+            <i class="fab fa-whatsapp"></i> Share Order via WhatsApp
+          </a>
+        </div>
+      `;
+      elements.orderConfirmationModal.style.display = 'block';
+    }
+    document.body.removeChild(whatsappLink);
+  }, 500);
 
   // Clear cart and redirect
   cart.length = 0;
   saveCart();
   elements.orderConfirmationModal.style.display = 'none';
-  showNotification('Order placed successfully! Thank you for your order. We will contact you shortly.');
+  showNotification('Order placed successfully! Please check WhatsApp for confirmation.');
   setTimeout(() => window.location.href = 'index.html', 3000);
 }
 
-function saveOrderToHistory() {
-  const orders = JSON.parse(localStorage.getItem('orderHistory')) || [];
-  const orderType = document.querySelector('input[name="orderType"]:checked').value;
-  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || 'Cash on Delivery';
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const total = subtotal + deliveryCharge;
-
-  const newOrder = {
-    id: Date.now(),
-    date: new Date().toLocaleString(),
-    customer: {
-      name: elements.customerName.value,
-      phone: elements.phoneNumber.value
-    },
-    type: orderType,
-    paymentMethod,
-    items: [...cart],
-    subtotal: subtotal,
-    deliveryCharge: orderType === 'Delivery' ? deliveryCharge : 0,
-    total: total,
-    status: 'pending'
-  };
-
-  orders.unshift(newOrder);
-  localStorage.setItem('orderHistory', JSON.stringify(orders));
-}
-
-function loadOrderHistory() {
-  const phoneNumber = elements.phoneNumber.value;
-  if (!phoneNumber) return;
-
-  // First check localStorage
-  const orders = JSON.parse(localStorage.getItem('orderHistory')) || [];
-  
-  if (orders.length === 0) {
-    elements.orderHistoryList.innerHTML = '<p class="no-orders">No past orders found</p>';
-  } else {
-    renderOrderHistory(orders);
-  }
-  
-  // Then listen for Firestore updates
-  const q = query(
-    collection(db, 'orders'),
-    where('phoneNumber', '==', phoneNumber),
-    orderBy('timestamp', 'desc')
-  );
-  
-  onSnapshot(q, (snapshot) => {
-    const firestoreOrders = [];
-    snapshot.forEach(doc => {
-      const order = doc.data();
-      order.id = doc.id;
-      firestoreOrders.push(order);
-    });
-    
-    renderOrderHistory(firestoreOrders);
-    localStorage.setItem('orderHistory', JSON.stringify(firestoreOrders));
-  });
-}
-
-function renderOrderHistory(orders) {
-  elements.orderHistoryList.innerHTML = orders.map(order => `
-    <div class="order-history-item" data-order-id="${order.id}">
-      <div class="order-history-header">
-        <span class="order-number">Order #${order.id.substring(0, 6)}</span>
-        <span class="order-date">${new Date(order.timestamp?.toDate?.() || order.timestamp).toLocaleString()}</span>
-      </div>
-      <div class="order-history-details">
-        <div><strong>Status:</strong> <span class="status-${order.status}">${order.status}</span></div>
-        <div><strong>Type:</strong> ${order.orderType}</div>
-        <div><strong>Payment:</strong> ${order.paymentMethod || 'Cash on Delivery'}</div>
-        ${order.orderType === 'Delivery' ? `<div><strong>Distance:</strong> ${order.deliveryDistance?.toFixed(1) || 'N/A'} km</div>` : ''}
-        <div class="order-total"><strong>Total:</strong> ${formatPrice(order.total)}</div>
-      </div>
-      <div class="order-items">
-        <ul>
-          ${order.items.slice(0, 3).map(item => `
-            <li>${item.name}${item.variant ? ` (${item.variant})` : ''} x${item.quantity}</li>
-          `).join('')}
-          ${order.items.length > 3 ? `<li>+${order.items.length - 3} more items</li>` : ''}
-        </ul>
-      </div>
-    </div>
-  `).join('');
-}
-
+// Initialize checkout
 document.addEventListener('DOMContentLoaded', initCheckout);

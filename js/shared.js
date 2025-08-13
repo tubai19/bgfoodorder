@@ -1,14 +1,22 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
-  getFirestore, 
-  serverTimestamp,  // Add this import
+  getFirestore,
+  collection,
   doc,
-  setDoc
+  setDoc,
+  getDoc,
+  updateDoc,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { 
   getMessaging, 
   getToken, 
-  onMessage 
+  onMessage,
+  isSupported
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
@@ -20,12 +28,17 @@ const firebaseConfig = {
   appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const messaging = getMessaging(app);
+let messaging;
 
-// Notification utility with improved error handling
+(async () => {
+  if (await isSupported()) {
+    messaging = getMessaging(app);
+  }
+})();
+
+// Notification utility
 function showNotification(message, type = 'success') {
   try {
     const notification = document.getElementById('notification');
@@ -44,12 +57,12 @@ function showNotification(message, type = 'success') {
   }
 }
 
-// Price formatting with currency symbol
+// Price formatting
 function formatPrice(amount) {
   return '₹' + amount.toFixed(0);
 }
 
-// Cart management with validation
+// Cart management
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
 function saveCart() {
@@ -73,9 +86,14 @@ function updateCartCount() {
   }
 }
 
-// Request notification permission
-async function requestNotificationPermission(phoneNumber) {
+// Notification functions
+async function requestNotificationPermission(phoneNumber, preferences = {}) {
   try {
+    if (!messaging) {
+      console.log('Messaging not supported');
+      return null;
+    }
+
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
       const token = await getToken(messaging, { 
@@ -83,38 +101,123 @@ async function requestNotificationPermission(phoneNumber) {
       });
       
       if (token) {
-        // Use modular v9 syntax
         await setDoc(doc(db, 'fcmTokens', token), {
           token,
           phoneNumber,
-          createdAt: serverTimestamp()  // Use imported serverTimestamp
+          preferences: {
+            statusUpdates: true,
+            specialOffers: true,
+            ...preferences
+          },
+          createdAt: serverTimestamp()
         });
       }
       return token;
     }
+    return null;
   } catch (error) {
     console.error('Notification permission error:', error);
     return null;
   }
 }
 
-// Handle incoming messages
-onMessage(messaging, (payload) => {
-  console.log('Message received:', payload);
-  showNotification(payload.notification?.body || 'You have a new update');
-});
+async function sendNotificationToUser(phoneNumber, title, body, data = {}) {
+  try {
+    const tokensRef = collection(db, 'fcmTokens');
+    const q = query(tokensRef, where('phoneNumber', '==', phoneNumber));
+    const querySnapshot = await getDocs(q);
+    
+    const tokens = [];
+    querySnapshot.forEach((doc) => {
+      // Check if user has opted in for this notification type
+      const preferences = doc.data().preferences || {};
+      if (data.type === 'order_update' && !preferences.statusUpdates) return;
+      if (data.type === 'promotion' && !preferences.specialOffers) return;
+      
+      tokens.push(doc.data().token);
+    });
 
-// Initialize cart count on page load
+    if (tokens.length === 0) return false;
+
+    // In production, call a cloud function or backend API here
+    console.log('Would send notification to:', tokens, 'with:', { title, body, data });
+    return true;
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    return false;
+  }
+}
+
+async function updateNotificationPreferences(phoneNumber, preferences) {
+  try {
+    const tokensRef = collection(db, 'fcmTokens');
+    const q = query(tokensRef, where('phoneNumber', '==', phoneNumber));
+    const querySnapshot = await getDocs(q);
+    
+    const batch = writeBatch(db);
+    querySnapshot.forEach((doc) => {
+      const docRef = doc.ref;
+      batch.update(docRef, { preferences });
+    });
+    
+    await batch.commit();
+    return true;
+  } catch (error) {
+    console.error('Error updating preferences:', error);
+    return false;
+  }
+}
+
+async function getNotificationPreferences(phoneNumber) {
+  try {
+    const tokensRef = collection(db, 'fcmTokens');
+    const q = query(tokensRef, where('phoneNumber', '==', phoneNumber), limit(1));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return doc.data().preferences || {
+        statusUpdates: true,
+        specialOffers: true
+      };
+    }
+    return {
+      statusUpdates: true,
+      specialOffers: true
+    };
+  } catch (error) {
+    console.error('Error getting preferences:', error);
+    return {
+      statusUpdates: true,
+      specialOffers: true
+    };
+  }
+}
+
+// Handle incoming messages
+if (messaging) {
+  onMessage(messaging, (payload) => {
+    console.log('Message received:', payload);
+    const notification = payload.notification;
+    const data = payload.data || {};
+    
+    showNotification(notification?.body || 'New update', data.type || 'info');
+  });
+}
+
+// Initialize cart count
 document.addEventListener('DOMContentLoaded', updateCartCount);
 
 export { 
   db,
   messaging,
-  getToken,
   showNotification, 
   formatPrice, 
   cart, 
   saveCart, 
   updateCartCount,
-  requestNotificationPermission
+  requestNotificationPermission,
+  sendNotificationToUser,
+  updateNotificationPreferences,
+  getNotificationPreferences
 };
