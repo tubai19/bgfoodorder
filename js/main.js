@@ -1,4 +1,4 @@
-import { db, showNotification, updateCartCount, requestNotificationPermission } from './shared.js';
+import { db, showNotification, updateCartCount } from './shared.js';
 
 // Common functionality across all pages
 function initCommon() {
@@ -50,27 +50,27 @@ function checkShopStatus() {
   const shopStatusText = document.getElementById('shopStatusText');
   
   // Then check Firebase for actual status
-  db.collection('settings').doc('shop')
-    .onSnapshot(doc => {
-      if (doc.exists) {
-        const settings = doc.data();
-        const isOpen = settings.isOpen;
-        const openingTime = parseTime(settings.openingTime);
-        const closingTime = parseTime(settings.closingTime);
-        
-        if (shopStatusBanner && shopStatusText) {
-          if (isOpen && currentTime >= openingTime && currentTime < closingTime) {
-            shopStatusText.textContent = `Shop: Open (${settings.openingTime}-${settings.closingTime})`;
-            shopStatusBanner.classList.add('open');
-            shopStatusBanner.classList.remove('closed');
-          } else {
-            shopStatusText.textContent = `Shop: Closed (Opens at ${settings.openingTime})`;
-            shopStatusBanner.classList.add('closed');
-            shopStatusBanner.classList.remove('open');
-          }
+  const settingsRef = doc(db, 'settings', 'shop');
+  onSnapshot(settingsRef, (doc) => {
+    if (doc.exists()) {
+      const settings = doc.data();
+      const isOpen = settings.isOpen;
+      const openingTime = parseTime(settings.openingTime);
+      const closingTime = parseTime(settings.closingTime);
+      
+      if (shopStatusBanner && shopStatusText) {
+        if (isOpen && currentTime >= openingTime && currentTime < closingTime) {
+          shopStatusText.textContent = `Shop: Open (${settings.openingTime}-${settings.closingTime})`;
+          shopStatusBanner.classList.add('open');
+          shopStatusBanner.classList.remove('closed');
+        } else {
+          shopStatusText.textContent = `Shop: Closed (Opens at ${settings.openingTime})`;
+          shopStatusBanner.classList.add('closed');
+          shopStatusBanner.classList.remove('open');
         }
       }
-    });
+    }
+  });
 }
 
 function parseTime(timeStr) {
