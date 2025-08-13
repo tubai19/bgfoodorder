@@ -556,11 +556,11 @@ async function confirmOrder() {
     (orderType === 'Delivery' ? `▸ Delivery Charge: ${formatPrice(deliveryCharge)}%0A` : '') +
     `*▸ TOTAL: ${formatPrice(total)}*%0A%0A` +
     (elements.orderNotes.value.trim() ? `📝 *Special Instructions*%0A${elements.orderNotes.value}%0A%0A` : '') +
-    `Thank you!%0AFor any changes, please call ${SHOP_PHONE}`;
+    `Thank you!%0AFor any changes, please call ${918240266267}`;
 
   // Create a hidden link and click it to ensure WhatsApp opens
   const whatsappLink = document.createElement('a');
-  whatsappLink.href = `https://wa.me/${SHOP_PHONE}?text=${whatsappMessage}`;
+  whatsappLink.href = `https://wa.me/${918240266267}?text=${whatsappMessage}`;
   whatsappLink.target = '_blank';
   whatsappLink.style.display = 'none';
   document.body.appendChild(whatsappLink);
