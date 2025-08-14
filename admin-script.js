@@ -71,6 +71,15 @@ const state = {
   }
 };
 
+// Order status mapping
+const ORDER_STATUS = {
+  pending: { text: 'Pending', color: '#ff9800' },
+  preparing: { text: 'Preparing', color: '#2196f3' },
+  delivering: { text: 'Out for Delivery', color: '#4caf50' },
+  completed: { text: 'Completed', color: '#8bc34a' },
+  cancelled: { text: 'Cancelled', color: '#f44336' }
+};
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function() {
   auth.onAuthStateChanged(user => {
@@ -100,7 +109,6 @@ function setupEventListeners() {
       elements.navItems.forEach(navItem => navItem.classList.remove('active'));
       item.classList.add('active');
       
-      // Load section-specific data
       if (section === 'notifications') {
         loadNotifications();
       } else if (section === 'analytics') {
@@ -178,6 +186,24 @@ function hideModal(modal) {
   document.body.style.overflow = 'auto';
 }
 
+function showNotification(message, type = 'success') {
+  const notification = document.createElement('div');
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.classList.add('fade-out');
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
+}
+
+function playNotificationSound() {
+  const sound = new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3');
+  sound.volume = 0.3;
+  sound.play().catch(e => console.log('Sound playback prevented:', e));
+}
+
 // Data Functions
 function setupRealtimeListeners() {
   // Orders listener
@@ -240,6 +266,160 @@ function setupRealtimeListeners() {
       elements.activeUsers.textContent = snapshot.size;
       calculateNotificationReach();
     });
+}
+
+function filterOrders() {
+  const statusFilter = elements.orderFilter.value;
+  const searchTerm = elements.orderSearch.value.toLowerCase();
+  
+  let filteredOrders = state.orders;
+  
+  if (statusFilter !== 'all') {
+    filteredOrders = filteredOrders.filter(order => order.status === statusFilter);
+  }
+  
+  if (searchTerm) {
+    filteredOrders = filteredOrders.filter(order => 
+      order.customerName.toLowerCase().includes(searchTerm) || 
+      order.phoneNumber.includes(searchTerm) ||
+      (order.id && order.id.toLowerCase().includes(searchTerm))
+    );
+  }
+  
+  renderOrders(filteredOrders);
+}
+
+function renderOrders(orders) {
+  elements.ordersListContainer.innerHTML = '';
+  
+  if (orders.length === 0) {
+    elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
+    return;
+  }
+  
+  orders.forEach(order => renderOrderCard(order));
+}
+
+function renderOrderCard(order) {
+  const orderCard = document.createElement('div');
+  orderCard.className = 'order-card';
+  orderCard.innerHTML = `
+    <div class="order-header">
+      <h3>Order #${order.id || ''}</h3>
+      <span class="order-status" style="background-color: ${ORDER_STATUS[order.status]?.color || '#999'}">
+        ${ORDER_STATUS[order.status]?.text || order.status}
+      </span>
+    </div>
+    <div class="order-details">
+      <p><strong>Customer:</strong> ${order.customerName}</p>
+      <p><strong>Phone:</strong> ${order.phoneNumber}</p>
+      <p><strong>Total:</strong> ₹${order.total?.toFixed(2) || '0.00'}</p>
+      <p><strong>Time:</strong> ${order.timestamp?.toDate().toLocaleString() || 'Just now'}</p>
+    </div>
+    <div class="order-actions">
+      ${order.status === 'pending' ? `
+        <button class="btn primary-btn action-btn" data-action="preparing" data-order="${order.id}">
+          <i class="fas fa-utensils"></i> Preparing
+        </button>
+      ` : ''}
+      ${order.status === 'preparing' ? `
+        <button class="btn success-btn action-btn" data-action="delivering" data-order="${order.id}">
+          <i class="fas fa-truck"></i> Out for Delivery
+        </button>
+      ` : ''}
+      ${order.status === 'delivering' ? `
+        <button class="btn success-btn action-btn" data-action="completed" data-order="${order.id}">
+          <i class="fas fa-check"></i> Delivered
+        </button>
+      ` : ''}
+      ${order.status !== 'completed' && order.status !== 'cancelled' ? `
+        <button class="btn danger-btn action-btn" data-action="cancelled" data-order="${order.id}">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+      ` : ''}
+      <button class="btn info-btn action-btn" data-action="details" data-order="${order.id}">
+        <i class="fas fa-eye"></i> Details
+      </button>
+    </div>
+  `;
+  
+  elements.ordersListContainer.appendChild(orderCard);
+  
+  // Add event listeners to action buttons
+  orderCard.querySelectorAll('.action-btn').forEach(button => {
+    button.addEventListener('click', async (e) => {
+      const action = e.currentTarget.dataset.action;
+      const orderId = e.currentTarget.dataset.order;
+      
+      if (action === 'details') {
+        showOrderDetails(orderId);
+      } else {
+        await updateOrderStatus(orderId, action);
+      }
+    });
+  });
+}
+
+function showOrderDetails(orderId) {
+  const order = state.orders.find(o => o.id === orderId);
+  if (!order) return;
+  
+  let itemsHtml = '';
+  if (order.items && order.items.length > 0) {
+    itemsHtml = order.items.map(item => `
+      <li>
+        ${item.quantity}x ${item.name}${item.variant ? ` (${item.variant})` : ''}
+        <span>₹${(item.price * item.quantity).toFixed(2)}</span>
+      </li>
+    `).join('');
+  }
+  
+  elements.orderDetailContent.innerHTML = `
+    <div class="order-detail-section">
+      <h4>Order Information</h4>
+      <p><strong>Order ID:</strong> ${order.id}</p>
+      <p><strong>Status:</strong> <span style="color: ${ORDER_STATUS[order.status]?.color || '#999'}">
+        ${ORDER_STATUS[order.status]?.text || order.status}
+      </span></p>
+      <p><strong>Order Type:</strong> ${order.orderType || 'Delivery'}</p>
+      <p><strong>Order Time:</strong> ${order.timestamp?.toDate().toLocaleString() || 'Unknown'}</p>
+    </div>
+    
+    <div class="order-detail-section">
+      <h4>Customer Details</h4>
+      <p><strong>Name:</strong> ${order.customerName}</p>
+      <p><strong>Phone:</strong> ${order.phoneNumber}</p>
+      ${order.orderType === 'Delivery' ? `
+        <p><strong>Delivery Address:</strong> ${order.deliveryAddress || 'Not specified'}</p>
+        <p><strong>Distance:</strong> ${order.distance ? order.distance.toFixed(1) + ' km' : 'Not calculated'}</p>
+      ` : ''}
+    </div>
+    
+    <div class="order-detail-section">
+      <h4>Order Items</h4>
+      <ul class="order-items">
+        ${itemsHtml || '<li>No items found</li>'}
+      </ul>
+    </div>
+    
+    <div class="order-detail-section">
+      <h4>Payment Summary</h4>
+      <p><strong>Subtotal:</strong> ₹${order.subtotal?.toFixed(2) || '0.00'}</p>
+      ${order.orderType === 'Delivery' ? `
+        <p><strong>Delivery Charge:</strong> ₹${order.deliveryCharge?.toFixed(2) || '0.00'}</p>
+      ` : ''}
+      <p><strong>Total:</strong> ₹${order.total?.toFixed(2) || '0.00'}</p>
+    </div>
+    
+    ${order.notes ? `
+      <div class="order-detail-section">
+        <h4>Special Instructions</h4>
+        <p>${order.notes}</p>
+      </div>
+    ` : ''}
+  `;
+  
+  showModal(elements.orderDetailModal);
 }
 
 function loadDashboardData() {
@@ -450,6 +630,17 @@ async function sendNotification(e) {
           phoneNumber: doc.data().phoneNumber,
           sentBy: state.currentUser.email
         });
+        
+        // Send FCM notification
+        sendFCMNotification(
+          doc.data().phoneNumber,
+          title,
+          body,
+          {
+            type,
+            click_action: `https://${window.location.hostname}`
+          }
+        );
       }
     });
     
@@ -461,6 +652,43 @@ async function sendNotification(e) {
   } catch (error) {
     console.error('Error sending notification:', error);
     showNotification('Failed to send notification', 'error');
+  }
+}
+
+async function sendFCMNotification(phoneNumber, title, body, data = {}) {
+  try {
+    const response = await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken()}`
+      },
+      body: JSON.stringify({
+        phoneNumber,
+        title,
+        body,
+        data
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send notification');
+    }
+    return true;
+  } catch (error) {
+    console.error('Error sending FCM notification:', error);
+    return false;
+  }
+}
+
+async function getAccessToken() {
+  try {
+    const response = await fetch('/api/get-fcm-token');
+    const data = await response.json();
+    return data.token;
+  } catch (error) {
+    console.error('Error getting FCM token:', error);
+    return null;
   }
 }
 
@@ -476,27 +704,52 @@ async function updateOrderStatus(orderId, newStatus) {
     const orderDoc = await orderRef.get();
     const order = orderDoc.data();
     
-    if (newStatus !== 'pending' && order.phoneNumber) {
-      const statusMessages = {
-        'preparing': 'Your order is now being prepared',
-        'delivering': 'Your order is out for delivery',
-        'completed': 'Your order has been completed. Thank you!',
-        'cancelled': 'Your order has been cancelled. Contact support for details.'
-      };
+    if (order.phoneNumber) {
+      let notificationTitle = '';
+      let notificationBody = '';
       
-      if (statusMessages[newStatus]) {
-        const prefs = await getNotificationPreferences(order.phoneNumber);
+      switch(newStatus) {
+        case 'preparing':
+          notificationTitle = 'Order Update';
+          notificationBody = `Your order #${orderId} is now being prepared`;
+          break;
+        case 'delivering':
+          notificationTitle = 'Order Update';
+          notificationBody = `Your order #${orderId} is out for delivery`;
+          break;
+        case 'completed':
+          notificationTitle = 'Order Delivered';
+          notificationBody = `Your order #${orderId} has been delivered. Enjoy your meal!`;
+          break;
+        case 'cancelled':
+          notificationTitle = 'Order Cancelled';
+          notificationBody = `Your order #${orderId} has been cancelled`;
+          break;
+      }
+      
+      if (notificationTitle && notificationBody) {
+        // Save notification to database
+        await db.collection('notifications').add({
+          title: notificationTitle,
+          body: notificationBody,
+          phoneNumber: order.phoneNumber,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          orderId: orderId,
+          type: 'status_update'
+        });
         
-        if (prefs.statusUpdates !== false) {
-          await db.collection('notifications').add({
-            title: 'Order Update',
-            body: statusMessages[newStatus],
-            phoneNumber: order.phoneNumber,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        // Send FCM notification
+        await sendFCMNotification(
+          order.phoneNumber,
+          notificationTitle,
+          notificationBody,
+          {
+            type: 'status_update',
             orderId: orderId,
-            type: 'status_update'
-          });
-        }
+            status: newStatus,
+            click_action: `https://${window.location.hostname}/checkout.html?orderId=${orderId}`
+          }
+        );
       }
     }
     
@@ -504,24 +757,6 @@ async function updateOrderStatus(orderId, newStatus) {
   } catch (error) {
     console.error('Error updating order status:', error);
     showNotification('Failed to update order status', 'error');
-  }
-}
-
-async function getNotificationPreferences(phoneNumber) {
-  try {
-    const querySnapshot = await db.collection('fcmTokens')
-      .where('phoneNumber', '==', phoneNumber)
-      .limit(1)
-      .get();
-    
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0];
-      return doc.data().preferences || state.defaultPreferences;
-    }
-    return state.defaultPreferences;
-  } catch (error) {
-    console.error('Error getting preferences:', error);
-    return state.defaultPreferences;
   }
 }
 
@@ -566,30 +801,11 @@ async function saveSettings(e) {
   }
 }
 
-// Helper Functions
-function showNotification(message, type = 'success') {
-  const notification = document.createElement('div');
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  
-  setTimeout(() => {
-    notification.classList.add('fade-out');
-    setTimeout(() => notification.remove(), 300);
-  }, 3000);
-}
-
-function playNotificationSound() {
-  const sound = new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3');
-  sound.volume = 0.3;
-  sound.play().catch(e => console.log('Sound playback prevented:', e));
-}
-
 async function handleLogout() {
   try {
     if (state.fcmToken) {
       try {
-        await deleteToken(messaging, state.fcmToken);
+        await messaging.deleteToken(state.fcmToken);
         await db.collection('adminTokens').doc(state.currentUser.uid).delete();
       } catch (error) {
         console.error('Error removing token:', error);

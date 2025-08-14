@@ -13,12 +13,13 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Background message handler
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   
-  const notificationTitle = payload.notification?.title || 'New Message';
+  const notificationTitle = payload.notification?.title || 'Order Update';
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new update',
+    body: payload.notification?.body || 'You have a new order update',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge.png',
     data: payload.data || {}
@@ -27,6 +28,7 @@ messaging.onBackgroundMessage((payload) => {
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
+// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
@@ -34,19 +36,21 @@ self.addEventListener('notificationclick', (event) => {
   if (event.notification.data) {
     if (event.notification.data.orderId) {
       url = `/checkout.html?orderId=${event.notification.data.orderId}`;
-    } else if (event.notification.data.path) {
-      url = event.notification.data.path;
+    } else if (event.notification.data.click_action) {
+      url = event.notification.data.click_action;
     }
   }
 
   event.waitUntil(
     clients.matchAll({type: 'window'}).then((windowClients) => {
+      // Focus on existing tab if it exists
       for (const client of windowClients) {
         if (client.url === url && 'focus' in client) {
           return client.focus();
         }
       }
       
+      // Open new tab if none exists
       if (clients.openWindow) {
         return clients.openWindow(url);
       }
