@@ -57,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   
-  // Load saved notification preferences if available
   loadNotificationPreferences();
   setupEventListeners();
   updateOrderSummary();
@@ -89,7 +88,6 @@ function setupEventListeners() {
     }
   });
 
-  // Save notification preferences when changed
   if (elements.notifyStatus) {
     elements.notifyStatus.addEventListener('change', saveNotificationPreferences);
   }
@@ -249,7 +247,6 @@ function generateOrderSummary() {
     `;
   }
 
-  // Add notification preferences to summary if they exist
   if (elements.notifyStatus || elements.notifyOffers) {
     summaryHTML += `
       <div class="summary-section">
@@ -540,10 +537,8 @@ async function confirmOrder() {
     userLocation.lat, userLocation.lng
   ) : 0;
   
-  // Generate a random 6-digit order number
   const orderNumber = Math.floor(100000 + Math.random() * 900000);
   
-  // Build message parts as an array for better readability
   const messageParts = [
     `*NEW ORDER - BAKE & GRILL*`,
     ``,
@@ -554,8 +549,12 @@ async function confirmOrder() {
   ];
 
   if (orderType === 'Delivery') {
+    const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
+    const address = elements.manualDeliveryAddress.value || 'Current Location';
+    
     messageParts.push(
-      `*Delivery Address:* ${elements.manualDeliveryAddress.value || 'Current Location'}`,
+      `*Delivery Address:* ${address}`,
+      `*Location:* ${mapsLink}`,
       `*Distance:* ${distance.toFixed(1)} km`
     );
     
@@ -606,7 +605,6 @@ async function confirmOrder() {
     );
   }
 
-  // Add notification preferences to WhatsApp message if they exist
   if (elements.notifyStatus || elements.notifyOffers) {
     messageParts.push(
       `*NOTIFICATION PREFERENCES:*`,
@@ -618,23 +616,19 @@ async function confirmOrder() {
   
   messageParts.push(`*Order Time:* ${new Date().toLocaleString()}`);
 
-  // Encode the entire message to handle special characters
   const encodedMessage = encodeURIComponent(messageParts.join('\n'));
   
   const whatsappUrl = `https://wa.me/918240266267?text=${encodedMessage}`;
   window.open(whatsappUrl, '_blank');
   
-  // Handle notification preferences
   try {
     const notificationPrefs = {
       statusUpdates: elements.notifyStatus?.checked || false,
       specialOffers: elements.notifyOffers?.checked || false
     };
 
-    // Save notification preferences
     await updateNotificationPreferences(elements.phoneNumber.value, notificationPrefs);
     
-    // Request notification permission if not already granted
     if (Notification.permission !== 'granted') {
       await requestNotificationPermission(
         elements.phoneNumber.value,
