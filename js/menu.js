@@ -1,6 +1,5 @@
-import { cart, saveCart, updateCartCount, showNotification, formatPrice } from './shared.js';
+import { cart, saveCart, updateCartCount, showNotification, formatPrice, validateOrder } from './shared.js';
 
-// DOM Elements
 const elements = {
   menuContainer: document.getElementById('menuContainer'),
   tabs: document.getElementById('tabs'),
@@ -12,10 +11,11 @@ const elements = {
   mobileCheckoutBtn: document.getElementById('mobileCheckoutBtn'),
   mobileClearCartBtn: document.getElementById('mobileClearCartBtn'),
   closeCartBtn: document.getElementById('closeCartBtn'),
-  cartOverlay: document.getElementById('cartOverlay')
+  cartOverlay: document.getElementById('cartOverlay'),
+  deliveryRestriction: document.getElementById('deliveryRestriction'),
+  orderTypeRadios: document.querySelectorAll('input[name="orderType"]')
 };
 
-// Menu Data
 let menuData = {};
 const categoryIcons = {
   'Veg-Pizzas': '🍕',
@@ -28,7 +28,6 @@ const categoryIcons = {
   'Combos': '🎁'
 };
 
-// Initialize Menu
 async function initMenu() {
   try {
     const response = await fetch('menu.json');
@@ -46,7 +45,6 @@ async function initMenu() {
   }
 }
 
-// Render Category Tabs
 function renderCategories() {
   elements.tabs.innerHTML = '';
   Object.keys(menuData).forEach(category => {
@@ -68,7 +66,6 @@ function renderCategories() {
   }
 }
 
-// Render Menu Items
 function renderMenuItems(category = null) {
   const activeCategory = category || document.querySelector('.mobile-category-tab.active')?.dataset.category;
   if (!activeCategory) return;
@@ -82,6 +79,7 @@ function renderMenuItems(category = null) {
   elements.menuContainer.innerHTML = items.length > 0 ? '' : '<p class="no-results">No items found</p>';
 
   items.forEach(item => {
+    const isCombo = activeCategory === 'Combos';
     const itemElement = document.createElement('div');
     itemElement.className = 'menu-item';
     itemElement.dataset.id = `${activeCategory}-${item.name.replace(/\s+/g, '-').toLowerCase()}`;
@@ -104,19 +102,26 @@ function renderMenuItems(category = null) {
 
     itemElement.innerHTML = `
       <div class="item-header">
-        <h3>${item.name}</h3>
+        <h3>${item.name}${isCombo ? '<span class="non-deliverable-tag">Pickup Only</span>' : ''}</h3>
         ${item.nameBn ? `<p class="item-name-bn">${item.nameBn}</p>` : ''}
       </div>
       ${item.desc ? `<p class="item-desc">${item.desc}</p>` : ''}
       ${variantsHTML}
-      <button class="add-to-cart" data-item='${JSON.stringify(item)}'>Add to Cart</button>
+      <button class="add-to-cart" data-item='${JSON.stringify({...item, category: activeCategory.replace(/-/g, ' ')})}'>
+        Add to Cart ${isCombo ? '<i class="fas fa-store"></i>' : '<i class="fas fa-truck"></i>'}
+      </button>
     `;
     elements.menuContainer.appendChild(itemElement);
   });
 }
 
-// Add Item to Cart
 function addItemToCart(item, menuItemElement) {
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+  if (orderType === 'Delivery' && item.category === 'Combos') {
+    showNotification('Combos are not available for delivery. Please choose pickup.', 'error');
+    return;
+  }
+
   const selectedVariant = menuItemElement.querySelector('.variant-option input:checked');
   const variantName = selectedVariant ? selectedVariant.dataset.variant : Object.keys(item.variants)[0];
   const price = selectedVariant ? parseFloat(selectedVariant.value) : item.price;
@@ -134,7 +139,8 @@ function addItemToCart(item, menuItemElement) {
       name: item.name,
       price: price,
       variant: variantName,
-      quantity: 1
+      quantity: 1,
+      category: item.category
     });
   }
 
@@ -143,9 +149,26 @@ function addItemToCart(item, menuItemElement) {
   showNotification(`${item.name} (${variantName}) added to cart`);
 }
 
-// Render Cart
 function renderCart() {
-  elements.cartItems.innerHTML = cart.length > 0 ? '' : '<li class="empty-cart">Your cart is empty</li>';
+  const orderType = document.querySelector('input[name="orderType"]:checked')?.value;
+  const hasCombos = cart.some(item => item.category === 'Combos');
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  let warnings = '';
+  
+  if (orderType === 'Delivery' && hasCombos) {
+    warnings += `<li class="cart-warning">
+      <i class="fas fa-exclamation-triangle"></i> Combos not available for delivery
+    </li>`;
+  }
+  
+  if (subtotal < 200) {
+    warnings += `<li class="cart-warning">
+      <i class="fas fa-exclamation-triangle"></i> ₹${200-subtotal} more needed for checkout
+    </li>`;
+  }
+  
+  elements.cartItems.innerHTML = warnings + (cart.length > 0 ? '' : '<li class="empty-cart">Your cart is empty</li>');
   
   cart.forEach((item, index) => {
     const cartItem = document.createElement('li');
@@ -171,35 +194,28 @@ function renderCart() {
   elements.cartTotal.textContent = `Total: ${formatPrice(total)}`;
 }
 
-// Event Listeners
 function setupEventListeners() {
-  // Search functionality
   elements.searchInput.addEventListener('input', () => {
     const activeTab = document.querySelector('.mobile-category-tab.active');
     renderMenuItems(activeTab?.dataset.category);
   });
 
-  // Cart button click - open drawer
   elements.mobileCartBtn.addEventListener('click', () => {
-    console.log('Cart button clicked'); // Debugging
     renderCart();
     elements.mobileCartDrawer.classList.add('open');
     elements.cartOverlay.classList.add('active');
   });
 
-  // Close cart button
   elements.closeCartBtn.addEventListener('click', () => {
     elements.mobileCartDrawer.classList.remove('open');
     elements.cartOverlay.classList.remove('active');
   });
 
-  // Overlay click - close cart
   elements.cartOverlay.addEventListener('click', () => {
     elements.mobileCartDrawer.classList.remove('open');
     elements.cartOverlay.classList.remove('active');
   });
 
-  // Add to cart button clicks
   elements.menuContainer.addEventListener('click', e => {
     if (e.target.classList.contains('add-to-cart')) {
       e.preventDefault();
@@ -210,7 +226,6 @@ function setupEventListeners() {
     }
   });
 
-  // Cart item interactions
   elements.cartItems.addEventListener('click', e => {
     if (!e.target.dataset.index) return;
     const index = parseInt(e.target.dataset.index);
@@ -238,7 +253,6 @@ function setupEventListeners() {
     }
   });
 
-  // Clear cart button
   elements.mobileClearCartBtn.addEventListener('click', () => {
     if (cart.length === 0) return;
     
@@ -251,15 +265,39 @@ function setupEventListeners() {
     }
   });
 
-  // Checkout button
-  elements.mobileCheckoutBtn.addEventListener('click', () => {
+  elements.mobileCheckoutBtn.addEventListener('click', (e) => {
+    const orderType = document.querySelector('input[name="orderType"]:checked')?.value || 'Delivery';
+    const errors = validateOrder(cart, orderType);
+    
+    if (errors.length > 0) {
+      e.preventDefault();
+      showNotification(errors[0], 'error');
+      elements.mobileCheckoutBtn.classList.add('shake');
+      setTimeout(() => {
+        elements.mobileCheckoutBtn.classList.remove('shake');
+      }, 500);
+      return;
+    }
+    
     if (cart.length > 0) {
       window.location.href = 'checkout.html';
     } else {
       showNotification('Your cart is empty');
     }
   });
+
+  elements.orderTypeRadios.forEach(radio => {
+    radio.addEventListener('change', () => {
+      const hasCombos = cart.some(item => item.category === 'Combos');
+      if (radio.value === 'Delivery' && hasCombos) {
+        showNotification('Switch to pickup or remove combos for delivery', 'warning');
+        elements.deliveryRestriction.style.display = 'block';
+      } else {
+        elements.deliveryRestriction.style.display = 'none';
+      }
+      renderCart();
+    });
+  });
 }
 
-// Initialize
 document.addEventListener('DOMContentLoaded', initMenu);

@@ -18,7 +18,8 @@ import {
   getMessaging, 
   getToken, 
   onMessage,
-  isSupported
+  isSupported,
+  deleteToken
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
@@ -30,7 +31,6 @@ const firebaseConfig = {
   appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 let messaging;
@@ -41,7 +41,98 @@ let messaging;
   }
 })();
 
-// Notification utility
+// PWA Installation
+let deferredPrompt;
+
+function isIos() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isAppInstalled() {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         window.navigator.standalone ||
+         document.referrer.includes('android-app://');
+}
+
+function showIosInstallPrompt() {
+  if (isAppInstalled() || localStorage.getItem('iosInstallDismissed')) return;
+  
+  const iosGuide = document.getElementById('iosInstallGuide');
+  if (iosGuide) {
+    iosGuide.style.display = 'flex';
+    
+    document.getElementById('closeIosGuide')?.addEventListener('click', () => {
+      iosGuide.style.display = 'none';
+      localStorage.setItem('iosInstallDismissed', 'true');
+    });
+  }
+}
+
+function setupInstallPromotion() {
+  const installContainer = document.getElementById('installContainer');
+  if (!installContainer) return;
+  
+  if (!isIos() && deferredPrompt) {
+    installContainer.style.display = 'flex';
+    
+    document.getElementById('installButton')?.addEventListener('click', () => {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(choiceResult => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted install');
+        }
+        installContainer.style.display = 'none';
+        deferredPrompt = null;
+      });
+    });
+    
+    document.getElementById('dismissInstall')?.addEventListener('click', () => {
+      installContainer.style.display = 'none';
+    });
+  }
+  
+  if (isIos()) {
+    showIosInstallPrompt();
+  }
+}
+
+function initPwaFeatures() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => {
+        console.log('ServiceWorker registered');
+        
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              console.log('New content available - please refresh');
+            }
+          });
+        });
+      })
+      .catch(err => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+  }
+  
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    setupInstallPromotion();
+  });
+  
+  window.addEventListener('appinstalled', () => {
+    console.log('App was installed');
+    const installContainer = document.getElementById('installContainer');
+    if (installContainer) installContainer.style.display = 'none';
+  });
+  
+  setupInstallPromotion();
+}
+
+// Notification functions
 function showNotification(message, type = 'success') {
   try {
     const notification = document.getElementById('notification');
@@ -60,12 +151,10 @@ function showNotification(message, type = 'success') {
   }
 }
 
-// Price formatting
 function formatPrice(amount) {
   return '₹' + amount.toFixed(0);
 }
 
-// Cart management
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
 function saveCart() {
@@ -89,7 +178,24 @@ function updateCartCount() {
   }
 }
 
-// Notification permission and token management
+function validateOrder(cart, orderType) {
+  const errors = [];
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  if (subtotal < 200) {
+    errors.push(`Minimum order value is ₹200 (Current: ₹${subtotal})`);
+  }
+  
+  if (orderType === 'Delivery') {
+    const hasCombos = cart.some(item => item.category === 'Combos');
+    if (hasCombos) {
+      errors.push('Combos are not available for delivery');
+    }
+  }
+  
+  return errors;
+}
+
 async function requestNotificationPermission(phoneNumber, preferences = {}) {
   try {
     if (!messaging) {
@@ -124,7 +230,6 @@ async function requestNotificationPermission(phoneNumber, preferences = {}) {
   }
 }
 
-// Notification sending functionality
 async function sendNotificationToUser(phoneNumber, title, body, data = {}) {
   try {
     const tokensRef = collection(db, 'fcmTokens');
@@ -141,8 +246,6 @@ async function sendNotificationToUser(phoneNumber, title, body, data = {}) {
     });
 
     if (tokens.length === 0) return false;
-
-    // In production, you would call a cloud function or backend API here
     console.log('Would send notification to:', tokens, 'with:', { title, body, data });
     return true;
   } catch (error) {
@@ -151,7 +254,6 @@ async function sendNotificationToUser(phoneNumber, title, body, data = {}) {
   }
 }
 
-// Notification preferences management
 async function updateNotificationPreferences(phoneNumber, preferences) {
   try {
     const tokensRef = collection(db, 'fcmTokens');
@@ -198,21 +300,17 @@ async function getNotificationPreferences(phoneNumber) {
   }
 }
 
-// Handle incoming push messages
 if (messaging) {
   onMessage(messaging, (payload) => {
     console.log('Message received:', payload);
     const notification = payload.notification;
     const data = payload.data || {};
-    
     showNotification(notification?.body || 'New update', data.type || 'info');
   });
 }
 
-// Initialize cart count when DOM is loaded
 document.addEventListener('DOMContentLoaded', updateCartCount);
 
-// Export all necessary functions and variables
 export { 
   db,
   messaging,
@@ -221,8 +319,11 @@ export {
   cart, 
   saveCart, 
   updateCartCount,
+  validateOrder,
   requestNotificationPermission,
   sendNotificationToUser,
   updateNotificationPreferences,
-  getNotificationPreferences
+  getNotificationPreferences,
+  initPwaFeatures,
+  isAppInstalled
 };
