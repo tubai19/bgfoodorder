@@ -6,7 +6,6 @@
   <title>Admin Panel – Bake & Grill</title>
   <meta name="description" content="Bake & Grill Admin Dashboard">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.css">
   <link rel="stylesheet" href="admin-styles.css">
 </head>
 <body>
@@ -80,6 +79,9 @@
           <div class="orders-list" id="ordersListContainer">
             <div class="loading">Loading orders...</div>
           </div>
+          <button id="loadMoreOrders" class="btn secondary-btn" style="display:none;">
+            <i class="fas fa-spinner fa-spin loading-spinner"></i> Load More Orders
+          </button>
         </section>
 
         <!-- Notifications Section -->
@@ -118,7 +120,9 @@
                 <option value="status_update">Status Update</option>
               </select>
             </div>
-            <button type="submit" class="btn primary-btn"><i class="fas fa-paper-plane"></i> Send Notification</button>
+            <button type="submit" class="btn primary-btn" id="sendNotificationBtn">
+              <i class="fas fa-paper-plane"></i> Send Notification
+            </button>
           </form>
           
           <div class="notification-history">
@@ -189,7 +193,9 @@
               </div>
             </div>
             
-            <button type="submit" class="btn primary-btn"><i class="fas fa-save"></i> Save Settings</button>
+            <button type="submit" class="btn primary-btn" id="saveSettingsBtn">
+              <i class="fas fa-save"></i> Save Settings
+            </button>
           </form>
         </section>
       </main>
@@ -212,10 +218,19 @@
     </div>
   </div>
 
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <i class="fas fa-spinner fa-spin"></i>
+      <p>Processing...</p>
+    </div>
+  </div>
+
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-analytics-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
   <script src="admin-script.js"></script>
 </body>
