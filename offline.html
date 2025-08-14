@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bake & Grill - Offline</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      background-color: #f8f9fa;
+      color: #333;
+      padding: 20px;
+    }
+    h1 {
+      color: #e63946;
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    p {
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+      max-width: 400px;
+    }
+    img {
+      width: 150px;
+      height: 150px;
+      margin-bottom: 2rem;
+    }
+    button {
+      background-color: #e63946;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #c1121f;
+    }
+    .offline-features {
+      text-align: left;
+      margin: 20px 0;
+    }
+    .offline-features h3 {
+      color: #e63946;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <img src="/icons/icon-192x192.png" alt="Bake & Grill Logo">
+  <h1>You're Offline</h1>
+  <p>Don't worry! You can still access some features of Bake & Grill.</p>
+  
+  <div class="offline-features">
+    <h3>Available Offline:</h3>
+    <ul>
+      <li>View menu categories</li>
+      <li>Browse previously viewed items</li>
+      <li>Access your order history</li>
+    </ul>
+  </div>
+  
+  <button onclick="window.location.href='/'">Go to Home</button>
+  
+  <script>
+    // Try to update the service worker when back online
+    window.addEventListener('online', () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.update();
+        });
+      }
+    });
+  </script>
+</body>
+</html>

@@ -3,71 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Bake & Grill – Fresh Pizza, Burgers & Sandwiches Delivery in Sanjua,Bakhrahat</title>
-  <meta name="description" content="Order delicious pizzas, burgers, sandwiches, and quick bites from Bake & Grill, Sanjua, Bakhrahat. Fast delivery within 8 km, free for orders above ₹500.">
-  <meta name="keywords" content="pizza delivery near me, burgers Kolkata, food delivery Bakhrahat,Amtala Bake & Grill, order food online">
+  <title>Bake & Grill – Fresh Pizza, Burgers & Sandwiches Delivery</title>
+  <meta name="description" content="Order delicious pizzas, burgers, sandwiches from Bake & Grill">
   
-  <!-- Favicons and Web App Manifest -->
-  <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="shortcut icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="icon" type="image/png" href="/android-chrome-192x192.png" sizes="192x192">
-  <meta name="apple-mobile-web-app-title" content="BakeAndGrill">
-  <link rel="manifest" href="/site.webmanifest.json">
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#e63946">
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bake & Grill">
   
-  <!-- Schema.org Structured Data -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Restaurant",
-    "name": "Bake & Grill",
-    "description": "Delicious fresh pizzas, burgers & sandwiches in Sanjua, Bakhrahat",
-    "image": "/android-chrome-192x192.png",
-    "url": "https://bakeandgrill.com",
-    "telephone": "+918240266267",
-    "priceRange": "$$",
-    "servesCuisine": ["Italian", "American", "Fast Food"],
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "Sanjua, Bakhrahat",
-      "addressLocality": "Kolkata",
-      "postalCode": "743377",
-      "addressCountry": "IN"
-    },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": "22.3908",
-      "longitude": "88.2189"
-    },
-    "openingHoursSpecification": {
-      "@type": "OpeningHoursSpecification",
-      "dayOfWeek": [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday"
-      ],
-      "opens": "16:00",
-      "closes": "22:00"
-    },
-    "menu": "https://bakeandgrill.com/menu",
-    "acceptsReservations": "False",
-    "sameAs": [
-      "https://www.facebook.com/bakeandgrill",
-      "https://www.instagram.com/bakeandgrill"
-    ],
-    "potentialAction": {
-      "@type": "OrderAction",
-      "target": "https://bakeandgrill.com/menu"
-    }
-  }
-  </script>
-
-  <!-- CSS and JavaScript Libraries -->
+  <!-- CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -181,6 +128,31 @@
     </div>
   </div>
 
+  <!-- PWA Install Prompts -->
+  <div id="installContainer" class="install-container" style="display: none;">
+    <div class="install-prompt">
+      <img src="/icons/icon-96x96.png" alt="Bake & Grill" class="install-icon">
+      <div class="install-text">
+        <h3>Install Bake & Grill</h3>
+        <p>Get the best experience with our app on your home screen</p>
+      </div>
+      <button id="installButton" class="install-button">Install</button>
+      <button id="dismissInstall" class="dismiss-button">&times;</button>
+    </div>
+  </div>
+
+  <div id="iosInstallGuide" class="ios-install-guide" style="display: none;">
+    <div class="ios-install-content">
+      <h3>Add Bake & Grill to Home Screen</h3>
+      <ol>
+        <li>Tap the <i class="fas fa-share"></i> Share button</li>
+        <li>Select "Add to Home Screen"</li>
+        <li>Tap "Add" in the top right</li>
+      </ol>
+      <button id="closeIosGuide" class="ios-close-btn">Got it!</button>
+    </div>
+  </div>
+
   <footer class="mobile-footer">
     <div class="footer-content">
       <div class="footer-section">
@@ -221,5 +193,6 @@
   </div>
 
   <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/shared.js"></script>
 </body>
 </html>

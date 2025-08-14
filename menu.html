@@ -4,9 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Menu - Bake & Grill</title>
-  <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites. Order online for delivery or pickup.">
+  <meta name="description" content="Browse our delicious menu of pizzas, burgers, sandwiches, and quick bites">
   
-  <!-- Favicons and CSS -->
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#e63946">
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bake & Grill">
+  
+  <!-- CSS -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -66,6 +74,31 @@
   <!-- Overlay -->
   <div id="cartOverlay" class="cart-overlay"></div>
 
+  <!-- PWA Install Prompts -->
+  <div id="installContainer" class="install-container" style="display: none;">
+    <div class="install-prompt">
+      <img src="/icons/icon-96x96.png" alt="Bake & Grill" class="install-icon">
+      <div class="install-text">
+        <h3>Install Bake & Grill</h3>
+        <p>Get the best experience with our app on your home screen</p>
+      </div>
+      <button id="installButton" class="install-button">Install</button>
+      <button id="dismissInstall" class="dismiss-button">&times;</button>
+    </div>
+  </div>
+
+  <div id="iosInstallGuide" class="ios-install-guide" style="display: none;">
+    <div class="ios-install-content">
+      <h3>Add Bake & Grill to Home Screen</h3>
+      <ol>
+        <li>Tap the <i class="fas fa-share"></i> Share button</li>
+        <li>Select "Add to Home Screen"</li>
+        <li>Tap "Add" in the top right</li>
+      </ol>
+      <button id="closeIosGuide" class="ios-close-btn">Got it!</button>
+    </div>
+  </div>
+
   <footer class="mobile-footer">
     <div class="footer-content">
       <div class="footer-nav">
@@ -82,7 +115,6 @@
     <span id="notificationText">Item added to cart!</span>
   </div>
 
-  <!-- Scripts in correct order -->
   <script type="module" src="js/shared.js"></script>
   <script type="module" src="js/menu.js"></script>
 </body>

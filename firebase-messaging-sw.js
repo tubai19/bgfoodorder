@@ -13,22 +13,20 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Background message handler
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   
   const notificationTitle = payload.notification?.title || 'New Message';
   const notificationOptions = {
     body: payload.notification?.body || 'You have a new update',
-    icon: '/android-chrome-192x192.png',
-    badge: '/badge.png',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/badge.png',
     data: payload.data || {}
   };
 
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
@@ -54,9 +52,4 @@ self.addEventListener('notificationclick', (event) => {
       }
     })
   );
-});
-
-// Notification close handler
-self.addEventListener('notificationclose', (event) => {
-  console.log('Notification closed', event.notification);
 });
