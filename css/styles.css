@@ -1999,6 +1999,126 @@ input[name="orderType"]:disabled + span {
   gap: 10px;
 }
 
+/* Cart Warnings */
+.cart-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cart-warning i {
+  color: #ffc107;
+}
+
+/* Non-deliverable Tags */
+.non-deliverable-tag {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-left: 8px;
+  display: inline-block;
+}
+
+/* Order Errors */
+.order-errors {
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.order-errors h3 {
+  color: #721c24;
+  margin-top: 0;
+}
+
+.order-errors ul {
+  padding-left: 20px;
+}
+
+/* Shake Animation */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+  animation: shake 0.5s;
+}
+
+/* Delivery Restriction */
+.mobile-delivery-restriction {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Summary Styles */
+.summary-section {
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-section h3 {
+  margin-top: 0;
+  color: #d35400;
+}
+
+.summary-items li {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.summary-total {
+  font-weight: bold;
+  font-size: 1.1em;
+  color: #d35400;
+}
+
+/* Quantity Controls */
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quantity-controls button {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 480px) {
+  .variant-options {
+    flex-direction: column;
+  }
+  
+  .variant-option {
+    margin-bottom: 5px;
+  }
+}
+
 .mobile-modal-btn {
   flex: 1;
   padding: 12px;
