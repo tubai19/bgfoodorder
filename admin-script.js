@@ -738,8 +738,6 @@ function setupEventListeners() {
       
       if (section === 'notifications') {
         loadNotifications();
-      } else if (section === 'analytics') {
-        loadAnalyticsData();
       }
     });
   });
