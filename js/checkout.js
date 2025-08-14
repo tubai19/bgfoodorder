@@ -475,8 +475,12 @@ function confirmOrder() {
   ];
 
   if (orderType === 'Delivery') {
+    const deliveryAddress = elements.manualDeliveryAddress.value || 'Current Location';
+    const googleMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${userLocation.lat},${userLocation.lng}`;
+    
     messageParts.push(
-      `*Delivery Address:* ${elements.manualDeliveryAddress.value || 'Current Location'}`,
+      `*Delivery Address:* ${deliveryAddress}`,
+      `*Location Link:* ${googleMapsLink}`,
       `*Distance:* ${distance.toFixed(1)} km`
     );
     
