@@ -12,6 +12,7 @@ const firebaseConfig = {
 // Initialize Firebase
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
+  firebase.analytics();
 }
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -27,6 +28,7 @@ const elements = {
   orderFilter: document.getElementById('orderFilter'),
   orderSearch: document.getElementById('orderSearch'),
   ordersListContainer: document.getElementById('ordersListContainer'),
+  loadMoreOrdersBtn: document.getElementById('loadMoreOrders'),
   notificationForm: document.getElementById('notificationForm'),
   notificationTitle: document.getElementById('notificationTitle'),
   notificationBody: document.getElementById('notificationBody'),
@@ -53,7 +55,10 @@ const elements = {
   notificationsList: document.getElementById('notificationsList'),
   defaultStatusUpdates: document.getElementById('defaultStatusUpdates'),
   defaultSpecialOffers: document.getElementById('defaultSpecialOffers'),
-  savePreferencesBtn: document.getElementById('savePreferencesBtn')
+  savePreferencesBtn: document.getElementById('savePreferencesBtn'),
+  sendNotificationBtn: document.getElementById('sendNotificationBtn'),
+  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+  loadingOverlay: document.getElementById('loadingOverlay')
 };
 
 // Global State
@@ -65,6 +70,8 @@ const state = {
   fcmToken: null,
   lastOrderId: null,
   debounceTimer: null,
+  lastVisibleOrder: null,
+  hasMoreOrders: true,
   defaultPreferences: {
     statusUpdates: true,
     specialOffers: true
@@ -80,7 +87,53 @@ const ORDER_STATUS = {
   cancelled: { text: 'Cancelled', color: '#f44336' }
 };
 
-// UI Functions
+// ====================== UTILITY FUNCTIONS ======================
+function setLoading(element, isLoading) {
+  if (isLoading) {
+    element.disabled = true;
+    const spinner = element.querySelector('.fa-spinner') || document.createElement('i');
+    spinner.className = 'fas fa-spinner fa-spin';
+    if (!element.querySelector('.fa-spinner')) {
+      element.insertBefore(spinner, element.firstChild);
+    }
+  } else {
+    element.disabled = false;
+    const spinner = element.querySelector('.fa-spinner');
+    if (spinner) spinner.remove();
+  }
+}
+
+function showLoadingOverlay(show) {
+  elements.loadingOverlay.style.display = show ? 'flex' : 'none';
+}
+
+async function safeFirebaseOperation(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    console.error('Firebase operation failed:', error);
+    showNotification(`Operation failed: ${error.message}`, 'error');
+    logAdminAction('firebase_error', { error: error.message });
+    return null;
+  }
+}
+
+function debounce(func, wait, immediate) {
+  let timeout;
+  return function() {
+    const context = this, args = arguments;
+    const later = () => {
+      timeout = null;
+      if (!immediate) func.apply(context, args);
+    };
+    const callNow = immediate && !timeout;
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+    if (callNow) func.apply(context, args);
+  };
+}
+
+// ====================== UI FUNCTIONS ======================
 function showSection(sectionId) {
   elements.contentSections.forEach(section => {
     section.style.display = 'none';
@@ -128,7 +181,7 @@ function playNotificationSound() {
   sound.play().catch(e => console.log('Sound playback prevented:', e));
 }
 
-// Order Functions
+// ====================== ORDER FUNCTIONS ======================
 function filterOrders() {
   const statusFilter = elements.orderFilter.value;
   const searchTerm = elements.orderSearch.value.toLowerCase();
@@ -283,18 +336,55 @@ function showOrderDetails(orderId) {
   showModal(elements.orderDetailModal);
 }
 
-// Data Functions
+async function loadMoreOrders() {
+  if (!state.hasMoreOrders) return;
+  
+  setLoading(elements.loadMoreOrdersBtn, true);
+  
+  let query = db.collection('orders')
+    .orderBy('timestamp', 'desc')
+    .limit(10);
+    
+  if (state.lastVisibleOrder) {
+    query = query.startAfter(state.lastVisibleOrder);
+  }
+
+  const snapshot = await safeFirebaseOperation(() => query.get());
+  if (!snapshot || snapshot.empty) {
+    state.hasMoreOrders = false;
+    elements.loadMoreOrdersBtn.style.display = 'none';
+    setLoading(elements.loadMoreOrdersBtn, false);
+    return;
+  }
+  
+  state.lastVisibleOrder = snapshot.docs[snapshot.docs.length-1];
+  
+  snapshot.forEach(doc => {
+    const order = doc.data();
+    order.id = doc.id;
+    state.orders.push(order);
+    renderOrderCard(order);
+  });
+  
+  setLoading(elements.loadMoreOrdersBtn, false);
+  elements.loadMoreOrdersBtn.style.display = 'block';
+}
+
+// ====================== DATA FUNCTIONS ======================
 function setupRealtimeListeners() {
   // Orders listener
   db.collection('orders')
     .orderBy('timestamp', 'desc')
-    .limit(50)
+    .limit(10)
     .onSnapshot(snapshot => {
       state.orders = [];
+      state.lastVisibleOrder = null;
+      state.hasMoreOrders = true;
       elements.ordersListContainer.innerHTML = '';
 
       if (snapshot.empty) {
         elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
+        elements.loadMoreOrdersBtn.style.display = 'none';
         return;
       }
 
@@ -305,6 +395,7 @@ function setupRealtimeListeners() {
           if (state.lastOrderId !== null) {
             playNotificationSound();
             showNotification('New order received!');
+            logAdminAction('new_order_received', { orderId: latestOrder.id });
           }
           state.lastOrderId = latestOrder.id;
         }
@@ -316,9 +407,13 @@ function setupRealtimeListeners() {
         state.orders.push(order);
         renderOrderCard(order);
       });
+      
+      state.lastVisibleOrder = snapshot.docs[snapshot.docs.length-1];
+      elements.loadMoreOrdersBtn.style.display = snapshot.size >= 10 ? 'block' : 'none';
     }, error => {
       console.error("Orders listener error:", error);
       elements.ordersListContainer.innerHTML = '<div class="error">Failed to load orders</div>';
+      logAdminAction('orders_listener_error', { error: error.message });
     });
 
   // Settings listener
@@ -352,101 +447,90 @@ function loadDashboardData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  db.collection('orders')
-    .where('timestamp', '>=', today)
-    .get()
-    .then(snapshot => {
-      elements.todayOrders.textContent = snapshot.size;
-      
-      // Calculate today's revenue
-      let revenue = 0;
-      snapshot.forEach(doc => {
-        revenue += doc.data().total || 0;
-      });
-      elements.todayRevenue.textContent = `₹${revenue.toFixed(2)}`;
-    })
-    .catch(error => {
-      console.error("Error loading dashboard data:", error);
-      showNotification('Failed to load dashboard data', 'error');
+  safeFirebaseOperation(() => 
+    db.collection('orders')
+      .where('timestamp', '>=', today)
+      .get()
+  ).then(snapshot => {
+    if (!snapshot) return;
+    
+    elements.todayOrders.textContent = snapshot.size;
+    
+    // Calculate today's revenue
+    let revenue = 0;
+    snapshot.forEach(doc => {
+      revenue += doc.data().total || 0;
     });
+    elements.todayRevenue.textContent = `₹${revenue.toFixed(2)}`;
+    logAdminAction('dashboard_data_loaded', { orderCount: snapshot.size, revenue });
+  });
 
   calculateNotificationReach();
 }
 
 function calculateNotificationReach() {
-  db.collection('fcmTokens').get().then(snapshot => {
+  safeFirebaseOperation(() => 
+    db.collection('fcmTokens').get()
+  ).then(snapshot => {
+    if (!snapshot) return;
+    
     const totalUsers = snapshot.size;
     if (totalUsers === 0) {
       elements.notificationReach.textContent = '0%';
       return;
     }
     
-    db.collection('fcmTokens')
-      .where('preferences.specialOffers', '==', true)
-      .get()
-      .then(activeSnapshot => {
-        const reach = (activeSnapshot.size / totalUsers * 100).toFixed(0);
-        elements.notificationReach.textContent = `${reach}%`;
-      });
+    safeFirebaseOperation(() => 
+      db.collection('fcmTokens')
+        .where('preferences.specialOffers', '==', true)
+        .get()
+    ).then(activeSnapshot => {
+      if (!activeSnapshot) return;
+      
+      const reach = (activeSnapshot.size / totalUsers * 100).toFixed(0);
+      elements.notificationReach.textContent = `${reach}%`;
+    });
   });
 }
 
 function loadDefaultPreferences() {
-  db.collection('settings').doc('notificationPreferences').get()
-    .then(doc => {
-      if (doc.exists) {
-        state.defaultPreferences = doc.data();
-        elements.defaultStatusUpdates.checked = state.defaultPreferences.statusUpdates !== false;
-        elements.defaultSpecialOffers.checked = state.defaultPreferences.specialOffers !== false;
-      }
-    });
-}
-
-function saveDefaultPreferences() {
-  const preferences = {
-    statusUpdates: elements.defaultStatusUpdates.checked,
-    specialOffers: elements.defaultSpecialOffers.checked,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-  
-  db.collection('settings').doc('notificationPreferences').set(preferences)
-    .then(() => {
-      showNotification('Default preferences saved');
-      state.defaultPreferences = preferences;
-    })
-    .catch(error => {
-      console.error("Error saving preferences:", error);
-      showNotification('Failed to save preferences', 'error');
-    });
+  safeFirebaseOperation(() => 
+    db.collection('settings').doc('notificationPreferences').get()
+  ).then(doc => {
+    if (doc && doc.exists) {
+      state.defaultPreferences = doc.data();
+      elements.defaultStatusUpdates.checked = state.defaultPreferences.statusUpdates !== false;
+      elements.defaultSpecialOffers.checked = state.defaultPreferences.specialOffers !== false;
+    }
+  });
 }
 
 function loadNotifications() {
   elements.notificationsList.innerHTML = '<div class="loading">Loading notifications...</div>';
   
-  db.collection('notifications')
-    .orderBy('timestamp', 'desc')
-    .limit(20)
-    .get()
-    .then(snapshot => {
-      state.notifications = [];
-      elements.notificationsList.innerHTML = '';
-      
-      if (snapshot.empty) {
-        elements.notificationsList.innerHTML = '<div class="no-notifications">No notifications found</div>';
-        return;
-      }
-      
-      snapshot.forEach(doc => {
-        const notification = doc.data();
-        notification.id = doc.id;
-        state.notifications.push(notification);
-        renderNotification(notification);
-      });
-    })
-    .catch(error => {
-      console.error("Error loading notifications:", error);
-      elements.notificationsList.innerHTML = '<div class="error">Failed to load notifications</div>';
+  safeFirebaseOperation(() => 
+    db.collection('notifications')
+      .orderBy('timestamp', 'desc')
+      .limit(20)
+      .get()
+  ).then(snapshot => {
+    if (!snapshot) return;
+    
+    state.notifications = [];
+    elements.notificationsList.innerHTML = '';
+    
+    if (snapshot.empty) {
+      elements.notificationsList.innerHTML = '<div class="no-notifications">No notifications found</div>';
+      return;
+    }
+    
+    snapshot.forEach(doc => {
+      const notification = doc.data();
+      notification.id = doc.id;
+      state.notifications.push(notification);
+      renderNotification(notification);
     });
+  });
 }
 
 function renderNotification(notification) {
@@ -463,7 +547,7 @@ function renderNotification(notification) {
   elements.notificationsList.appendChild(notificationElement);
 }
 
-// Notification Functions
+// ====================== NOTIFICATION FUNCTIONS ======================
 async function initializeMessaging() {
   try {
     if (!firebase.messaging.isSupported()) {
@@ -499,6 +583,7 @@ async function initializeMessaging() {
   } catch (error) {
     console.error('Messaging error:', error);
     elements.fcmStatus.textContent = 'Error initializing';
+    logAdminAction('messaging_init_error', { error: error.message });
   }
 }
 
@@ -511,6 +596,7 @@ async function saveAdminToken(token) {
     }, { merge: true });
   } catch (error) {
     console.error('Error saving token:', error);
+    logAdminAction('token_save_error', { error: error.message });
   }
 }
 
@@ -526,19 +612,30 @@ async function sendNotification(e) {
     return;
   }
   
+  showLoadingOverlay(true);
+  setLoading(elements.sendNotificationBtn, true);
+  
   try {
     // Save to admin notifications
-    await db.collection('adminNotifications').add({
-      title,
-      body,
-      type,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-      sentBy: state.currentUser.email
-    });
+    await safeFirebaseOperation(() => 
+      db.collection('adminNotifications').add({
+        title,
+        body,
+        type,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        sentBy: state.currentUser.email
+      })
+    );
     
     // Send to users based on preferences
-    const tokensSnapshot = await db.collection('fcmTokens').get();
+    const tokensSnapshot = await safeFirebaseOperation(() => 
+      db.collection('fcmTokens').get()
+    );
+    
+    if (!tokensSnapshot) return;
+    
     const batch = db.batch();
+    let notificationCount = 0;
     
     tokensSnapshot.forEach(doc => {
       const userPrefs = doc.data().preferences || state.defaultPreferences;
@@ -546,6 +643,7 @@ async function sendNotification(e) {
                        type === 'promotion' ? userPrefs.specialOffers !== false : true;
       
       if (shouldSend) {
+        notificationCount++;
         const notificationRef = db.collection('notifications').doc();
         batch.set(notificationRef, {
           title,
@@ -569,14 +667,22 @@ async function sendNotification(e) {
       }
     });
     
-    await batch.commit();
+    await safeFirebaseOperation(() => batch.commit());
     
-    showNotification('Notification sent successfully!');
+    showNotification(`Notification sent to ${notificationCount} users!`);
     elements.notificationForm.reset();
     loadNotifications();
+    logAdminAction('notification_sent', { 
+      type, 
+      recipientCount: notificationCount 
+    });
   } catch (error) {
     console.error('Error sending notification:', error);
     showNotification('Failed to send notification', 'error');
+    logAdminAction('notification_send_error', { error: error.message });
+  } finally {
+    showLoadingOverlay(false);
+    setLoading(elements.sendNotificationBtn, false);
   }
 }
 
@@ -602,6 +708,10 @@ async function sendFCMNotification(phoneNumber, title, body, data = {}) {
     return true;
   } catch (error) {
     console.error('Error sending FCM notification:', error);
+    logAdminAction('fcm_send_error', { 
+      phoneNumber,
+      error: error.message 
+    });
     return false;
   }
 }
@@ -613,20 +723,27 @@ async function getAccessToken() {
     return data.token;
   } catch (error) {
     console.error('Error getting FCM token:', error);
+    logAdminAction('fcm_token_fetch_error', { error: error.message });
     return null;
   }
 }
 
-// Order Management Functions
+// ====================== ORDER MANAGEMENT FUNCTIONS ======================
 async function updateOrderStatus(orderId, newStatus) {
+  setLoading(document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`), true);
+  
   try {
     const orderRef = db.collection('orders').doc(orderId);
-    await orderRef.update({
-      status: newStatus,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    await safeFirebaseOperation(() => 
+      orderRef.update({
+        status: newStatus,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      })
+    );
     
-    const orderDoc = await orderRef.get();
+    const orderDoc = await safeFirebaseOperation(() => orderRef.get());
+    if (!orderDoc) return;
+    
     const order = orderDoc.data();
     
     if (order.phoneNumber) {
@@ -654,14 +771,16 @@ async function updateOrderStatus(orderId, newStatus) {
       
       if (notificationTitle && notificationBody) {
         // Save notification to database
-        await db.collection('notifications').add({
-          title: notificationTitle,
-          body: notificationBody,
-          phoneNumber: order.phoneNumber,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          orderId: orderId,
-          type: 'status_update'
-        });
+        await safeFirebaseOperation(() => 
+          db.collection('notifications').add({
+            title: notificationTitle,
+            body: notificationBody,
+            phoneNumber: order.phoneNumber,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            orderId: orderId,
+            type: 'status_update'
+          })
+        );
         
         // Send FCM notification
         await sendFCMNotification(
@@ -679,13 +798,23 @@ async function updateOrderStatus(orderId, newStatus) {
     }
     
     showNotification('Order status updated successfully');
+    logAdminAction('order_status_updated', { 
+      orderId, 
+      newStatus 
+    });
   } catch (error) {
     console.error('Error updating order status:', error);
     showNotification('Failed to update order status', 'error');
+    logAdminAction('order_status_update_error', { 
+      orderId, 
+      error: error.message 
+    });
+  } finally {
+    setLoading(document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`), false);
   }
 }
 
-// Settings Functions
+// ====================== SETTINGS FUNCTIONS ======================
 async function saveSettings(e) {
   e.preventDefault();
   
@@ -704,29 +833,90 @@ async function saveSettings(e) {
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   
+  showLoadingOverlay(true);
+  setLoading(elements.saveSettingsBtn, true);
+  
   try {
-    await db.collection('settings').doc('shop').set(settings, { merge: true });
+    await safeFirebaseOperation(() => 
+      db.collection('settings').doc('shop').set(settings, { merge: true })
+    );
     
     // Send shop status update
     const statusMessage = settings.isOpen 
       ? `We're now open! (${settings.openingTime}-${settings.closingTime})` 
       : `We're currently closed. Opens at ${settings.openingTime}`;
     
-    await db.collection('notifications').add({
-      title: 'Shop Status Update',
-      body: statusMessage,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-      type: 'shop_status'
-    });
+    await safeFirebaseOperation(() => 
+      db.collection('notifications').add({
+        title: 'Shop Status Update',
+        body: statusMessage,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        type: 'shop_status'
+      })
+    );
     
     showNotification('Settings saved successfully');
+    logAdminAction('settings_updated', { settings });
   } catch (error) {
     console.error('Error saving settings:', error);
     showNotification('Failed to save settings', 'error');
+    logAdminAction('settings_update_error', { error: error.message });
+  } finally {
+    showLoadingOverlay(false);
+    setLoading(elements.saveSettingsBtn, false);
   }
 }
 
-// Event Listeners
+async function saveDefaultPreferences() {
+  const preferences = {
+    statusUpdates: elements.defaultStatusUpdates.checked,
+    specialOffers: elements.defaultSpecialOffers.checked,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  
+  setLoading(elements.savePreferencesBtn, true);
+  
+  try {
+    await safeFirebaseOperation(() => 
+      db.collection('settings').doc('notificationPreferences').set(preferences)
+    );
+    
+    showNotification('Default preferences saved');
+    state.defaultPreferences = preferences;
+    logAdminAction('preferences_updated', { preferences });
+  } catch (error) {
+    console.error("Error saving preferences:", error);
+    showNotification('Failed to save preferences', 'error');
+    logAdminAction('preferences_update_error', { error: error.message });
+  } finally {
+    setLoading(elements.savePreferencesBtn, false);
+  }
+}
+
+// ====================== AUDIT LOGGING ======================
+async function logAdminAction(action, details = {}) {
+  try {
+    await db.collection('adminAuditLogs').add({
+      action,
+      details,
+      admin: state.currentUser?.email || 'unknown',
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      ipAddress: await fetch('https://api.ipify.org?format=json')
+        .then(r => r.json())
+        .then(data => data.ip)
+        .catch(() => 'unknown')
+    });
+    
+    // Log to analytics
+    if (firebase.analytics) {
+      firebase.analytics().logEvent(`admin_${action}`, details);
+    }
+  } catch (error) {
+    console.error('Error logging admin action:', error);
+  }
+}
+
+// ====================== EVENT LISTENERS ======================
 function setupEventListeners() {
   // Navigation
   elements.navItems.forEach(item => {
@@ -744,10 +934,10 @@ function setupEventListeners() {
 
   // Order filter
   elements.orderFilter.addEventListener('change', filterOrders);
-  elements.orderSearch.addEventListener('input', () => {
-    clearTimeout(state.debounceTimer);
-    state.debounceTimer = setTimeout(filterOrders, 300);
-  });
+  elements.orderSearch.addEventListener('input', debounce(filterOrders, 300));
+
+  // Load more orders
+  elements.loadMoreOrdersBtn.addEventListener('click', loadMoreOrders);
 
   // Notification form
   elements.notificationForm.addEventListener('submit', sendNotification);
@@ -781,7 +971,10 @@ function setupEventListeners() {
   });
 }
 
+// ====================== AUTH FUNCTIONS ======================
 async function handleLogout() {
+  showLoadingOverlay(true);
+  
   try {
     if (state.fcmToken) {
       try {
@@ -789,19 +982,35 @@ async function handleLogout() {
         await db.collection('adminTokens').doc(state.currentUser.uid).delete();
       } catch (error) {
         console.error('Error removing token:', error);
+        logAdminAction('token_removal_error', { error: error.message });
       }
     }
     
     await auth.signOut();
+    logAdminAction('logout');
     window.location.href = '/admin-login.html';
   } catch (error) {
     console.error('Logout error:', error);
     showNotification('Logout failed', 'error');
+    logAdminAction('logout_error', { error: error.message });
+  } finally {
+    showLoadingOverlay(false);
   }
 }
 
-// Initialize the application
+// ====================== INITIALIZATION ======================
+function checkCompatibility() {
+  if (!('serviceWorker' in navigator)) {
+    showNotification('Some features may not work in your browser. Please update.', 'warning');
+  }
+  if (!window.Notification) {
+    elements.fcmStatus.textContent = 'Notifications not supported';
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
+  checkCompatibility();
+  
   auth.onAuthStateChanged(user => {
     if (user && user.email === "suvradeep.pal93@gmail.com") {
       state.currentUser = user;
@@ -811,6 +1020,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       initializeMessaging();
       updateCurrentTime();
       setInterval(updateCurrentTime, 1000);
+      logAdminAction('login');
     } else {
       window.location.href = '/admin-login.html';
     }
