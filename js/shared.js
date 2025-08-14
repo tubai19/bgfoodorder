@@ -300,6 +300,40 @@ async function getNotificationPreferences(phoneNumber) {
   }
 }
 
+async function sendFCMNotification(phoneNumber, title, body, data = {}) {
+  try {
+    const response = await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken()}`
+      },
+      body: JSON.stringify({
+        phoneNumber,
+        title,
+        body,
+        data
+      })
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Error sending FCM:', error);
+    return false;
+  }
+}
+
+async function getAccessToken() {
+  try {
+    const response = await fetch('/api/get-fcm-token');
+    const data = await response.json();
+    return data.token;
+  } catch (error) {
+    console.error('Error getting FCM token:', error);
+    return null;
+  }
+}
+
 if (messaging) {
   onMessage(messaging, (payload) => {
     console.log('Message received:', payload);
@@ -325,5 +359,7 @@ export {
   updateNotificationPreferences,
   getNotificationPreferences,
   initPwaFeatures,
-  isAppInstalled
+  isAppInstalled,
+  sendFCMNotification,
+  getAccessToken
 };

@@ -23,7 +23,9 @@ const elements = {
   distanceText: document.getElementById('distanceText'),
   deliveryTimeEstimate: document.getElementById('deliveryTimeEstimate'),
   timeEstimateText: document.getElementById('timeEstimateText'),
-  geocodingLoading: document.getElementById('geocodingLoading')
+  geocodingLoading: document.getElementById('geocodingLoading'),
+  notifyStatus: document.getElementById('notifyStatus'),
+  notifyOffers: document.getElementById('notifyOffers')
 };
 
 let map;
@@ -55,6 +57,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   
+  // Load saved notification preferences if available
+  loadNotificationPreferences();
   setupEventListeners();
   updateOrderSummary();
 });
@@ -84,6 +88,70 @@ function setupEventListeners() {
       closeConfirmationModal();
     }
   });
+
+  // Save notification preferences when changed
+  if (elements.notifyStatus) {
+    elements.notifyStatus.addEventListener('change', saveNotificationPreferences);
+  }
+  if (elements.notifyOffers) {
+    elements.notifyOffers.addEventListener('change', saveNotificationPreferences);
+  }
+}
+
+function loadNotificationPreferences() {
+  if (!elements.phoneNumber) return;
+  
+  const phone = elements.phoneNumber.value.trim();
+  if (!phone) return;
+
+  const savedPrefs = localStorage.getItem(`notifPrefs_${phone}`);
+  if (savedPrefs) {
+    try {
+      const prefs = JSON.parse(savedPrefs);
+      if (elements.notifyStatus) elements.notifyStatus.checked = prefs.statusUpdates;
+      if (elements.notifyOffers) elements.notifyOffers.checked = prefs.specialOffers;
+    } catch (e) {
+      console.error('Error loading notification preferences:', e);
+    }
+  }
+}
+
+function saveNotificationPreferences() {
+  if (!elements.phoneNumber || !elements.notifyStatus || !elements.notifyOffers) return;
+  
+  const phone = elements.phoneNumber.value.trim();
+  if (!phone) return;
+
+  const prefs = {
+    statusUpdates: elements.notifyStatus.checked,
+    specialOffers: elements.notifyOffers.checked
+  };
+  
+  localStorage.setItem(`notifPrefs_${phone}`, JSON.stringify(prefs));
+}
+
+async function updateNotificationPreferences(phoneNumber, preferences) {
+  localStorage.setItem(`notifPrefs_${phoneNumber}`, JSON.stringify(preferences));
+}
+
+async function requestNotificationPermission(phoneNumber, preferences) {
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    localStorage.setItem(`notifPermission_${phoneNumber}`, 'granted');
+    registerServiceWorker();
+  }
+}
+
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => {
+        console.log('ServiceWorker registration successful');
+      })
+      .catch(err => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+  }
 }
 
 function validateAndShowConfirmation() {
@@ -177,6 +245,17 @@ function generateOrderSummary() {
       <div class="summary-section">
         <h3>Special Instructions</h3>
         <p>${elements.orderNotes.value}</p>
+      </div>
+    `;
+  }
+
+  // Add notification preferences to summary if they exist
+  if (elements.notifyStatus || elements.notifyOffers) {
+    summaryHTML += `
+      <div class="summary-section">
+        <h3>Notification Preferences</h3>
+        <p><strong>Order Status Updates:</strong> ${elements.notifyStatus?.checked ? 'Yes' : 'No'}</p>
+        <p><strong>Special Offers:</strong> ${elements.notifyOffers?.checked ? 'Yes' : 'No'}</p>
       </div>
     `;
   }
@@ -453,7 +532,7 @@ function closeConfirmationModal() {
   elements.orderConfirmationModal.style.display = 'none';
 }
 
-function confirmOrder() {
+async function confirmOrder() {
   const orderType = getOrderType();
   const totals = calculateTotal();
   const distance = orderType === 'Delivery' ? calculateDistance(
@@ -475,12 +554,8 @@ function confirmOrder() {
   ];
 
   if (orderType === 'Delivery') {
-    const deliveryAddress = elements.manualDeliveryAddress.value || 'Current Location';
-    const googleMapsLink = `https://www.google.com/maps/dir/?api=1&destination=${userLocation.lat},${userLocation.lng}`;
-    
     messageParts.push(
-      `*Delivery Address:* ${deliveryAddress}`,
-      `*Location Link:* ${googleMapsLink}`,
+      `*Delivery Address:* ${elements.manualDeliveryAddress.value || 'Current Location'}`,
       `*Distance:* ${distance.toFixed(1)} km`
     );
     
@@ -530,18 +605,46 @@ function confirmOrder() {
       ``
     );
   }
+
+  // Add notification preferences to WhatsApp message if they exist
+  if (elements.notifyStatus || elements.notifyOffers) {
+    messageParts.push(
+      `*NOTIFICATION PREFERENCES:*`,
+      `Order Updates: ${elements.notifyStatus?.checked ? 'Yes' : 'No'}`,
+      `Special Offers: ${elements.notifyOffers?.checked ? 'Yes' : 'No'}`,
+      ``
+    );
+  }
   
   messageParts.push(`*Order Time:* ${new Date().toLocaleString()}`);
 
-  // Join with encoded newlines
-  const message = messageParts.join('%0A');
-  
   // Encode the entire message to handle special characters
   const encodedMessage = encodeURIComponent(messageParts.join('\n'));
   
   const whatsappUrl = `https://wa.me/918240266267?text=${encodedMessage}`;
   window.open(whatsappUrl, '_blank');
   
+  // Handle notification preferences
+  try {
+    const notificationPrefs = {
+      statusUpdates: elements.notifyStatus?.checked || false,
+      specialOffers: elements.notifyOffers?.checked || false
+    };
+
+    // Save notification preferences
+    await updateNotificationPreferences(elements.phoneNumber.value, notificationPrefs);
+    
+    // Request notification permission if not already granted
+    if (Notification.permission !== 'granted') {
+      await requestNotificationPermission(
+        elements.phoneNumber.value,
+        notificationPrefs
+      );
+    }
+  } catch (error) {
+    console.error('Error handling notifications:', error);
+  }
+
   closeConfirmationModal();
   showNotification('Order shared via WhatsApp!');
   
