@@ -456,58 +456,86 @@ function closeConfirmationModal() {
 function confirmOrder() {
   const orderType = getOrderType();
   const totals = calculateTotal();
-  const distance = calculateDistance(
+  const distance = orderType === 'Delivery' ? calculateDistance(
     shopLocation.lat, shopLocation.lng,
     userLocation.lat, userLocation.lng
-  );
+  ) : 0;
   
   // Generate a random 6-digit order number
   const orderNumber = Math.floor(100000 + Math.random() * 900000);
   
-  let message = `*NEW ORDER - BAKE & GRILL*%0A%0A`;
-  message += `*Order ID:* #${orderNumber}%0A`;
-  message += `*Customer Name:* ${elements.customerName.value}%0A`;
-  message += `*Phone:* ${elements.phoneNumber.value}%0A`;
-  message += `*Order Type:* ${orderType}%0A`;
-  
+  // Build message parts as an array for better readability
+  const messageParts = [
+    `*NEW ORDER - BAKE & GRILL*`,
+    ``,
+    `*Order ID:* #${orderNumber}`,
+    `*Customer Name:* ${elements.customerName.value}`,
+    `*Phone:* ${elements.phoneNumber.value}`,
+    `*Order Type:* ${orderType}`
+  ];
+
   if (orderType === 'Delivery') {
-    message += `*Delivery Address:* ${elements.manualDeliveryAddress.value || 'Current Location'}%0A`;
-    message += `*Distance:* ${distance.toFixed(1)} km%0A`;
+    messageParts.push(
+      `*Delivery Address:* ${elements.manualDeliveryAddress.value || 'Current Location'}`,
+      `*Distance:* ${distance.toFixed(1)} km`
+    );
     
     if (totals.subtotal > freeDeliveryThreshold) {
-      message += `*Delivery Charge:* Free (order above ₹${freeDeliveryThreshold})%0A`;
+      messageParts.push(`*Delivery Charge:* Free (order above ₹${freeDeliveryThreshold})`);
     } else if (distance <= 4) {
-      message += `*Delivery Charge:* Free (0-4 km)%0A`;
+      messageParts.push(`*Delivery Charge:* Free (0-4 km)`);
     } else if (distance <= 6) {
-      message += `*Delivery Charge:* ₹20 (4-6 km)%0A`;
+      messageParts.push(`*Delivery Charge:* ₹20 (4-6 km)`);
     } else if (distance <= 8) {
-      message += `*Delivery Charge:* ₹30 (6-8 km)%0A`;
+      messageParts.push(`*Delivery Charge:* ₹30 (6-8 km)`);
     }
     
-    message += `*Estimated Time:* ${basePrepTime + Math.round(distance * minutesPerKm)} minutes%0A`;
+    messageParts.push(`*Estimated Time:* ${basePrepTime + Math.round(distance * minutesPerKm)} minutes`);
   }
   
-  message += `%0A*ORDER ITEMS:*%0A`;
+  messageParts.push(
+    ``,
+    `*ORDER ITEMS:*`
+  );
+  
   cart.forEach(item => {
-    message += `- ${item.quantity}x ${item.name}${item.variant ? ` (${item.variant})` : ''} - ${formatPrice(item.price * item.quantity)}%0A`;
+    messageParts.push(`- ${item.quantity}x ${item.name}${item.variant ? ` (${item.variant})` : ''} - ${formatPrice(item.price * item.quantity)}`);
     if (orderType === 'Delivery' && item.category === 'Combos') {
-      message += `  (PICKUP ONLY - NOT INCLUDED IN DELIVERY)%0A`;
+      messageParts.push(`  (PICKUP ONLY - NOT INCLUDED IN DELIVERY)`);
     }
   });
   
-  message += `%0A*SUBTOTAL:* ${formatPrice(totals.subtotal)}%0A`;
+  messageParts.push(
+    ``,
+    `*SUBTOTAL:* ${formatPrice(totals.subtotal)}`
+  );
+  
   if (orderType === 'Delivery') {
-    message += `*DELIVERY CHARGE:* ${formatPrice(totals.deliveryCharge)}%0A`;
+    messageParts.push(`*DELIVERY CHARGE:* ${formatPrice(totals.deliveryCharge)}`);
   }
-  message += `*TOTAL AMOUNT:* ${formatPrice(totals.grandTotal)}%0A%0A`;
+  
+  messageParts.push(
+    `*TOTAL AMOUNT:* ${formatPrice(totals.grandTotal)}`,
+    ``
+  );
   
   if (elements.orderNotes.value) {
-    message += `*SPECIAL INSTRUCTIONS:*%0A${elements.orderNotes.value}%0A%0A`;
+    messageParts.push(
+      `*SPECIAL INSTRUCTIONS:*`,
+      `${elements.orderNotes.value}`,
+      ``
+    );
   }
   
-  message += `*Order Time:* ${new Date().toLocaleString()}`;
+  messageParts.push(`*Order Time:* ${new Date().toLocaleString()}`);
 
-  const whatsappUrl = `https://wa.me/918240266267?text=${message}`;
+  // Join with encoded newlines
+  const message = messageParts.join('%0A');
+  
+  // Encode the entire message to handle special characters
+  const encodedMessage = encodeURIComponent(messageParts.join('\n'));
+  
+  const whatsappUrl = `https://wa.me/918240266267?text=${encodedMessage}`;
   window.open(whatsappUrl, '_blank');
   
   closeConfirmationModal();
