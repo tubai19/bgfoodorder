@@ -80,82 +80,6 @@ const ORDER_STATUS = {
   cancelled: { text: 'Cancelled', color: '#f44336' }
 };
 
-// Initialize the application
-document.addEventListener('DOMContentLoaded', async function() {
-  auth.onAuthStateChanged(user => {
-    if (user && user.email === "suvradeep.pal93@gmail.com") {
-      state.currentUser = user;
-      setupRealtimeListeners();
-      loadDashboardData();
-      loadDefaultPreferences();
-      initializeMessaging();
-      updateCurrentTime();
-      setInterval(updateCurrentTime, 1000);
-    } else {
-      window.location.href = '/admin-login.html';
-    }
-  });
-
-  setupEventListeners();
-});
-
-// Event Listeners
-function setupEventListeners() {
-  // Navigation
-  elements.navItems.forEach(item => {
-    item.addEventListener('click', () => {
-      const section = item.dataset.section;
-      showSection(section);
-      elements.navItems.forEach(navItem => navItem.classList.remove('active'));
-      item.classList.add('active');
-      
-      if (section === 'notifications') {
-        loadNotifications();
-      } else if (section === 'analytics') {
-        loadAnalyticsData();
-      }
-    });
-  });
-
-  // Order filter
-  elements.orderFilter.addEventListener('change', filterOrders);
-  elements.orderSearch.addEventListener('input', () => {
-    clearTimeout(state.debounceTimer);
-    state.debounceTimer = setTimeout(filterOrders, 300);
-  });
-
-  // Notification form
-  elements.notificationForm.addEventListener('submit', sendNotification);
-
-  // Settings form
-  elements.settingsForm.addEventListener('submit', saveSettings);
-
-  // Save preferences
-  elements.savePreferencesBtn.addEventListener('click', saveDefaultPreferences);
-
-  // Logout button
-  elements.logoutBtn.addEventListener('click', handleLogout);
-
-  // Shop status toggle
-  elements.shopStatusToggle.addEventListener('change', function() {
-    elements.shopStatusText.textContent = this.checked ? 'Open' : 'Closed';
-  });
-
-  // Modal controls
-  elements.closeModalButtons.forEach(button => {
-    button.addEventListener('click', () => {
-      hideModal(elements.orderDetailModal);
-    });
-  });
-
-  // Click outside modal to close
-  window.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal')) {
-      hideModal(elements.orderDetailModal);
-    }
-  });
-}
-
 // UI Functions
 function showSection(sectionId) {
   elements.contentSections.forEach(section => {
@@ -204,70 +128,7 @@ function playNotificationSound() {
   sound.play().catch(e => console.log('Sound playback prevented:', e));
 }
 
-// Data Functions
-function setupRealtimeListeners() {
-  // Orders listener
-  db.collection('orders')
-    .orderBy('timestamp', 'desc')
-    .limit(50)
-    .onSnapshot(snapshot => {
-      state.orders = [];
-      elements.ordersListContainer.innerHTML = '';
-
-      if (snapshot.empty) {
-        elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
-        return;
-      }
-
-      // Check for new orders
-      if (snapshot.docs.length > 0) {
-        const latestOrder = snapshot.docs[0];
-        if (state.lastOrderId !== latestOrder.id) {
-          if (state.lastOrderId !== null) {
-            playNotificationSound();
-            showNotification('New order received!');
-          }
-          state.lastOrderId = latestOrder.id;
-        }
-      }
-
-      snapshot.forEach(doc => {
-        const order = doc.data();
-        order.id = doc.id;
-        state.orders.push(order);
-        renderOrderCard(order);
-      });
-    }, error => {
-      console.error("Orders listener error:", error);
-      elements.ordersListContainer.innerHTML = '<div class="error">Failed to load orders</div>';
-    });
-
-  // Settings listener
-  db.collection('settings').doc('shop')
-    .onSnapshot(doc => {
-      if (doc.exists) {
-        const settings = doc.data();
-        elements.shopStatusToggle.checked = settings.isOpen || false;
-        elements.shopStatusText.textContent = settings.isOpen ? 'Open' : 'Closed';
-        elements.openingTime.value = settings.openingTime || '10:00';
-        elements.closingTime.value = settings.closingTime || '22:00';
-        elements.deliveryRadius.value = settings.deliveryRadius || 8;
-        elements.minDeliveryOrder.value = settings.minDeliveryOrder || 200;
-        elements.chargeUnder4km.value = settings.deliveryCharges?.under4km || 0;
-        elements.charge4to6km.value = settings.deliveryCharges?.between4and6km || 20;
-        elements.charge6to8km.value = settings.deliveryCharges?.between6and8km || 30;
-        elements.freeDeliveryThreshold.value = settings.deliveryCharges?.freeThreshold || 500;
-      }
-    });
-
-  // Active users count
-  db.collection('fcmTokens')
-    .onSnapshot(snapshot => {
-      elements.activeUsers.textContent = snapshot.size;
-      calculateNotificationReach();
-    });
-}
-
+// Order Functions
 function filterOrders() {
   const statusFilter = elements.orderFilter.value;
   const searchTerm = elements.orderSearch.value.toLowerCase();
@@ -420,6 +281,70 @@ function showOrderDetails(orderId) {
   `;
   
   showModal(elements.orderDetailModal);
+}
+
+// Data Functions
+function setupRealtimeListeners() {
+  // Orders listener
+  db.collection('orders')
+    .orderBy('timestamp', 'desc')
+    .limit(50)
+    .onSnapshot(snapshot => {
+      state.orders = [];
+      elements.ordersListContainer.innerHTML = '';
+
+      if (snapshot.empty) {
+        elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
+        return;
+      }
+
+      // Check for new orders
+      if (snapshot.docs.length > 0) {
+        const latestOrder = snapshot.docs[0];
+        if (state.lastOrderId !== latestOrder.id) {
+          if (state.lastOrderId !== null) {
+            playNotificationSound();
+            showNotification('New order received!');
+          }
+          state.lastOrderId = latestOrder.id;
+        }
+      }
+
+      snapshot.forEach(doc => {
+        const order = doc.data();
+        order.id = doc.id;
+        state.orders.push(order);
+        renderOrderCard(order);
+      });
+    }, error => {
+      console.error("Orders listener error:", error);
+      elements.ordersListContainer.innerHTML = '<div class="error">Failed to load orders</div>';
+    });
+
+  // Settings listener
+  db.collection('settings').doc('shop')
+    .onSnapshot(doc => {
+      if (doc.exists) {
+        const settings = doc.data();
+        elements.shopStatusToggle.checked = settings.isOpen || false;
+        elements.shopStatusText.textContent = settings.isOpen ? 'Open' : 'Closed';
+        elements.openingTime.value = settings.openingTime || '10:00';
+        elements.closingTime.value = settings.closingTime || '22:00';
+        elements.deliveryRadius.value = settings.deliveryRadius || 8;
+        elements.minDeliveryOrder.value = settings.minDeliveryOrder || 200;
+        elements.chargeUnder4km.value = settings.deliveryCharges?.under4km || 0;
+        elements.charge4to6km.value = settings.deliveryCharges?.between4and6km || 20;
+        elements.charge6to8km.value = settings.deliveryCharges?.between6and8km || 30;
+        elements.freeDeliveryThreshold.value = settings.deliveryCharges?.freeThreshold || 500;
+      }
+    });
+
+  // Active users count
+  db.collection('fcmTokens')
+    .onSnapshot(snapshot => {
+      elements.activeUsers.textContent = snapshot.size;
+      calculateNotificationReach();
+    });
 }
 
 function loadDashboardData() {
@@ -801,6 +726,63 @@ async function saveSettings(e) {
   }
 }
 
+// Event Listeners
+function setupEventListeners() {
+  // Navigation
+  elements.navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const section = item.dataset.section;
+      showSection(section);
+      elements.navItems.forEach(navItem => navItem.classList.remove('active'));
+      item.classList.add('active');
+      
+      if (section === 'notifications') {
+        loadNotifications();
+      } else if (section === 'analytics') {
+        loadAnalyticsData();
+      }
+    });
+  });
+
+  // Order filter
+  elements.orderFilter.addEventListener('change', filterOrders);
+  elements.orderSearch.addEventListener('input', () => {
+    clearTimeout(state.debounceTimer);
+    state.debounceTimer = setTimeout(filterOrders, 300);
+  });
+
+  // Notification form
+  elements.notificationForm.addEventListener('submit', sendNotification);
+
+  // Settings form
+  elements.settingsForm.addEventListener('submit', saveSettings);
+
+  // Save preferences
+  elements.savePreferencesBtn.addEventListener('click', saveDefaultPreferences);
+
+  // Logout button
+  elements.logoutBtn.addEventListener('click', handleLogout);
+
+  // Shop status toggle
+  elements.shopStatusToggle.addEventListener('change', function() {
+    elements.shopStatusText.textContent = this.checked ? 'Open' : 'Closed';
+  });
+
+  // Modal controls
+  elements.closeModalButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      hideModal(elements.orderDetailModal);
+    });
+  });
+
+  // Click outside modal to close
+  window.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+      hideModal(elements.orderDetailModal);
+    }
+  });
+}
+
 async function handleLogout() {
   try {
     if (state.fcmToken) {
@@ -819,3 +801,22 @@ async function handleLogout() {
     showNotification('Logout failed', 'error');
   }
 }
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', async function() {
+  auth.onAuthStateChanged(user => {
+    if (user && user.email === "suvradeep.pal93@gmail.com") {
+      state.currentUser = user;
+      setupRealtimeListeners();
+      loadDashboardData();
+      loadDefaultPreferences();
+      initializeMessaging();
+      updateCurrentTime();
+      setInterval(updateCurrentTime, 1000);
+    } else {
+      window.location.href = '/admin-login.html';
+    }
+  });
+
+  setupEventListeners();
+});
