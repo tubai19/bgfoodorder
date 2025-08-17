@@ -1,33 +1,3 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { 
-  getFirestore,
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-  serverTimestamp,
-  onSnapshot,
-  orderBy,
-  limit,
-  addDoc,
-  deleteDoc,
-  startAfter
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { 
-  getMessaging, 
-  getToken, 
-  onMessage,
-  isSupported,
-  deleteToken
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
-
 // Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
@@ -40,17 +10,17 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const analytics = getAnalytics(app);
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+const analytics = firebase.analytics();
 const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
 let messaging;
 
 // Initialize messaging if supported
 (async () => {
-  if (await isSupported()) {
-    messaging = getMessaging(app);
+  if (firebase.messaging.isSupported()) {
+    messaging = firebase.messaging();
     setupMessageHandling();
   }
 })();
@@ -377,16 +347,15 @@ async function loadMoreOrders() {
   
   setLoading(elements.loadMoreOrdersBtn, true);
   
-  let ordersQuery = query(
-    collection(db, 'orders'),
-    orderBy('timestamp', 'desc'),
-    limit(10)
+  let ordersQuery = db.collection('orders')
+    .orderBy('timestamp', 'desc')
+    .limit(10);
     
   if (state.lastVisibleOrder) {
-    ordersQuery = query(ordersQuery, startAfter(state.lastVisibleOrder));
+    ordersQuery = ordersQuery.startAfter(state.lastVisibleOrder);
   }
 
-  const snapshot = await safeFirebaseOperation(() => getDocs(ordersQuery));
+  const snapshot = await safeFirebaseOperation(() => ordersQuery.get());
   if (!snapshot || snapshot.empty) {
     state.hasMoreOrders = false;
     elements.loadMoreOrdersBtn.style.display = 'none';
@@ -410,13 +379,11 @@ async function loadMoreOrders() {
 // ====================== DATA FUNCTIONS ======================
 function setupRealtimeListeners() {
   // Orders listener
-  const ordersQuery = query(
-    collection(db, 'orders'),
-    orderBy('timestamp', 'desc'),
-    limit(10)
-  );
+  const ordersQuery = db.collection('orders')
+    .orderBy('timestamp', 'desc')
+    .limit(10);
   
-  onSnapshot(ordersQuery, (snapshot) => {
+  ordersQuery.onSnapshot((snapshot) => {
     state.orders = [];
     state.lastVisibleOrder = null;
     state.hasMoreOrders = true;
@@ -457,7 +424,7 @@ function setupRealtimeListeners() {
   });
 
   // Settings listener
-  onSnapshot(doc(db, 'settings', 'shop'), (doc) => {
+  db.collection('settings').doc('shop').onSnapshot((doc) => {
     if (doc.exists()) {
       const settings = doc.data();
       elements.shopStatusToggle.checked = settings.isOpen || false;
@@ -474,7 +441,7 @@ function setupRealtimeListeners() {
   });
 
   // Active users count
-  onSnapshot(collection(db, 'fcmTokens'), (snapshot) => {
+  db.collection('fcmTokens').onSnapshot((snapshot) => {
     elements.activeUsers.textContent = snapshot.size;
     calculateNotificationReach();
   });
@@ -485,12 +452,10 @@ async function loadDashboardData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  const ordersQuery = query(
-    collection(db, 'orders'),
-    where('timestamp', '>=', today)
-  );
+  const ordersQuery = db.collection('orders')
+    .where('timestamp', '>=', today);
   
-  const snapshot = await safeFirebaseOperation(() => getDocs(ordersQuery));
+  const snapshot = await safeFirebaseOperation(() => ordersQuery.get());
   if (!snapshot) return;
   
   elements.todayOrders.textContent = snapshot.size;
@@ -508,7 +473,7 @@ async function loadDashboardData() {
 
 async function calculateNotificationReach() {
   const tokensSnapshot = await safeFirebaseOperation(() => 
-    getDocs(collection(db, 'fcmTokens'))
+    db.collection('fcmTokens').get()
   );
   if (!tokensSnapshot) return;
   
@@ -518,12 +483,10 @@ async function calculateNotificationReach() {
     return;
   }
   
-  const activeQuery = query(
-    collection(db, 'fcmTokens'),
-    where('preferences.specialOffers', '==', true)
-  );
+  const activeQuery = db.collection('fcmTokens')
+    .where('preferences.specialOffers', '==', true);
   
-  const activeSnapshot = await safeFirebaseOperation(() => getDocs(activeQuery));
+  const activeSnapshot = await safeFirebaseOperation(() => activeQuery.get());
   if (!activeSnapshot) return;
   
   const reach = (activeSnapshot.size / totalUsers * 100).toFixed(0);
@@ -531,8 +494,8 @@ async function calculateNotificationReach() {
 }
 
 async function loadDefaultPreferences() {
-  const docRef = doc(db, 'settings', 'notificationPreferences');
-  const docSnap = await safeFirebaseOperation(() => getDoc(docRef));
+  const docRef = db.collection('settings').doc('notificationPreferences');
+  const docSnap = await safeFirebaseOperation(() => docRef.get());
   
   if (docSnap && docSnap.exists()) {
     state.defaultPreferences = docSnap.data();
@@ -544,13 +507,11 @@ async function loadDefaultPreferences() {
 async function loadNotifications() {
   elements.notificationsList.innerHTML = '<div class="loading">Loading notifications...</div>';
   
-  const notificationsQuery = query(
-    collection(db, 'notifications'),
-    orderBy('timestamp', 'desc'),
-    limit(20)
-  );
+  const notificationsQuery = db.collection('notifications')
+    .orderBy('timestamp', 'desc')
+    .limit(20);
   
-  const snapshot = await safeFirebaseOperation(() => getDocs(notificationsQuery));
+  const snapshot = await safeFirebaseOperation(() => notificationsQuery.get());
   if (!snapshot) return;
   
   state.notifications = [];
@@ -585,7 +546,7 @@ function renderNotification(notification) {
 
 // ====================== NOTIFICATION FUNCTIONS ======================
 function setupMessageHandling() {
-  onMessage(messaging, (payload) => {
+  firebase.messaging().onMessage((payload) => {
     showNotification(payload.notification?.body || 'New message');
     playNotificationSound();
   });
@@ -605,7 +566,7 @@ async function initializeMessaging() {
       return;
     }
     
-    const token = await getToken(messaging, {
+    const token = await messaging.getToken({
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: await navigator.serviceWorker.ready
     });
@@ -626,10 +587,10 @@ async function initializeMessaging() {
 
 async function saveAdminToken(token) {
   try {
-    await setDoc(doc(db, 'adminTokens', state.currentUser.uid), {
+    await db.collection('adminTokens').doc(state.currentUser.uid).set({
       token,
       email: state.currentUser.email,
-      lastActive: serverTimestamp()
+      lastActive: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch (error) {
     console.error('Error saving token:', error);
@@ -655,23 +616,23 @@ async function sendNotification(e) {
   try {
     // Save to admin notifications
     await safeFirebaseOperation(() => 
-      addDoc(collection(db, 'adminNotifications'), {
+      db.collection('adminNotifications').add({
         title,
         body,
         type,
-        timestamp: serverTimestamp(),
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         sentBy: state.currentUser.email
       })
     );
     
     // Send to users based on preferences
     const tokensSnapshot = await safeFirebaseOperation(() => 
-      getDocs(collection(db, 'fcmTokens'))
+      db.collection('fcmTokens').get()
     );
     
     if (!tokensSnapshot) return;
     
-    const batch = writeBatch(db);
+    const batch = db.batch();
     let notificationCount = 0;
     
     tokensSnapshot.forEach(doc => {
@@ -681,12 +642,12 @@ async function sendNotification(e) {
       
       if (shouldSend) {
         notificationCount++;
-        const notificationRef = doc(collection(db, 'notifications'));
+        const notificationRef = db.collection('notifications').doc();
         batch.set(notificationRef, {
           title,
           body,
           type,
-          timestamp: serverTimestamp(),
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
           phoneNumber: doc.data().phoneNumber,
           sentBy: state.currentUser.email
         });
@@ -750,13 +711,13 @@ async function updateOrderStatus(orderId, newStatus) {
   setLoading(document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`), true);
   
   try {
-    const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, {
+    const orderRef = db.collection('orders').doc(orderId);
+    await orderRef.update({
       status: newStatus,
-      updatedAt: serverTimestamp()
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
-    const orderDoc = await getDoc(orderRef);
+    const orderDoc = await orderRef.get();
     if (!orderDoc.exists()) return;
 
     const order = orderDoc.data();
@@ -785,23 +746,21 @@ async function updateOrderStatus(orderId, newStatus) {
 
     if (notificationTitle && notificationBody) {
       // Save notification to database
-      await addDoc(collection(db, 'notifications'), {
+      await db.collection('notifications').add({
         title: notificationTitle,
         body: notificationBody,
         phoneNumber: order.phoneNumber,
-        timestamp: serverTimestamp(),
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         orderId: orderId,
         type: 'status_update',
         read: false
       });
 
       // Get user's FCM tokens
-      const tokensQuery = query(
-        collection(db, 'fcmTokens'),
-        where('phoneNumber', '==', order.phoneNumber),
-        where('preferences.statusUpdates', '==', true)
-      );
-      const tokensSnapshot = await getDocs(tokensQuery);
+      const tokensQuery = db.collection('fcmTokens')
+        .where('phoneNumber', '==', order.phoneNumber)
+        .where('preferences.statusUpdates', '==', true);
+      const tokensSnapshot = await tokensQuery.get();
       
       if (!tokensSnapshot.empty) {
         const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
@@ -855,24 +814,24 @@ async function saveSettings(e) {
       between6and8km: parseInt(elements.charge6to8km.value),
       freeThreshold: parseInt(elements.freeDeliveryThreshold.value)
     },
-    updatedAt: serverTimestamp()
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   
   showLoadingOverlay(true);
   setLoading(elements.saveSettingsBtn, true);
   
   try {
-    await setDoc(doc(db, 'settings', 'shop'), settings, { merge: true });
+    await db.collection('settings').doc('shop').set(settings, { merge: true });
     
     // Send shop status update
     const statusMessage = settings.isOpen 
       ? `We're now open! (${settings.openingTime}-${settings.closingTime})` 
       : `We're currently closed. Opens at ${settings.openingTime}`;
     
-    await addDoc(collection(db, 'notifications'), {
+    await db.collection('notifications').add({
       title: 'Shop Status Update',
       body: statusMessage,
-      timestamp: serverTimestamp(),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       type: 'shop_status'
     });
     
@@ -892,13 +851,13 @@ async function saveDefaultPreferences() {
   const preferences = {
     statusUpdates: elements.defaultStatusUpdates.checked,
     specialOffers: elements.defaultSpecialOffers.checked,
-    updatedAt: serverTimestamp()
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   
   setLoading(elements.savePreferencesBtn, true);
   
   try {
-    await setDoc(doc(db, 'settings', 'notificationPreferences'), preferences);
+    await db.collection('settings').doc('notificationPreferences').set(preferences);
     
     showNotification('Default preferences saved');
     state.defaultPreferences = preferences;
@@ -915,11 +874,11 @@ async function saveDefaultPreferences() {
 // ====================== AUDIT LOGGING ======================
 async function logAdminAction(action, details = {}) {
   try {
-    await addDoc(collection(db, 'adminAuditLogs'), {
+    await db.collection('adminAuditLogs').add({
       action,
       details,
       admin: state.currentUser?.email || 'unknown',
-      timestamp: serverTimestamp(),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       ipAddress: await fetch('https://api.ipify.org?format=json')
         .then(r => r.json())
         .then(data => data.ip)
@@ -927,7 +886,7 @@ async function logAdminAction(action, details = {}) {
     });
     
     // Log to analytics
-    logEvent(analytics, `admin_${action}`, details);
+    firebase.analytics().logEvent(`admin_${action}`, details);
   } catch (error) {
     console.error('Error logging admin action:', error);
   }
@@ -995,15 +954,15 @@ async function handleLogout() {
   try {
     if (state.fcmToken) {
       try {
-        await deleteToken(messaging, state.fcmToken);
-        await deleteDoc(doc(db, 'adminTokens', state.currentUser.uid));
+        await messaging.deleteToken(state.fcmToken);
+        await db.collection('adminTokens').doc(state.currentUser.uid).delete();
       } catch (error) {
         console.error('Error removing token:', error);
         logAdminAction('token_removal_error', { error: error.message });
       }
     }
     
-    await signOut(auth);
+    await auth.signOut();
     logAdminAction('logout');
     window.location.href = '/admin-login.html';
   } catch (error) {
@@ -1028,7 +987,7 @@ function checkCompatibility() {
 document.addEventListener('DOMContentLoaded', async function() {
   checkCompatibility();
   
-  onAuthStateChanged(auth, user => {
+  auth.onAuthStateChanged(user => {
     if (user && user.email === "suvradeep.pal93@gmail.com") {
       state.currentUser = user;
       setupRealtimeListeners();
