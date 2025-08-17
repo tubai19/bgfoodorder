@@ -1,3 +1,31 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { 
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+  serverTimestamp,
+  onSnapshot,
+  orderBy,
+  limit,
+  addDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { 
+  getMessaging, 
+  getToken, 
+  onMessage,
+  isSupported,
+  deleteToken
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAnalytics, logEvent } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+
 // Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
@@ -10,14 +38,20 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-  firebase.analytics();
-}
-const auth = firebase.auth();
-const db = firebase.firestore();
-let messaging;
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const analytics = getAnalytics(app);
 const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
+let messaging;
+
+// Initialize messaging if supported
+(async () => {
+  if (await isSupported()) {
+    messaging = getMessaging(app);
+    setupMessageHandling();
+  }
+})();
 
 // DOM Elements
 const elements = {
@@ -341,15 +375,16 @@ async function loadMoreOrders() {
   
   setLoading(elements.loadMoreOrdersBtn, true);
   
-  let query = db.collection('orders')
-    .orderBy('timestamp', 'desc')
-    .limit(10);
+  let ordersQuery = query(
+    collection(db, 'orders'),
+    orderBy('timestamp', 'desc'),
+    limit(10)
     
   if (state.lastVisibleOrder) {
-    query = query.startAfter(state.lastVisibleOrder);
+    ordersQuery = query(ordersQuery, startAfter(state.lastVisibleOrder));
   }
 
-  const snapshot = await safeFirebaseOperation(() => query.get());
+  const snapshot = await safeFirebaseOperation(() => getDocs(ordersQuery));
   if (!snapshot || snapshot.empty) {
     state.hasMoreOrders = false;
     elements.loadMoreOrdersBtn.style.display = 'none';
@@ -373,163 +408,162 @@ async function loadMoreOrders() {
 // ====================== DATA FUNCTIONS ======================
 function setupRealtimeListeners() {
   // Orders listener
-  db.collection('orders')
-    .orderBy('timestamp', 'desc')
-    .limit(10)
-    .onSnapshot(snapshot => {
-      state.orders = [];
-      state.lastVisibleOrder = null;
-      state.hasMoreOrders = true;
-      elements.ordersListContainer.innerHTML = '';
+  const ordersQuery = query(
+    collection(db, 'orders'),
+    orderBy('timestamp', 'desc'),
+    limit(10)
+  );
+  
+  onSnapshot(ordersQuery, (snapshot) => {
+    state.orders = [];
+    state.lastVisibleOrder = null;
+    state.hasMoreOrders = true;
+    elements.ordersListContainer.innerHTML = '';
 
-      if (snapshot.empty) {
-        elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
-        elements.loadMoreOrdersBtn.style.display = 'none';
-        return;
-      }
+    if (snapshot.empty) {
+      elements.ordersListContainer.innerHTML = '<div class="no-orders">No orders found</div>';
+      elements.loadMoreOrdersBtn.style.display = 'none';
+      return;
+    }
 
-      // Check for new orders
-      if (snapshot.docs.length > 0) {
-        const latestOrder = snapshot.docs[0];
-        if (state.lastOrderId !== latestOrder.id) {
-          if (state.lastOrderId !== null) {
-            playNotificationSound();
-            showNotification('New order received!');
-            logAdminAction('new_order_received', { orderId: latestOrder.id });
-          }
-          state.lastOrderId = latestOrder.id;
+    // Check for new orders
+    if (snapshot.docs.length > 0) {
+      const latestOrder = snapshot.docs[0];
+      if (state.lastOrderId !== latestOrder.id) {
+        if (state.lastOrderId !== null) {
+          playNotificationSound();
+          showNotification('New order received!');
+          logAdminAction('new_order_received', { orderId: latestOrder.id });
         }
+        state.lastOrderId = latestOrder.id;
       }
+    }
 
-      snapshot.forEach(doc => {
-        const order = doc.data();
-        order.id = doc.id;
-        state.orders.push(order);
-        renderOrderCard(order);
-      });
-      
-      state.lastVisibleOrder = snapshot.docs[snapshot.docs.length-1];
-      elements.loadMoreOrdersBtn.style.display = snapshot.size >= 10 ? 'block' : 'none';
-    }, error => {
-      console.error("Orders listener error:", error);
-      elements.ordersListContainer.innerHTML = '<div class="error">Failed to load orders</div>';
-      logAdminAction('orders_listener_error', { error: error.message });
+    snapshot.forEach(doc => {
+      const order = doc.data();
+      order.id = doc.id;
+      state.orders.push(order);
+      renderOrderCard(order);
     });
+    
+    state.lastVisibleOrder = snapshot.docs[snapshot.docs.length-1];
+    elements.loadMoreOrdersBtn.style.display = snapshot.size >= 10 ? 'block' : 'none';
+  }, error => {
+    console.error("Orders listener error:", error);
+    elements.ordersListContainer.innerHTML = '<div class="error">Failed to load orders</div>';
+    logAdminAction('orders_listener_error', { error: error.message });
+  });
 
   // Settings listener
-  db.collection('settings').doc('shop')
-    .onSnapshot(doc => {
-      if (doc.exists) {
-        const settings = doc.data();
-        elements.shopStatusToggle.checked = settings.isOpen || false;
-        elements.shopStatusText.textContent = settings.isOpen ? 'Open' : 'Closed';
-        elements.openingTime.value = settings.openingTime || '10:00';
-        elements.closingTime.value = settings.closingTime || '22:00';
-        elements.deliveryRadius.value = settings.deliveryRadius || 8;
-        elements.minDeliveryOrder.value = settings.minDeliveryOrder || 200;
-        elements.chargeUnder4km.value = settings.deliveryCharges?.under4km || 0;
-        elements.charge4to6km.value = settings.deliveryCharges?.between4and6km || 20;
-        elements.charge6to8km.value = settings.deliveryCharges?.between6and8km || 30;
-        elements.freeDeliveryThreshold.value = settings.deliveryCharges?.freeThreshold || 500;
-      }
-    });
+  onSnapshot(doc(db, 'settings', 'shop'), (doc) => {
+    if (doc.exists()) {
+      const settings = doc.data();
+      elements.shopStatusToggle.checked = settings.isOpen || false;
+      elements.shopStatusText.textContent = settings.isOpen ? 'Open' : 'Closed';
+      elements.openingTime.value = settings.openingTime || '10:00';
+      elements.closingTime.value = settings.closingTime || '22:00';
+      elements.deliveryRadius.value = settings.deliveryRadius || 8;
+      elements.minDeliveryOrder.value = settings.minDeliveryOrder || 200;
+      elements.chargeUnder4km.value = settings.deliveryCharges?.under4km || 0;
+      elements.charge4to6km.value = settings.deliveryCharges?.between4and6km || 20;
+      elements.charge6to8km.value = settings.deliveryCharges?.between6and8km || 30;
+      elements.freeDeliveryThreshold.value = settings.deliveryCharges?.freeThreshold || 500;
+    }
+  });
 
   // Active users count
-  db.collection('fcmTokens')
-    .onSnapshot(snapshot => {
-      elements.activeUsers.textContent = snapshot.size;
-      calculateNotificationReach();
-    });
+  onSnapshot(collection(db, 'fcmTokens'), (snapshot) => {
+    elements.activeUsers.textContent = snapshot.size;
+    calculateNotificationReach();
+  });
 }
 
-function loadDashboardData() {
+async function loadDashboardData() {
   // Today's orders count
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  safeFirebaseOperation(() => 
-    db.collection('orders')
-      .where('timestamp', '>=', today)
-      .get()
-  ).then(snapshot => {
-    if (!snapshot) return;
-    
-    elements.todayOrders.textContent = snapshot.size;
-    
-    // Calculate today's revenue
-    let revenue = 0;
-    snapshot.forEach(doc => {
-      revenue += doc.data().total || 0;
-    });
-    elements.todayRevenue.textContent = `₹${revenue.toFixed(2)}`;
-    logAdminAction('dashboard_data_loaded', { orderCount: snapshot.size, revenue });
+  const ordersQuery = query(
+    collection(db, 'orders'),
+    where('timestamp', '>=', today)
+  );
+  
+  const snapshot = await safeFirebaseOperation(() => getDocs(ordersQuery));
+  if (!snapshot) return;
+  
+  elements.todayOrders.textContent = snapshot.size;
+  
+  // Calculate today's revenue
+  let revenue = 0;
+  snapshot.forEach(doc => {
+    revenue += doc.data().total || 0;
   });
+  elements.todayRevenue.textContent = `₹${revenue.toFixed(2)}`;
+  logAdminAction('dashboard_data_loaded', { orderCount: snapshot.size, revenue });
 
   calculateNotificationReach();
 }
 
-function calculateNotificationReach() {
-  safeFirebaseOperation(() => 
-    db.collection('fcmTokens').get()
-  ).then(snapshot => {
-    if (!snapshot) return;
-    
-    const totalUsers = snapshot.size;
-    if (totalUsers === 0) {
-      elements.notificationReach.textContent = '0%';
-      return;
-    }
-    
-    safeFirebaseOperation(() => 
-      db.collection('fcmTokens')
-        .where('preferences.specialOffers', '==', true)
-        .get()
-    ).then(activeSnapshot => {
-      if (!activeSnapshot) return;
-      
-      const reach = (activeSnapshot.size / totalUsers * 100).toFixed(0);
-      elements.notificationReach.textContent = `${reach}%`;
-    });
-  });
+async function calculateNotificationReach() {
+  const tokensSnapshot = await safeFirebaseOperation(() => 
+    getDocs(collection(db, 'fcmTokens'))
+  );
+  if (!tokensSnapshot) return;
+  
+  const totalUsers = tokensSnapshot.size;
+  if (totalUsers === 0) {
+    elements.notificationReach.textContent = '0%';
+    return;
+  }
+  
+  const activeQuery = query(
+    collection(db, 'fcmTokens'),
+    where('preferences.specialOffers', '==', true)
+  );
+  
+  const activeSnapshot = await safeFirebaseOperation(() => getDocs(activeQuery));
+  if (!activeSnapshot) return;
+  
+  const reach = (activeSnapshot.size / totalUsers * 100).toFixed(0);
+  elements.notificationReach.textContent = `${reach}%`;
 }
 
-function loadDefaultPreferences() {
-  safeFirebaseOperation(() => 
-    db.collection('settings').doc('notificationPreferences').get()
-  ).then(doc => {
-    if (doc && doc.exists) {
-      state.defaultPreferences = doc.data();
-      elements.defaultStatusUpdates.checked = state.defaultPreferences.statusUpdates !== false;
-      elements.defaultSpecialOffers.checked = state.defaultPreferences.specialOffers !== false;
-    }
-  });
+async function loadDefaultPreferences() {
+  const docRef = doc(db, 'settings', 'notificationPreferences');
+  const docSnap = await safeFirebaseOperation(() => getDoc(docRef));
+  
+  if (docSnap && docSnap.exists()) {
+    state.defaultPreferences = docSnap.data();
+    elements.defaultStatusUpdates.checked = state.defaultPreferences.statusUpdates !== false;
+    elements.defaultSpecialOffers.checked = state.defaultPreferences.specialOffers !== false;
+  }
 }
 
-function loadNotifications() {
+async function loadNotifications() {
   elements.notificationsList.innerHTML = '<div class="loading">Loading notifications...</div>';
   
-  safeFirebaseOperation(() => 
-    db.collection('notifications')
-      .orderBy('timestamp', 'desc')
-      .limit(20)
-      .get()
-  ).then(snapshot => {
-    if (!snapshot) return;
-    
-    state.notifications = [];
-    elements.notificationsList.innerHTML = '';
-    
-    if (snapshot.empty) {
-      elements.notificationsList.innerHTML = '<div class="no-notifications">No notifications found</div>';
-      return;
-    }
-    
-    snapshot.forEach(doc => {
-      const notification = doc.data();
-      notification.id = doc.id;
-      state.notifications.push(notification);
-      renderNotification(notification);
-    });
+  const notificationsQuery = query(
+    collection(db, 'notifications'),
+    orderBy('timestamp', 'desc'),
+    limit(20)
+  );
+  
+  const snapshot = await safeFirebaseOperation(() => getDocs(notificationsQuery));
+  if (!snapshot) return;
+  
+  state.notifications = [];
+  elements.notificationsList.innerHTML = '';
+  
+  if (snapshot.empty) {
+    elements.notificationsList.innerHTML = '<div class="no-notifications">No notifications found</div>';
+    return;
+  }
+  
+  snapshot.forEach(doc => {
+    const notification = doc.data();
+    notification.id = doc.id;
+    state.notifications.push(notification);
+    renderNotification(notification);
   });
 }
 
@@ -548,14 +582,20 @@ function renderNotification(notification) {
 }
 
 // ====================== NOTIFICATION FUNCTIONS ======================
+function setupMessageHandling() {
+  onMessage(messaging, (payload) => {
+    showNotification(payload.notification?.body || 'New message');
+    playNotificationSound();
+  });
+}
+
 async function initializeMessaging() {
   try {
-    if (!firebase.messaging.isSupported()) {
+    if (!messaging) {
       elements.fcmStatus.textContent = 'Not supported in this browser';
       return;
     }
     
-    messaging = firebase.messaging();
     const permission = await Notification.requestPermission();
     
     if (permission !== 'granted') {
@@ -563,7 +603,7 @@ async function initializeMessaging() {
       return;
     }
     
-    const token = await messaging.getToken({
+    const token = await getToken(messaging, {
       vapidKey: VAPID_KEY,
       serviceWorkerRegistration: await navigator.serviceWorker.ready
     });
@@ -572,11 +612,6 @@ async function initializeMessaging() {
       state.fcmToken = token;
       elements.fcmStatus.textContent = 'Ready to send notifications';
       await saveAdminToken(token);
-      
-      messaging.onMessage((payload) => {
-        showNotification(payload.notification?.body || 'New message');
-        playNotificationSound();
-      });
     } else {
       elements.fcmStatus.textContent = 'No token available';
     }
@@ -589,10 +624,10 @@ async function initializeMessaging() {
 
 async function saveAdminToken(token) {
   try {
-    await db.collection('adminTokens').doc(state.currentUser.uid).set({
+    await setDoc(doc(db, 'adminTokens', state.currentUser.uid), {
       token,
       email: state.currentUser.email,
-      lastActive: firebase.firestore.FieldValue.serverTimestamp()
+      lastActive: serverTimestamp()
     }, { merge: true });
   } catch (error) {
     console.error('Error saving token:', error);
@@ -618,23 +653,23 @@ async function sendNotification(e) {
   try {
     // Save to admin notifications
     await safeFirebaseOperation(() => 
-      db.collection('adminNotifications').add({
+      addDoc(collection(db, 'adminNotifications'), {
         title,
         body,
         type,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        timestamp: serverTimestamp(),
         sentBy: state.currentUser.email
       })
     );
     
     // Send to users based on preferences
     const tokensSnapshot = await safeFirebaseOperation(() => 
-      db.collection('fcmTokens').get()
+      getDocs(collection(db, 'fcmTokens'))
     );
     
     if (!tokensSnapshot) return;
     
-    const batch = db.batch();
+    const batch = writeBatch(db);
     let notificationCount = 0;
     
     tokensSnapshot.forEach(doc => {
@@ -644,26 +679,36 @@ async function sendNotification(e) {
       
       if (shouldSend) {
         notificationCount++;
-        const notificationRef = db.collection('notifications').doc();
+        const notificationRef = doc(collection(db, 'notifications'));
         batch.set(notificationRef, {
           title,
           body,
           type,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          timestamp: serverTimestamp(),
           phoneNumber: doc.data().phoneNumber,
           sentBy: state.currentUser.email
         });
         
-        // Send FCM notification
-        sendFCMNotification(
-          doc.data().phoneNumber,
-          title,
-          body,
-          {
-            type,
-            click_action: `https://${window.location.hostname}`
-          }
-        );
+        // Send FCM notification via backend
+        fetch('/api/send-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await getAdminToken()}`
+          },
+          body: JSON.stringify({
+            phoneNumber: doc.data().phoneNumber,
+            title,
+            body,
+            data: {
+              type,
+              click_action: `https://${window.location.hostname}`
+            }
+          })
+        }).catch(error => {
+          console.error('Error sending notification:', error);
+          logAdminAction('fcm_send_error', { phoneNumber: doc.data().phoneNumber, error: error.message });
+        });
       }
     });
     
@@ -686,44 +731,14 @@ async function sendNotification(e) {
   }
 }
 
-async function sendFCMNotification(phoneNumber, title, body, data = {}) {
+async function getAdminToken() {
   try {
-    const response = await fetch('/api/send-notification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await getAccessToken()}`
-      },
-      body: JSON.stringify({
-        phoneNumber,
-        title,
-        body,
-        data
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to send notification');
-    }
-    return true;
-  } catch (error) {
-    console.error('Error sending FCM notification:', error);
-    logAdminAction('fcm_send_error', { 
-      phoneNumber,
-      error: error.message 
-    });
-    return false;
-  }
-}
-
-async function getAccessToken() {
-  try {
-    const response = await fetch('/api/get-fcm-token');
+    const response = await fetch('/api/get-admin-token');
     const data = await response.json();
     return data.token;
   } catch (error) {
-    console.error('Error getting FCM token:', error);
-    logAdminAction('fcm_token_fetch_error', { error: error.message });
+    console.error('Error getting admin token:', error);
+    logAdminAction('admin_token_fetch_error', { error: error.message });
     return null;
   }
 }
@@ -733,82 +748,90 @@ async function updateOrderStatus(orderId, newStatus) {
   setLoading(document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`), true);
   
   try {
-    const orderRef = db.collection('orders').doc(orderId);
-    await safeFirebaseOperation(() => 
-      orderRef.update({
-        status: newStatus,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      })
-    );
-    
-    const orderDoc = await safeFirebaseOperation(() => orderRef.get());
-    if (!orderDoc) return;
-    
+    const orderRef = doc(db, 'orders', orderId);
+    await updateDoc(orderRef, {
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    });
+
+    const orderDoc = await getDoc(orderRef);
+    if (!orderDoc.exists()) return;
+
     const order = orderDoc.data();
+    if (!order.phoneNumber) return;
+
+    let notificationTitle, notificationBody;
     
-    if (order.phoneNumber) {
-      let notificationTitle = '';
-      let notificationBody = '';
+    switch(newStatus) {
+      case 'preparing':
+        notificationTitle = 'Order Update';
+        notificationBody = `Your order #${orderId} is now being prepared`;
+        break;
+      case 'delivering':
+        notificationTitle = 'Order Update';
+        notificationBody = `Your order #${orderId} is out for delivery`;
+        break;
+      case 'completed':
+        notificationTitle = 'Order Delivered';
+        notificationBody = `Your order #${orderId} has been delivered. Enjoy your meal!`;
+        break;
+      case 'cancelled':
+        notificationTitle = 'Order Cancelled';
+        notificationBody = `Your order #${orderId} has been cancelled`;
+        break;
+    }
+
+    if (notificationTitle && notificationBody) {
+      // Save notification to database
+      await addDoc(collection(db, 'notifications'), {
+        title: notificationTitle,
+        body: notificationBody,
+        phoneNumber: order.phoneNumber,
+        timestamp: serverTimestamp(),
+        orderId: orderId,
+        type: 'status_update',
+        read: false
+      });
+
+      // Get user's FCM tokens
+      const tokensQuery = query(
+        collection(db, 'fcmTokens'),
+        where('phoneNumber', '==', order.phoneNumber),
+        where('preferences.statusUpdates', '==', true)
+      );
+      const tokensSnapshot = await getDocs(tokensQuery);
       
-      switch(newStatus) {
-        case 'preparing':
-          notificationTitle = 'Order Update';
-          notificationBody = `Your order #${orderId} is now being prepared`;
-          break;
-        case 'delivering':
-          notificationTitle = 'Order Update';
-          notificationBody = `Your order #${orderId} is out for delivery`;
-          break;
-        case 'completed':
-          notificationTitle = 'Order Delivered';
-          notificationBody = `Your order #${orderId} has been delivered. Enjoy your meal!`;
-          break;
-        case 'cancelled':
-          notificationTitle = 'Order Cancelled';
-          notificationBody = `Your order #${orderId} has been cancelled`;
-          break;
-      }
-      
-      if (notificationTitle && notificationBody) {
-        // Save notification to database
-        await safeFirebaseOperation(() => 
-          db.collection('notifications').add({
+      if (!tokensSnapshot.empty) {
+        const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
+        
+        // Send via backend
+        await fetch('/api/send-notifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await getAdminToken()}`
+          },
+          body: JSON.stringify({
             title: notificationTitle,
             body: notificationBody,
-            phoneNumber: order.phoneNumber,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            orderId: orderId,
-            type: 'status_update'
-          })
-        );
-        
-        // Send FCM notification
-        await sendFCMNotification(
-          order.phoneNumber,
-          notificationTitle,
-          notificationBody,
-          {
             type: 'status_update',
-            orderId: orderId,
-            status: newStatus,
-            click_action: `https://${window.location.hostname}/checkout.html?orderId=${orderId}`
-          }
-        );
+            tokens,
+            data: {
+              orderId,
+              status: newStatus,
+              click_action: `https://${window.location.hostname}/order-status.html?orderId=${orderId}`
+            }
+          })
+        });
       }
     }
-    
+
     showNotification('Order status updated successfully');
-    logAdminAction('order_status_updated', { 
-      orderId, 
-      newStatus 
-    });
+    logAdminAction('order_status_updated', { orderId, newStatus });
   } catch (error) {
     console.error('Error updating order status:', error);
     showNotification('Failed to update order status', 'error');
-    logAdminAction('order_status_update_error', { 
-      orderId, 
-      error: error.message 
-    });
+    logAdminAction('order_status_update_error', { orderId, error: error.message });
   } finally {
     setLoading(document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`), false);
   }
@@ -830,30 +853,26 @@ async function saveSettings(e) {
       between6and8km: parseInt(elements.charge6to8km.value),
       freeThreshold: parseInt(elements.freeDeliveryThreshold.value)
     },
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    updatedAt: serverTimestamp()
   };
   
   showLoadingOverlay(true);
   setLoading(elements.saveSettingsBtn, true);
   
   try {
-    await safeFirebaseOperation(() => 
-      db.collection('settings').doc('shop').set(settings, { merge: true })
-    );
+    await setDoc(doc(db, 'settings', 'shop'), settings, { merge: true });
     
     // Send shop status update
     const statusMessage = settings.isOpen 
       ? `We're now open! (${settings.openingTime}-${settings.closingTime})` 
       : `We're currently closed. Opens at ${settings.openingTime}`;
     
-    await safeFirebaseOperation(() => 
-      db.collection('notifications').add({
-        title: 'Shop Status Update',
-        body: statusMessage,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        type: 'shop_status'
-      })
-    );
+    await addDoc(collection(db, 'notifications'), {
+      title: 'Shop Status Update',
+      body: statusMessage,
+      timestamp: serverTimestamp(),
+      type: 'shop_status'
+    });
     
     showNotification('Settings saved successfully');
     logAdminAction('settings_updated', { settings });
@@ -871,15 +890,13 @@ async function saveDefaultPreferences() {
   const preferences = {
     statusUpdates: elements.defaultStatusUpdates.checked,
     specialOffers: elements.defaultSpecialOffers.checked,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    updatedAt: serverTimestamp()
   };
   
   setLoading(elements.savePreferencesBtn, true);
   
   try {
-    await safeFirebaseOperation(() => 
-      db.collection('settings').doc('notificationPreferences').set(preferences)
-    );
+    await setDoc(doc(db, 'settings', 'notificationPreferences'), preferences);
     
     showNotification('Default preferences saved');
     state.defaultPreferences = preferences;
@@ -896,11 +913,11 @@ async function saveDefaultPreferences() {
 // ====================== AUDIT LOGGING ======================
 async function logAdminAction(action, details = {}) {
   try {
-    await db.collection('adminAuditLogs').add({
+    await addDoc(collection(db, 'adminAuditLogs'), {
       action,
       details,
       admin: state.currentUser?.email || 'unknown',
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      timestamp: serverTimestamp(),
       ipAddress: await fetch('https://api.ipify.org?format=json')
         .then(r => r.json())
         .then(data => data.ip)
@@ -908,9 +925,7 @@ async function logAdminAction(action, details = {}) {
     });
     
     // Log to analytics
-    if (firebase.analytics) {
-      firebase.analytics().logEvent(`admin_${action}`, details);
-    }
+    logEvent(analytics, `admin_${action}`, details);
   } catch (error) {
     console.error('Error logging admin action:', error);
   }
@@ -978,15 +993,15 @@ async function handleLogout() {
   try {
     if (state.fcmToken) {
       try {
-        await messaging.deleteToken(state.fcmToken);
-        await db.collection('adminTokens').doc(state.currentUser.uid).delete();
+        await deleteToken(messaging, state.fcmToken);
+        await deleteDoc(doc(db, 'adminTokens', state.currentUser.uid));
       } catch (error) {
         console.error('Error removing token:', error);
         logAdminAction('token_removal_error', { error: error.message });
       }
     }
     
-    await auth.signOut();
+    await signOut(auth);
     logAdminAction('logout');
     window.location.href = '/admin-login.html';
   } catch (error) {
@@ -1011,7 +1026,7 @@ function checkCompatibility() {
 document.addEventListener('DOMContentLoaded', async function() {
   checkCompatibility();
   
-  auth.onAuthStateChanged(user => {
+  onAuthStateChanged(auth, user => {
     if (user && user.email === "suvradeep.pal93@gmail.com") {
       state.currentUser = user;
       setupRealtimeListeners();

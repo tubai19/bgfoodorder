@@ -1,10 +1,11 @@
-const CACHE_NAME = 'bake-and-grill-v3';
+const CACHE_NAME = 'bake-and-grill-v4';
 const OFFLINE_URL = 'offline.html';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/menu.html',
   '/checkout.html',
+  '/order-status.html',
   '/css/styles.css',
   '/js/main.js',
   '/js/menu.js',
@@ -68,4 +69,40 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+});
+
+// Background push notifications
+self.addEventListener('push', (event) => {
+  const payload = event.data?.json() || {};
+  const title = payload.notification?.title || 'New Update';
+  const body = payload.notification?.body || 'You have a new notification';
+  const data = payload.data || {};
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/icons/icon-192x192.png',
+      data
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  
+  const urlToOpen = event.notification.data?.click_action || '/';
+  
+  event.waitUntil(
+    clients.matchAll({type: 'window'}).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });
