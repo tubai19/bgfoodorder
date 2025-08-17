@@ -23,6 +23,10 @@ import {
   isSupported,
   deleteToken
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+import { 
+  getFunctions, 
+  httpsCallable 
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
@@ -36,6 +40,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const functions = getFunctions(app);
 const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
 let messaging;
 
@@ -212,6 +217,8 @@ async function getNotificationPreferences(phoneNumber) {
 
 async function sendOrderNotification(orderId, phoneNumber, title, body) {
   try {
+    console.log(`Attempting to send notification for order ${orderId} to ${phoneNumber}`);
+    
     // Get user's FCM tokens
     const tokensQuery = query(
       collection(db, 'fcmTokens'),
@@ -223,26 +230,17 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
     if (!tokensSnapshot.empty) {
       const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
       
-      // Send via backend
-      const response = await fetch('/api/send-notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAdminToken()}`
-        },
-        body: JSON.stringify({
-          title,
-          body,
-          type: 'status_update',
-          tokens,
-          data: {
-            orderId,
-            click_action: `https://${window.location.hostname}/checkout.html?orderId=${orderId}`
-          }
-        })
+      // Call Cloud Function directly
+      const sendNotification = httpsCallable(functions, 'sendNotification');
+      await sendNotification({
+        tokens,
+        title,
+        body,
+        data: {
+          orderId,
+          click_action: `https://${window.location.hostname}/checkout.html?orderId=${orderId}`
+        }
       });
-
-      if (!response.ok) throw new Error('Failed to send notification');
     }
 
     // Save notification to database
@@ -256,21 +254,12 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
       read: false
     });
 
+    console.log('Notification sent and saved successfully');
     return true;
   } catch (error) {
     console.error('Error sending notification:', error);
+    showNotification('Failed to send notification', 'error');
     return false;
-  }
-}
-
-async function getAdminToken() {
-  try {
-    const response = await fetch('/api/get-admin-token');
-    const data = await response.json();
-    return data.token;
-  } catch (error) {
-    console.error('Error getting admin token:', error);
-    return null;
   }
 }
 
