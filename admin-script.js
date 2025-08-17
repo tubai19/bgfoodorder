@@ -424,9 +424,9 @@ function setupRealtimeListeners() {
   });
 
   // Settings listener
-  db.collection('settings').doc('shop').onSnapshot((doc) => {
-    if (doc.exists()) {
-      const settings = doc.data();
+  db.collection('settings').doc('shop').onSnapshot((docSnapshot) => {
+    if (docSnapshot.exists) {
+      const settings = docSnapshot.data();
       elements.shopStatusToggle.checked = settings.isOpen || false;
       elements.shopStatusText.textContent = settings.isOpen ? 'Open' : 'Closed';
       elements.openingTime.value = settings.openingTime || '10:00';
@@ -497,7 +497,7 @@ async function loadDefaultPreferences() {
   const docRef = db.collection('settings').doc('notificationPreferences');
   const docSnap = await safeFirebaseOperation(() => docRef.get());
   
-  if (docSnap && docSnap.exists()) {
+  if (docSnap && docSnap.exists) {
     state.defaultPreferences = docSnap.data();
     elements.defaultStatusUpdates.checked = state.defaultPreferences.statusUpdates !== false;
     elements.defaultSpecialOffers.checked = state.defaultPreferences.specialOffers !== false;
@@ -719,7 +719,7 @@ async function updateOrderStatus(orderId, newStatus) {
     });
 
     const orderDoc = await orderRef.get();
-    if (!orderDoc.exists()) return;
+    if (!orderDoc.exists) return;
 
     const order = orderDoc.data();
     if (!order.phoneNumber) return;
