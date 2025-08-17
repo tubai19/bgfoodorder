@@ -1,5 +1,5 @@
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js');
+importScripts('https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js');
+importScripts('https://www.gstatic.com/firebasejs/10.11.1/firebase-messaging.js');
 
 const firebaseConfig = {
   apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
@@ -13,7 +13,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Background message handler
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   
@@ -28,7 +27,6 @@ messaging.onBackgroundMessage((payload) => {
   return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
@@ -43,14 +41,12 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({type: 'window'}).then((windowClients) => {
-      // Focus on existing tab if it exists
       for (const client of windowClients) {
         if (client.url === url && 'focus' in client) {
           return client.focus();
         }
       }
       
-      // Open new tab if none exists
       if (clients.openWindow) {
         return clients.openWindow(url);
       }
