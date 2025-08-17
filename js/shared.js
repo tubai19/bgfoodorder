@@ -12,7 +12,9 @@ import {
   writeBatch,
   serverTimestamp,
   onSnapshot,
-  limit
+  limit,
+  addDoc,
+  GeoPoint
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { 
   getMessaging, 
@@ -28,111 +30,44 @@ const firebaseConfig = {
   projectId: "bakeandgrill-44c25",
   storageBucket: "bakeandgrill-44c25.appspot.com",
   messagingSenderId: "713279633359",
-  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba"
+  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
+  measurementId: "G-SLG2R88J72"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
 let messaging;
 
 (async () => {
   if (await isSupported()) {
     messaging = getMessaging(app);
+    setupMessageHandling();
   }
 })();
 
 // PWA Installation
 let deferredPrompt;
 
-function isIos() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-function isAppInstalled() {
-  return window.matchMedia('(display-mode: standalone)').matches || 
-         window.navigator.standalone ||
-         document.referrer.includes('android-app://');
-}
-
-function showIosInstallPrompt() {
-  if (isAppInstalled() || localStorage.getItem('iosInstallDismissed')) return;
-  
-  const iosGuide = document.getElementById('iosInstallGuide');
-  if (iosGuide) {
-    iosGuide.style.display = 'flex';
+function setupMessageHandling() {
+  onMessage(messaging, (payload) => {
+    console.log('Message received:', payload);
+    const notification = payload.notification;
+    const data = payload.data || {};
+    showNotification(notification?.body || 'New update', data.type || 'info');
     
-    document.getElementById('closeIosGuide')?.addEventListener('click', () => {
-      iosGuide.style.display = 'none';
-      localStorage.setItem('iosInstallDismissed', 'true');
-    });
-  }
-}
-
-function setupInstallPromotion() {
-  const installContainer = document.getElementById('installContainer');
-  if (!installContainer) return;
-  
-  if (!isIos() && deferredPrompt) {
-    installContainer.style.display = 'flex';
-    
-    document.getElementById('installButton')?.addEventListener('click', () => {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(choiceResult => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('User accepted install');
-        }
-        installContainer.style.display = 'none';
-        deferredPrompt = null;
-      });
-    });
-    
-    document.getElementById('dismissInstall')?.addEventListener('click', () => {
-      installContainer.style.display = 'none';
-    });
-  }
-  
-  if (isIos()) {
-    showIosInstallPrompt();
-  }
-}
-
-function initPwaFeatures() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('ServiceWorker registered');
-        
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('New content available - please refresh');
-            }
-          });
-        });
-      })
-      .catch(err => {
-        console.log('ServiceWorker registration failed: ', err);
-      });
-  }
-  
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    setupInstallPromotion();
+    if (data.type === 'status_update') {
+      playNotificationSound();
+    }
   });
-  
-  window.addEventListener('appinstalled', () => {
-    console.log('App was installed');
-    const installContainer = document.getElementById('installContainer');
-    if (installContainer) installContainer.style.display = 'none';
-  });
-  
-  setupInstallPromotion();
 }
 
-// Notification functions
+function playNotificationSound() {
+  const sound = new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3');
+  sound.volume = 0.3;
+  sound.play().catch(e => console.log('Sound playback prevented:', e));
+}
+
 function showNotification(message, type = 'success') {
   try {
     const notification = document.getElementById('notification');
@@ -198,16 +133,11 @@ function validateOrder(cart, orderType) {
 
 async function requestNotificationPermission(phoneNumber, preferences = {}) {
   try {
-    if (!messaging) {
-      console.log('Messaging not supported');
-      return null;
-    }
+    if (!messaging) return null;
 
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      const token = await getToken(messaging, { 
-        vapidKey: 'BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY' 
-      });
+      const token = await getToken(messaging, { vapidKey: VAPID_KEY });
       
       if (token) {
         await setDoc(doc(db, 'fcmTokens', token), {
@@ -218,10 +148,11 @@ async function requestNotificationPermission(phoneNumber, preferences = {}) {
             specialOffers: true,
             ...preferences
           },
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          lastActive: serverTimestamp()
         });
+        return token;
       }
-      return token;
     }
     return null;
   } catch (error) {
@@ -230,40 +161,17 @@ async function requestNotificationPermission(phoneNumber, preferences = {}) {
   }
 }
 
-async function sendNotificationToUser(phoneNumber, title, body, data = {}) {
-  try {
-    const tokensRef = collection(db, 'fcmTokens');
-    const q = query(tokensRef, where('phoneNumber', '==', phoneNumber));
-    const querySnapshot = await getDocs(q);
-    
-    const tokens = [];
-    querySnapshot.forEach((doc) => {
-      const preferences = doc.data().preferences || {};
-      if (data.type === 'order_update' && !preferences.statusUpdates) return;
-      if (data.type === 'promotion' && !preferences.specialOffers) return;
-      
-      tokens.push(doc.data().token);
-    });
-
-    if (tokens.length === 0) return false;
-    console.log('Would send notification to:', tokens, 'with:', { title, body, data });
-    return true;
-  } catch (error) {
-    console.error('Error sending notification:', error);
-    return false;
-  }
-}
-
 async function updateNotificationPreferences(phoneNumber, preferences) {
   try {
-    const tokensRef = collection(db, 'fcmTokens');
-    const q = query(tokensRef, where('phoneNumber', '==', phoneNumber));
-    const querySnapshot = await getDocs(q);
+    const tokensQuery = query(
+      collection(db, 'fcmTokens'),
+      where('phoneNumber', '==', phoneNumber)
+    );
+    const querySnapshot = await getDocs(tokensQuery);
     
     const batch = writeBatch(db);
-    querySnapshot.forEach((doc) => {
-      const docRef = doc.ref;
-      batch.update(docRef, { preferences });
+    querySnapshot.forEach(doc => {
+      batch.update(doc.ref, { preferences });
     });
     
     await batch.commit();
@@ -276,13 +184,15 @@ async function updateNotificationPreferences(phoneNumber, preferences) {
 
 async function getNotificationPreferences(phoneNumber) {
   try {
-    const tokensRef = collection(db, 'fcmTokens');
-    const q = query(tokensRef, where('phoneNumber', '==', phoneNumber), limit(1));
-    const querySnapshot = await getDocs(q);
+    const tokensQuery = query(
+      collection(db, 'fcmTokens'),
+      where('phoneNumber', '==', phoneNumber),
+      limit(1)
+    );
+    const querySnapshot = await getDocs(tokensQuery);
     
     if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0];
-      return doc.data().preferences || {
+      return querySnapshot.docs[0].data().preferences || {
         statusUpdates: true,
         specialOffers: true
       };
@@ -300,50 +210,69 @@ async function getNotificationPreferences(phoneNumber) {
   }
 }
 
-async function sendFCMNotification(phoneNumber, title, body, data = {}) {
+async function sendOrderNotification(orderId, phoneNumber, title, body) {
   try {
-    const response = await fetch('/api/send-notification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await getAccessToken()}`
-      },
-      body: JSON.stringify({
-        phoneNumber,
-        title,
-        body,
-        data
-      })
+    // Get user's FCM tokens
+    const tokensQuery = query(
+      collection(db, 'fcmTokens'),
+      where('phoneNumber', '==', phoneNumber),
+      where('preferences.statusUpdates', '==', true)
+    );
+    const tokensSnapshot = await getDocs(tokensQuery);
+    
+    if (!tokensSnapshot.empty) {
+      const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
+      
+      // Send via backend
+      const response = await fetch('/api/send-notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getAdminToken()}`
+        },
+        body: JSON.stringify({
+          title,
+          body,
+          type: 'status_update',
+          tokens,
+          data: {
+            orderId,
+            click_action: `https://${window.location.hostname}/checkout.html?orderId=${orderId}`
+          }
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to send notification');
+    }
+
+    // Save notification to database
+    await addDoc(collection(db, 'notifications'), {
+      title,
+      body,
+      phoneNumber,
+      timestamp: serverTimestamp(),
+      orderId,
+      type: 'status_update',
+      read: false
     });
 
-    return response.ok;
+    return true;
   } catch (error) {
-    console.error('Error sending FCM:', error);
+    console.error('Error sending notification:', error);
     return false;
   }
 }
 
-async function getAccessToken() {
+async function getAdminToken() {
   try {
-    const response = await fetch('/api/get-fcm-token');
+    const response = await fetch('/api/get-admin-token');
     const data = await response.json();
     return data.token;
   } catch (error) {
-    console.error('Error getting FCM token:', error);
+    console.error('Error getting admin token:', error);
     return null;
   }
 }
-
-if (messaging) {
-  onMessage(messaging, (payload) => {
-    console.log('Message received:', payload);
-    const notification = payload.notification;
-    const data = payload.data || {};
-    showNotification(notification?.body || 'New update', data.type || 'info');
-  });
-}
-
-document.addEventListener('DOMContentLoaded', updateCartCount);
 
 export { 
   db,
@@ -355,11 +284,13 @@ export {
   updateCartCount,
   validateOrder,
   requestNotificationPermission,
-  sendNotificationToUser,
   updateNotificationPreferences,
   getNotificationPreferences,
-  initPwaFeatures,
-  isAppInstalled,
-  sendFCMNotification,
-  getAccessToken
+  sendOrderNotification,
+  serverTimestamp,
+  GeoPoint,
+  addDoc,
+  collection,
+  doc,
+  setDoc
 };

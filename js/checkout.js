@@ -1,4 +1,9 @@
-import { cart, saveCart, updateCartCount, showNotification, formatPrice, validateOrder } from './shared.js';
+import { 
+  cart, saveCart, updateCartCount, showNotification, formatPrice, validateOrder,
+  requestNotificationPermission, updateNotificationPreferences, sendOrderNotification,
+  serverTimestamp, GeoPoint, addDoc, collection, doc, setDoc, db,
+  getNotificationPreferences
+} from './shared.js';
 
 const elements = {
   placeOrderBtn: document.getElementById('placeOrderBtn'),
@@ -96,25 +101,18 @@ function setupEventListeners() {
   }
 }
 
-function loadNotificationPreferences() {
+async function loadNotificationPreferences() {
   if (!elements.phoneNumber) return;
   
   const phone = elements.phoneNumber.value.trim();
   if (!phone) return;
 
-  const savedPrefs = localStorage.getItem(`notifPrefs_${phone}`);
-  if (savedPrefs) {
-    try {
-      const prefs = JSON.parse(savedPrefs);
-      if (elements.notifyStatus) elements.notifyStatus.checked = prefs.statusUpdates;
-      if (elements.notifyOffers) elements.notifyOffers.checked = prefs.specialOffers;
-    } catch (e) {
-      console.error('Error loading notification preferences:', e);
-    }
-  }
+  const prefs = await getNotificationPreferences(phone);
+  if (elements.notifyStatus) elements.notifyStatus.checked = prefs.statusUpdates;
+  if (elements.notifyOffers) elements.notifyOffers.checked = prefs.specialOffers;
 }
 
-function saveNotificationPreferences() {
+async function saveNotificationPreferences() {
   if (!elements.phoneNumber || !elements.notifyStatus || !elements.notifyOffers) return;
   
   const phone = elements.phoneNumber.value.trim();
@@ -125,31 +123,7 @@ function saveNotificationPreferences() {
     specialOffers: elements.notifyOffers.checked
   };
   
-  localStorage.setItem(`notifPrefs_${phone}`, JSON.stringify(prefs));
-}
-
-async function updateNotificationPreferences(phoneNumber, preferences) {
-  localStorage.setItem(`notifPrefs_${phoneNumber}`, JSON.stringify(preferences));
-}
-
-async function requestNotificationPermission(phoneNumber, preferences) {
-  const permission = await Notification.requestPermission();
-  if (permission === 'granted') {
-    localStorage.setItem(`notifPermission_${phoneNumber}`, 'granted');
-    registerServiceWorker();
-  }
-}
-
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(registration => {
-        console.log('ServiceWorker registration successful');
-      })
-      .catch(err => {
-        console.log('ServiceWorker registration failed: ', err);
-      });
-  }
+  await updateNotificationPreferences(phone, prefs);
 }
 
 function validateAndShowConfirmation() {
@@ -529,7 +503,7 @@ function closeConfirmationModal() {
   elements.orderConfirmationModal.style.display = 'none';
 }
 
-async function confirmOrder() {
+function sendWhatsAppMessage(orderId) {
   const orderType = getOrderType();
   const totals = calculateTotal();
   const distance = orderType === 'Delivery' ? calculateDistance(
@@ -537,12 +511,10 @@ async function confirmOrder() {
     userLocation.lat, userLocation.lng
   ) : 0;
   
-  const orderNumber = Math.floor(100000 + Math.random() * 900000);
-  
   const messageParts = [
     `*NEW ORDER - BAKE & GRILL*`,
     ``,
-    `*Order ID:* #${orderNumber}`,
+    `*Order ID:* #${orderId}`,
     `*Customer Name:* ${elements.customerName.value}`,
     `*Phone:* ${elements.phoneNumber.value}`,
     `*Order Type:* ${orderType}`
@@ -617,32 +589,91 @@ async function confirmOrder() {
   messageParts.push(`*Order Time:* ${new Date().toLocaleString()}`);
 
   const encodedMessage = encodeURIComponent(messageParts.join('\n'));
-  
   const whatsappUrl = `https://wa.me/918240266267?text=${encodedMessage}`;
   window.open(whatsappUrl, '_blank');
+}
+
+async function confirmOrder() {
+  const orderType = getOrderType();
+  const totals = calculateTotal();
+  const distance = orderType === 'Delivery' ? calculateDistance(
+    shopLocation.lat, shopLocation.lng,
+    userLocation.lat, userLocation.lng
+  ) : 0;
+  
+  const orderNumber = Math.floor(100000 + Math.random() * 900000);
+  const orderId = `BG-${orderNumber}`;
   
   try {
-    const notificationPrefs = {
-      statusUpdates: elements.notifyStatus?.checked || false,
-      specialOffers: elements.notifyOffers?.checked || false
-    };
+    // Save order to Firestore
+    const orderRef = doc(collection(db, 'orders'), orderId);
+    await setDoc(orderRef, {
+      id: orderId,
+      customerName: elements.customerName.value,
+      phoneNumber: elements.phoneNumber.value,
+      orderType: orderType,
+      items: cart.map(item => ({
+        name: item.name,
+        variant: item.variant,
+        price: item.price,
+        quantity: item.quantity,
+        category: item.category
+      })),
+      subtotal: totals.subtotal,
+      deliveryCharge: orderType === 'Delivery' ? totals.deliveryCharge : 0,
+      total: totals.grandTotal,
+      status: 'pending',
+      timestamp: serverTimestamp(),
+      ...(orderType === 'Delivery' && userLocation && {
+        deliveryAddress: elements.manualDeliveryAddress.value || 'Current Location',
+        location: new GeoPoint(userLocation.lat, userLocation.lng),
+        distance: distance
+      }),
+      notificationPreferences: {
+        statusUpdates: elements.notifyStatus?.checked || false,
+        specialOffers: elements.notifyOffers?.checked || false
+      },
+      specialInstructions: elements.orderNotes.value || ''
+    });
 
-    await updateNotificationPreferences(elements.phoneNumber.value, notificationPrefs);
-    
-    if (Notification.permission !== 'granted') {
+    // Request notification permission if needed
+    if (elements.notifyStatus?.checked || elements.notifyOffers?.checked) {
       await requestNotificationPermission(
         elements.phoneNumber.value,
-        notificationPrefs
+        {
+          statusUpdates: elements.notifyStatus?.checked,
+          specialOffers: elements.notifyOffers?.checked
+        }
       );
     }
-  } catch (error) {
-    console.error('Error handling notifications:', error);
-  }
 
-  closeConfirmationModal();
-  showNotification('Order shared via WhatsApp!');
-  
-  cart.length = 0;
-  saveCart();
-  updateCartCount();
+    // Send order confirmation notification
+    if (elements.notifyStatus?.checked) {
+      await sendOrderNotification(
+        orderId,
+        elements.phoneNumber.value,
+        'Order Confirmed',
+        `Your order #${orderId} has been received and is being processed`
+      );
+    }
+
+    // Send WhatsApp message
+    sendWhatsAppMessage(orderId);
+
+    closeConfirmationModal();
+    showNotification('Order placed successfully!');
+    
+    // Clear cart
+    cart.length = 0;
+    saveCart();
+    updateCartCount();
+    
+    // Redirect to thank you page or order tracking
+    setTimeout(() => {
+      window.location.href = `order-status.html?orderId=${orderId}`;
+    }, 2000);
+  } catch (error) {
+    console.error('Error confirming order:', error);
+    showNotification('Failed to place order. Please try again.', 'error');
+  }
 }
