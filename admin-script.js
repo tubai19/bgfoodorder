@@ -598,6 +598,26 @@ async function saveAdminToken(token) {
   }
 }
 
+async function getAdminToken() {
+  try {
+    if (!auth.currentUser) {
+      throw new Error('No authenticated user');
+    }
+    
+    const token = await auth.currentUser.getIdToken();
+    if (!token) {
+      throw new Error('Failed to get ID token');
+    }
+    return token;
+    
+  } catch (error) {
+    console.error('Error getting admin token:', error);
+    logAdminAction('admin_token_fetch_error', { error: error.message });
+    showNotification('Failed to authenticate. Please refresh the page.', 'error');
+    return null;
+  }
+}
+
 async function sendNotification(e) {
   e.preventDefault();
   
@@ -614,7 +634,12 @@ async function sendNotification(e) {
   setLoading(elements.sendNotificationBtn, true);
   
   try {
-    // Save to admin notifications
+    const token = await getAdminToken();
+    if (!token) {
+      showNotification('Authentication failed. Please try again.', 'error');
+      return;
+    }
+
     await safeFirebaseOperation(() => 
       db.collection('adminNotifications').add({
         title,
@@ -625,7 +650,6 @@ async function sendNotification(e) {
       })
     );
     
-    // Send to users based on preferences
     const tokensSnapshot = await safeFirebaseOperation(() => 
       db.collection('fcmTokens').get()
     );
@@ -634,7 +658,6 @@ async function sendNotification(e) {
     
     const batch = db.batch();
     let notificationCount = 0;
-    const token = await getAdminToken(); // Get token once before the loop
     
     tokensSnapshot.forEach(doc => {
       const userPrefs = doc.data().preferences || state.defaultPreferences;
@@ -653,7 +676,6 @@ async function sendNotification(e) {
           sentBy: state.currentUser.email
         });
         
-        // Send FCM notification via backend
         fetch('/api/send-notification', {
           method: 'POST',
           headers: {
@@ -671,7 +693,10 @@ async function sendNotification(e) {
           })
         }).catch(error => {
           console.error('Error sending notification:', error);
-          logAdminAction('fcm_send_error', { phoneNumber: doc.data().phoneNumber, error: error.message });
+          logAdminAction('fcm_send_error', { 
+            phoneNumber: doc.data().phoneNumber, 
+            error: error.message 
+          });
         });
       }
     });
@@ -695,21 +720,10 @@ async function sendNotification(e) {
   }
 }
 
-async function getAdminToken() {
-  try {
-    const response = await fetch('/api/get-admin-token');
-    const data = await response.json();
-    return data.token;
-  } catch (error) {
-    console.error('Error getting admin token:', error);
-    logAdminAction('admin_token_fetch_error', { error: error.message });
-    return null;
-  }
-}
-
 // ====================== ORDER MANAGEMENT FUNCTIONS ======================
 async function updateOrderStatus(orderId, newStatus) {
-  setLoading(document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`), true);
+  const actionButton = document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`);
+  setLoading(actionButton, true);
   
   try {
     const orderRef = db.collection('orders').doc(orderId);
@@ -746,7 +760,9 @@ async function updateOrderStatus(orderId, newStatus) {
     }
 
     if (notificationTitle && notificationBody) {
-      // Save notification to database
+      const token = await getAdminToken();
+      if (!token) return;
+
       await db.collection('notifications').add({
         title: notificationTitle,
         body: notificationBody,
@@ -757,7 +773,6 @@ async function updateOrderStatus(orderId, newStatus) {
         read: false
       });
 
-      // Get user's FCM tokens
       const tokensQuery = db.collection('fcmTokens')
         .where('phoneNumber', '==', order.phoneNumber)
         .where('preferences.statusUpdates', '==', true);
@@ -765,9 +780,7 @@ async function updateOrderStatus(orderId, newStatus) {
       
       if (!tokensSnapshot.empty) {
         const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
-        const token = await getAdminToken(); // Get token before fetch
         
-        // Send via backend
         await fetch('/api/send-notifications', {
           method: 'POST',
           headers: {
@@ -796,7 +809,8 @@ async function updateOrderStatus(orderId, newStatus) {
     showNotification('Failed to update order status', 'error');
     logAdminAction('order_status_update_error', { orderId, error: error.message });
   } finally {
-    setLoading(document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`), false);
+    const button = document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`);
+    if (button) setLoading(button, false);
   }
 }
 
@@ -825,7 +839,6 @@ async function saveSettings(e) {
   try {
     await db.collection('settings').doc('shop').set(settings, { merge: true });
     
-    // Send shop status update
     const statusMessage = settings.isOpen 
       ? `We're now open! (${settings.openingTime}-${settings.closingTime})` 
       : `We're currently closed. Opens at ${settings.openingTime}`;
@@ -887,7 +900,6 @@ async function logAdminAction(action, details = {}) {
         .catch(() => 'unknown')
     });
     
-    // Log to analytics
     firebase.analytics().logEvent(`admin_${action}`, details);
   } catch (error) {
     console.error('Error logging admin action:', error);
