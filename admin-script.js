@@ -634,6 +634,7 @@ async function sendNotification(e) {
     
     const batch = db.batch();
     let notificationCount = 0;
+    const token = await getAdminToken(); // Get token once before the loop
     
     tokensSnapshot.forEach(doc => {
       const userPrefs = doc.data().preferences || state.defaultPreferences;
@@ -657,7 +658,7 @@ async function sendNotification(e) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await getAdminToken()}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             phoneNumber: doc.data().phoneNumber,
@@ -764,13 +765,14 @@ async function updateOrderStatus(orderId, newStatus) {
       
       if (!tokensSnapshot.empty) {
         const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
+        const token = await getAdminToken(); // Get token before fetch
         
         // Send via backend
         await fetch('/api/send-notifications', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await getAdminToken()}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             title: notificationTitle,
