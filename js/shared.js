@@ -68,6 +68,15 @@ function playNotificationSound() {
   sound.play().catch(e => console.log('Sound playback prevented:', e));
 }
 
+// Price formatting function (previously missing)
+function formatPrice(amount) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2
+  }).format(amount);
+}
+
 // Cart management
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
@@ -98,7 +107,7 @@ function validateOrder(cart, orderType) {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
   if (subtotal < 200) {
-    errors.push(`Minimum order value is ₹200 (Current: ₹${subtotal})`);
+    errors.push(`Minimum order value is ₹200 (Current: ₹${subtotal.toFixed(2)})`);
   }
   
   if (orderType === 'Delivery') {
