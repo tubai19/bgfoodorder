@@ -60,8 +60,20 @@
   </div>
 
   <script type="module">
-    import { db, onSnapshot, doc, formatPrice, getNotificationPreferences, updateNotificationPreferences } from './shared.js';
-    
+    // Import from shared.js (local file)
+    import { 
+      db, 
+      formatPrice, 
+      getNotificationPreferences, 
+      updateNotificationPreferences 
+    } from './js/shared.js';
+
+    // Import Firestore helpers from CDN
+    import { 
+      doc, getDoc, onSnapshot, 
+      collection, query, where, orderBy, limit, getDocs 
+    } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
     document.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const orderId = urlParams.get('orderId');
@@ -112,13 +124,14 @@
     function loadOrderStatus(orderId) {
       const orderRef = doc(db, 'orders', orderId);
       
-      onSnapshot(orderRef, (doc) => {
-        if (!doc.exists()) {
+      onSnapshot(orderRef, (docSnap) => {
+        if (!docSnap.exists()) {
           showError('Order not found');
           return;
         }
         
-        const order = doc.data();
+        const order = docSnap.data();
+        order.id = docSnap.id;
         renderOrderStatus(order);
       }, (error) => {
         console.error('Error loading order:', error);
@@ -128,10 +141,12 @@
     
     async function loadOrderNotifications(orderId) {
       try {
-        const notificationsRef = collection(db, 'notifications')
-          .where('orderId', '==', orderId)
-          .orderBy('timestamp', 'desc')
-          .limit(5);
+        const notificationsRef = query(
+          collection(db, 'notifications'),
+          where('orderId', '==', orderId),
+          orderBy('timestamp', 'desc'),
+          limit(5)
+        );
         
         const snapshot = await getDocs(notificationsRef);
         const container = document.getElementById('notificationList');
@@ -142,8 +157,8 @@
         }
         
         container.innerHTML = '';
-        snapshot.forEach(doc => {
-          const notif = doc.data();
+        snapshot.forEach(docSnap => {
+          const notif = docSnap.data();
           const item = document.createElement('div');
           item.className = 'notification-item';
           item.innerHTML = `
