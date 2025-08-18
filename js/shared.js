@@ -1,31 +1,14 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
-  getFirestore,
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-  serverTimestamp,
-  onSnapshot,
-  limit,
-  addDoc,
-  GeoPoint
+  getFirestore, collection, doc, setDoc, getDoc, updateDoc, 
+  query, where, getDocs, writeBatch, serverTimestamp, 
+  onSnapshot, limit, addDoc, GeoPoint
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { 
-  getMessaging, 
-  getToken, 
-  onMessage,
-  isSupported,
-  deleteToken
+  getMessaging, getToken, onMessage, isSupported, deleteToken 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 import { 
-  getFunctions, 
-  httpsCallable 
+  getFunctions, httpsCallable 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 const firebaseConfig = {
@@ -44,6 +27,7 @@ const functions = getFunctions(app);
 const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
 let messaging;
 
+// Initialize Firebase Messaging
 (async () => {
   if (await isSupported()) {
     messaging = getMessaging(app);
@@ -51,28 +35,23 @@ let messaging;
   }
 })();
 
-// PWA Installation
-let deferredPrompt;
-
+// Message handling setup
 function setupMessageHandling() {
   onMessage(messaging, (payload) => {
     console.log('Message received:', payload);
-    const notification = payload.notification;
-    const data = payload.data || {};
-    showNotification(notification?.body || 'New update', data.type || 'info');
+    showNotification(
+      payload.notification?.title || 'Order Update',
+      payload.notification?.body || 'Your order status has changed',
+      payload.data?.type || 'info'
+    );
     
-    if (data.type === 'status_update') {
+    if (payload.data?.type === 'status_update') {
       playNotificationSound();
     }
   });
 }
 
-function playNotificationSound() {
-  const sound = new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3');
-  sound.volume = 0.3;
-  sound.play().catch(e => console.log('Sound playback prevented:', e));
-}
-
+// Notification functions
 function showNotification(message, type = 'success') {
   try {
     const notification = document.getElementById('notification');
@@ -91,10 +70,13 @@ function showNotification(message, type = 'success') {
   }
 }
 
-function formatPrice(amount) {
-  return '₹' + amount.toFixed(0);
+function playNotificationSound() {
+  const sound = new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3');
+  sound.volume = 0.3;
+  sound.play().catch(e => console.log('Sound playback prevented:', e));
 }
 
+// Cart management
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
 function saveCart() {
@@ -118,6 +100,7 @@ function updateCartCount() {
   }
 }
 
+// Order validation
 function validateOrder(cart, orderType) {
   const errors = [];
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -136,6 +119,7 @@ function validateOrder(cart, orderType) {
   return errors;
 }
 
+// Notification management
 async function requestNotificationPermission(phoneNumber, preferences = {}) {
   try {
     if (!messaging) return null;
@@ -219,7 +203,7 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
   try {
     console.log(`Attempting to send notification for order ${orderId} to ${phoneNumber}`);
     
-    // Get user's FCM tokens
+    // Get user's FCM tokens with status updates enabled
     const tokensQuery = query(
       collection(db, 'fcmTokens'),
       where('phoneNumber', '==', phoneNumber),
@@ -227,22 +211,30 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
     );
     const tokensSnapshot = await getDocs(tokensQuery);
     
-    if (!tokensSnapshot.empty) {
-      const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
-      
-      // Call Cloud Function directly
-      const sendNotification = httpsCallable(functions, 'sendNotification');
-      await sendNotification({
-        tokens,
-        title,
-        body,
-        data: {
-          orderId,
-          click_action: `https://${window.location.hostname}/checkout.html?orderId=${orderId}`
-        }
-      });
+    if (tokensSnapshot.empty) {
+      console.log('No active tokens found for user with status updates enabled');
+      await logNotificationStatus(orderId, phoneNumber, "failed", "No active tokens");
+      return false;
     }
 
+    const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
+    
+    // Call Cloud Function to send notification
+    const sendNotification = httpsCallable(functions, 'sendNotification');
+    await sendNotification({
+      tokens,
+      title,
+      body,
+      data: {
+        orderId,
+        type: 'status_update',
+        click_action: `${window.location.origin}/order-status.html?orderId=${orderId}`
+      }
+    });
+
+    // Log successful notification
+    await logNotificationStatus(orderId, phoneNumber, "sent");
+    
     // Save notification to database
     await addDoc(collection(db, 'notifications'), {
       title,
@@ -258,8 +250,45 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
     return true;
   } catch (error) {
     console.error('Error sending notification:', error);
-    showNotification('Failed to send notification', 'error');
+    await logNotificationStatus(orderId, phoneNumber, "failed", error.message);
     return false;
+  }
+}
+
+async function logNotificationStatus(orderId, phoneNumber, status, error = "") {
+  try {
+    await addDoc(collection(db, 'notificationLogs'), {
+      orderId,
+      phoneNumber,
+      status,
+      error,
+      timestamp: serverTimestamp()
+    });
+  } catch (logError) {
+    console.error('Failed to log notification status:', logError);
+  }
+}
+
+async function sendOrderUpdateWithFallback(orderId, phoneNumber, message) {
+  // First try push notification
+  const pushSent = await sendOrderNotification(
+    orderId, 
+    phoneNumber, 
+    "Order Update", 
+    message
+  );
+  
+  // If push fails, try SMS fallback
+  if (!pushSent) {
+    try {
+      await httpsCallable(functions, 'sendSMS')({
+        phoneNumber,
+        message: `[Bake & Grill] ${message}`
+      });
+      console.log('Sent SMS fallback notification');
+    } catch (smsError) {
+      console.error('SMS fallback failed:', smsError);
+    }
   }
 }
 
@@ -276,6 +305,7 @@ export {
   updateNotificationPreferences,
   getNotificationPreferences,
   sendOrderNotification,
+  sendOrderUpdateWithFallback,
   serverTimestamp,
   GeoPoint,
   addDoc,
