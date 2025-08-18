@@ -2,7 +2,7 @@ import {
   cart, saveCart, updateCartCount, showNotification, formatPrice, validateOrder,
   requestNotificationPermission, updateNotificationPreferences, sendOrderNotification,
   serverTimestamp, GeoPoint, addDoc, collection, doc, setDoc, db,
-  getNotificationPreferences
+  getNotificationPreferences, sendOrderUpdateWithFallback
 } from './shared.js';
 
 const elements = {
@@ -30,7 +30,8 @@ const elements = {
   timeEstimateText: document.getElementById('timeEstimateText'),
   geocodingLoading: document.getElementById('geocodingLoading'),
   notifyStatus: document.getElementById('notifyStatus'),
-  notifyOffers: document.getElementById('notifyOffers')
+  notifyOffers: document.getElementById('notifyOffers'),
+  notificationStatus: document.getElementById('notificationStatus')
 };
 
 let map;
@@ -62,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   
-  loadNotificationPreferences();
+  setupNotificationPreferences();
   setupEventListeners();
   updateOrderSummary();
 });
@@ -101,7 +102,7 @@ function setupEventListeners() {
   }
 }
 
-async function loadNotificationPreferences() {
+async function setupNotificationPreferences() {
   if (!elements.phoneNumber) return;
   
   const phone = elements.phoneNumber.value.trim();
@@ -110,20 +111,30 @@ async function loadNotificationPreferences() {
   const prefs = await getNotificationPreferences(phone);
   if (elements.notifyStatus) elements.notifyStatus.checked = prefs.statusUpdates;
   if (elements.notifyOffers) elements.notifyOffers.checked = prefs.specialOffers;
+
+  // Update UI based on permission
+  if ('Notification' in window && elements.notificationStatus) {
+    if (Notification.permission === 'granted') {
+      elements.notificationStatus.innerHTML = '<i class="fas fa-check-circle"></i> Notifications enabled';
+    } else {
+      elements.notificationStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Notifications disabled';
+    }
+  }
 }
 
 async function saveNotificationPreferences() {
-  if (!elements.phoneNumber || !elements.notifyStatus || !elements.notifyOffers) return;
+  if (!elements.phoneNumber) return;
   
   const phone = elements.phoneNumber.value.trim();
   if (!phone) return;
 
   const prefs = {
-    statusUpdates: elements.notifyStatus.checked,
-    specialOffers: elements.notifyOffers.checked
+    statusUpdates: elements.notifyStatus?.checked || false,
+    specialOffers: elements.notifyOffers?.checked || false
   };
   
   await updateNotificationPreferences(phone, prefs);
+  showNotification('Notification preferences saved');
 }
 
 function validateAndShowConfirmation() {
@@ -636,25 +647,24 @@ async function confirmOrder() {
       specialInstructions: elements.orderNotes.value || ''
     });
 
-    // Request notification permission if needed
-    if (elements.notifyStatus?.checked || elements.notifyOffers?.checked) {
-      await requestNotificationPermission(
-        elements.phoneNumber.value,
-        {
-          statusUpdates: elements.notifyStatus?.checked,
-          specialOffers: elements.notifyOffers?.checked
-        }
-      );
-    }
-
-    // Send order confirmation notification
+    // Handle notifications
     if (elements.notifyStatus?.checked) {
-      await sendOrderNotification(
-        orderId,
-        elements.phoneNumber.value,
-        'Order Confirmed',
-        `Your order #${orderId} has been received and is being processed`
-      );
+      try {
+        // Request permission if not already granted
+        if (Notification.permission !== 'granted') {
+          await Notification.requestPermission();
+        }
+
+        // Save preferences and send initial notification
+        await saveNotificationPreferences();
+        await sendOrderUpdateWithFallback(
+          orderId,
+          elements.phoneNumber.value,
+          `Your order #${orderId} has been received! Status: Preparing`
+        );
+      } catch (error) {
+        console.error('Notification setup failed:', error);
+      }
     }
 
     // Send WhatsApp message
