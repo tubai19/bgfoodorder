@@ -1,3 +1,4 @@
+// sw.js
 const CACHE_NAME = 'bake-and-grill-v4';
 const OFFLINE_URL = 'offline.html';
 const PRECACHE_URLS = [
