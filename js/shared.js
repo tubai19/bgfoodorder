@@ -51,6 +51,15 @@ function setupMessageHandling() {
   });
 }
 
+// Format price for display
+function formatPrice(amount) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0
+  }).format(amount).replace('₹', '₹ ');
+}
+
 // Notification functions
 function showNotification(message, type = 'success') {
   try {
