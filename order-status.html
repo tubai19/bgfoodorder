@@ -35,6 +35,24 @@
       </div>
     </div>
 
+    <div class="notification-section">
+      <h3><i class="fas fa-bell"></i> Order Updates</h3>
+      
+      <div class="notification-toggle">
+        <label>
+          <input type="checkbox" id="enableNotifications" checked>
+          Receive status updates
+        </label>
+      </div>
+      
+      <div class="notification-history">
+        <h4>Recent Updates</h4>
+        <div id="notificationList" class="notification-items">
+          <!-- Notifications will load here -->
+        </div>
+      </div>
+    </div>
+
     <div class="order-actions">
       <a href="menu.html" class="mobile-cta-btn">Order Again</a>
       <a href="index.html" class="mobile-cta-btn secondary">Back to Home</a>
@@ -42,9 +60,10 @@
   </div>
 
   <script type="module">
-    import { db, onSnapshot, doc, formatPrice } from './shared.js';
+    import { db, onSnapshot, doc, formatPrice, getNotificationPreferences, updateNotificationPreferences } from './shared.js';
+    import { firebase } from './firebase-config.js';
     
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const orderId = urlParams.get('orderId');
       
@@ -54,7 +73,45 @@
       }
       
       loadOrderStatus(orderId);
+      
+      // Load notification preferences
+      const phoneNumber = await getOrderPhoneNumber(orderId); // You'll need to implement this
+      if (phoneNumber) {
+        const prefs = await getNotificationPreferences(phoneNumber);
+        
+        document.getElementById('enableNotifications').checked = prefs.statusUpdates;
+        
+        // Toggle event
+        document.getElementById('enableNotifications').addEventListener('change', async (e) => {
+          await updateNotificationPreferences(phoneNumber, {
+            ...prefs,
+            statusUpdates: e.target.checked
+          });
+          
+          if (e.target.checked) {
+            alert('You will now receive updates about this order');
+          }
+        });
+      }
+      
+      // Load notification history
+      loadOrderNotifications(orderId);
     });
+    
+    async function getOrderPhoneNumber(orderId) {
+      // Implement this function to retrieve phone number from order
+      try {
+        const orderRef = doc(db, 'orders', orderId);
+        const orderDoc = await getDoc(orderRef);
+        if (orderDoc.exists()) {
+          return orderDoc.data().customerPhone;
+        }
+        return null;
+      } catch (error) {
+        console.error('Error getting order phone number:', error);
+        return null;
+      }
+    }
     
     function loadOrderStatus(orderId) {
       const orderRef = doc(db, 'orders', orderId);
@@ -70,6 +127,34 @@
       }, (error) => {
         console.error('Error loading order:', error);
         showError('Failed to load order details');
+      });
+    }
+    
+    async function loadOrderNotifications(orderId) {
+      const notificationsRef = firebase.firestore().collection('notifications')
+        .where('orderId', '==', orderId)
+        .orderBy('timestamp', 'desc')
+        .limit(5);
+      
+      const snapshot = await notificationsRef.get();
+      const container = document.getElementById('notificationList');
+      
+      if (snapshot.empty) {
+        container.innerHTML = '<p>No updates yet</p>';
+        return;
+      }
+      
+      container.innerHTML = '';
+      snapshot.forEach(doc => {
+        const notif = doc.data();
+        const item = document.createElement('div');
+        item.className = 'notification-item';
+        item.innerHTML = `
+          <p><strong>${notif.title}</strong></p>
+          <p>${notif.body}</p>
+          <small>${notif.timestamp?.toDate().toLocaleString() || ''}</small>
+        `;
+        container.appendChild(item);
       });
     }
     

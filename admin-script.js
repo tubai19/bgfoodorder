@@ -14,6 +14,7 @@ const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 const analytics = firebase.analytics();
+const functions = firebase.functions();
 const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
 let messaging;
 
@@ -64,7 +65,9 @@ const elements = {
   savePreferencesBtn: document.getElementById('savePreferencesBtn'),
   sendNotificationBtn: document.getElementById('sendNotificationBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
-  loadingOverlay: document.getElementById('loadingOverlay')
+  loadingOverlay: document.getElementById('loadingOverlay'),
+  lastNotificationTime: document.getElementById('lastNotificationTime'),
+  testNotificationBtn: document.getElementById('testNotificationBtn')
 };
 
 // Global State
@@ -81,7 +84,8 @@ const state = {
   defaultPreferences: {
     statusUpdates: true,
     specialOffers: true
-  }
+  },
+  lastNotificationSent: null
 };
 
 // Order status mapping
@@ -231,6 +235,15 @@ function renderOrderCard(order) {
     </div>
   `;
   
+  // Add resend notification button
+  if (order.status !== 'completed' && order.status !== 'cancelled') {
+    const resendBtn = document.createElement('button');
+    resendBtn.className = 'btn info-btn';
+    resendBtn.innerHTML = '<i class="fas fa-bell"></i> Resend Notification';
+    resendBtn.addEventListener('click', () => resendOrderNotification(order.id));
+    orderCard.querySelector('.order-actions').appendChild(resendBtn);
+  }
+  
   elements.ordersListContainer.appendChild(orderCard);
   
   // Add event listeners to action buttons
@@ -246,6 +259,54 @@ function renderOrderCard(order) {
       }
     });
   });
+}
+
+async function resendOrderNotification(orderId) {
+  const orderRef = db.collection('orders').doc(orderId);
+  const orderSnap = await safeFirebaseOperation(() => orderRef.get());
+  
+  if (!orderSnap || !orderSnap.exists) {
+    showNotification('Order not found', 'error');
+    return;
+  }
+  
+  const order = orderSnap.data();
+  const statusMessages = {
+    pending: 'Order received and being processed',
+    preparing: 'Your order is being prepared',
+    delivering: 'Your order is out for delivery',
+    completed: 'Your order has been delivered'
+  };
+
+  try {
+    const token = await getAdminToken();
+    if (!token) return;
+
+    await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        phoneNumber: order.phoneNumber,
+        title: 'Order Update',
+        body: `Order #${orderId}: ${statusMessages[order.status]}`,
+        data: {
+          type: 'status_update',
+          orderId: orderId,
+          click_action: `https://${window.location.hostname}/order-status.html?orderId=${orderId}`
+        }
+      })
+    });
+
+    showNotification('Notification resent successfully');
+    logAdminAction('notification_resent', { orderId, status: order.status });
+  } catch (error) {
+    showNotification('Failed to resend notification', 'error');
+    console.error('Resend failed:', error);
+    logAdminAction('notification_resend_error', { orderId, error: error.message });
+  }
 }
 
 function filterOrders() {
@@ -445,6 +506,46 @@ function setupRealtimeListeners() {
     elements.activeUsers.textContent = snapshot.size;
     calculateNotificationReach();
   });
+
+  // Last notification sent time
+  db.collection('notifications')
+    .orderBy('timestamp', 'desc')
+    .limit(1)
+    .onSnapshot(snapshot => {
+      if (!snapshot.empty) {
+        const lastNotification = snapshot.docs[0].data();
+        state.lastNotificationSent = lastNotification.timestamp;
+        updateLastNotificationTime();
+      }
+    });
+}
+
+function updateLastNotificationTime() {
+  if (state.lastNotificationSent) {
+    const lastSent = state.lastNotificationSent.toDate();
+    const now = new Date();
+    const diffMinutes = Math.floor((now - lastSent) / (1000 * 60));
+    
+    let timeText;
+    if (diffMinutes < 1) {
+      timeText = 'Just now';
+    } else if (diffMinutes < 60) {
+      timeText = `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+    } else if (diffMinutes < 1440) {
+      const hours = Math.floor(diffMinutes / 60);
+      timeText = `${hours} hour${hours === 1 ? '' : 's'} ago`;
+    } else {
+      timeText = lastSent.toLocaleString();
+    }
+    
+    if (elements.lastNotificationTime) {
+      elements.lastNotificationTime.textContent = timeText;
+    }
+  } else {
+    if (elements.lastNotificationTime) {
+      elements.lastNotificationTime.textContent = 'No notifications sent yet';
+    }
+  }
 }
 
 async function loadDashboardData() {
@@ -469,6 +570,7 @@ async function loadDashboardData() {
   logAdminAction('dashboard_data_loaded', { orderCount: snapshot.size, revenue });
 
   calculateNotificationReach();
+  updateLastNotificationTime();
 }
 
 async function calculateNotificationReach() {
@@ -720,6 +822,40 @@ async function sendNotification(e) {
   }
 }
 
+async function sendTestNotification() {
+  const phoneNumber = prompt("Enter customer phone number for test:");
+  if (!phoneNumber) return;
+
+  try {
+    const token = await getAdminToken();
+    if (!token) return;
+
+    await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        phoneNumber: phoneNumber,
+        title: 'Test Notification',
+        body: 'This is a test notification from Bake & Grill',
+        data: {
+          type: 'test',
+          click_action: `https://${window.location.hostname}`
+        }
+      })
+    });
+
+    showNotification('Test notification sent');
+    logAdminAction('test_notification_sent', { phoneNumber });
+  } catch (error) {
+    showNotification('Failed to send test notification', 'error');
+    console.error('Test failed:', error);
+    logAdminAction('test_notification_error', { error: error.message });
+  }
+}
+
 // ====================== ORDER MANAGEMENT FUNCTIONS ======================
 async function updateOrderStatus(orderId, newStatus) {
   const actionButton = document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`);
@@ -959,6 +1095,11 @@ function setupEventListeners() {
       hideModal(elements.orderDetailModal);
     }
   });
+
+  // Test notification button
+  if (elements.testNotificationBtn) {
+    elements.testNotificationBtn.addEventListener('click', sendTestNotification);
+  }
 }
 
 // ====================== AUTH FUNCTIONS ======================
@@ -998,6 +1139,22 @@ function checkCompatibility() {
   }
 }
 
+function renderNotificationStatus() {
+  const statusSection = document.createElement('div');
+  statusSection.className = 'notification-status-card';
+  statusSection.innerHTML = `
+    <h3><i class="fas fa-bell"></i> Notification System</h3>
+    <p>FCM Status: <span id="fcmStatus">Active</span></p>
+    <p>Last Notification: <span id="lastNotificationTime">Loading...</span></p>
+    <button id="testNotificationBtn" class="btn">
+      <i class="fas fa-paper-plane"></i> Send Test Notification
+    </button>
+  `;
+  document.getElementById('dashboardSection').appendChild(statusSection);
+
+  document.getElementById('testNotificationBtn').addEventListener('click', sendTestNotification);
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
   checkCompatibility();
   
@@ -1010,6 +1167,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       initializeMessaging();
       updateCurrentTime();
       setInterval(updateCurrentTime, 1000);
+      renderNotificationStatus();
       logAdminAction('login');
     } else {
       window.location.href = '/admin-login.html';

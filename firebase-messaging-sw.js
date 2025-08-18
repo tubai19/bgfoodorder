@@ -13,32 +13,42 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Background message handler
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   
+  // Customize notification
   const notificationTitle = payload.notification?.title || 'Order Update';
   const notificationOptions = {
     body: payload.notification?.body || 'You have a new order update',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/badge.png',
-    data: payload.data || {}
+    data: payload.data || {},
+    vibrate: [200, 100, 200] // Vibration pattern
   };
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  // Show notification
+  return self.registration.showNotification(notificationTitle, notificationOptions)
+    .catch(err => {
+      console.error('Failed to show notification:', err);
+    });
 });
 
+// Notification click handler
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
+  // Determine URL to open
   let url = '/';
   if (event.notification.data) {
     if (event.notification.data.orderId) {
-      url = `/checkout.html?orderId=${event.notification.data.orderId}`;
+      url = `/order-status.html?orderId=${event.notification.data.orderId}`;
     } else if (event.notification.data.click_action) {
       url = event.notification.data.click_action;
     }
   }
 
+  // Focus existing tab or open new one
   event.waitUntil(
     clients.matchAll({type: 'window'}).then((windowClients) => {
       for (const client of windowClients) {
