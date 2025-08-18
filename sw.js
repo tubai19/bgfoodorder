@@ -72,9 +72,21 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Background push notifications
+// Background push notifications with proper JSON parsing
 self.addEventListener('push', (event) => {
-  const payload = event.data?.json() || {};
+  let payload;
+  try {
+    payload = event.data?.json();
+  } catch (e) {
+    // Fallback for non-JSON payload
+    payload = {
+      notification: {
+        title: 'New Update',
+        body: event.data?.text() || 'You have a new notification'
+      }
+    };
+  }
+
   const title = payload.notification?.title || 'New Update';
   const body = payload.notification?.body || 'You have a new notification';
   const data = payload.data || {};
@@ -84,26 +96,6 @@ self.addEventListener('push', (event) => {
       body,
       icon: '/icons/icon-192x192.png',
       data
-    })
-  );
-});
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  
-  const urlToOpen = event.notification.data?.click_action || '/';
-  
-  event.waitUntil(
-    clients.matchAll({type: 'window'}).then(windowClients => {
-      for (const client of windowClients) {
-        if (client.url === urlToOpen && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
     })
   );
 });
