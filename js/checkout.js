@@ -112,7 +112,6 @@ async function setupNotificationPreferences() {
   if (elements.notifyStatus) elements.notifyStatus.checked = prefs.statusUpdates;
   if (elements.notifyOffers) elements.notifyOffers.checked = prefs.specialOffers;
 
-  // Update UI based on permission
   if ('Notification' in window && elements.notificationStatus) {
     if (Notification.permission === 'granted') {
       elements.notificationStatus.innerHTML = '<i class="fas fa-check-circle"></i> Notifications enabled';
@@ -522,13 +521,17 @@ function sendWhatsAppMessage(orderId) {
     userLocation.lat, userLocation.lng
   ) : 0;
   
+  // Construct the order status URL
+  const orderStatusUrl = `${window.location.origin}/order-status.html?orderId=${orderId}`;
+  
   const messageParts = [
     `*NEW ORDER - BAKE & GRILL*`,
     ``,
     `*Order ID:* #${orderId}`,
     `*Customer Name:* ${elements.customerName.value}`,
     `*Phone:* ${elements.phoneNumber.value}`,
-    `*Order Type:* ${orderType}`
+    `*Order Type:* ${orderType}`,
+    `*Track your order:* ${orderStatusUrl}`
   ];
 
   if (orderType === 'Delivery') {
@@ -597,7 +600,11 @@ function sendWhatsAppMessage(orderId) {
     );
   }
   
-  messageParts.push(`*Order Time:* ${new Date().toLocaleString()}`);
+  messageParts.push(
+    `*Order Time:* ${new Date().toLocaleString()}`,
+    ``,
+    `Track your order status: ${orderStatusUrl}`
+  );
 
   const encodedMessage = encodeURIComponent(messageParts.join('\n'));
   const whatsappUrl = `https://wa.me/918240266267?text=${encodedMessage}`;
@@ -616,7 +623,6 @@ async function confirmOrder() {
   const orderId = `BG-${orderNumber}`;
   
   try {
-    // Save order to Firestore
     const orderRef = doc(collection(db, 'orders'), orderId);
     await setDoc(orderRef, {
       id: orderId,
@@ -647,15 +653,12 @@ async function confirmOrder() {
       specialInstructions: elements.orderNotes.value || ''
     });
 
-    // Handle notifications
     if (elements.notifyStatus?.checked) {
       try {
-        // Request permission if not already granted
         if (Notification.permission !== 'granted') {
           await Notification.requestPermission();
         }
 
-        // Save preferences and send initial notification
         await saveNotificationPreferences();
         await sendOrderUpdateWithFallback(
           orderId,
@@ -667,18 +670,15 @@ async function confirmOrder() {
       }
     }
 
-    // Send WhatsApp message
     sendWhatsAppMessage(orderId);
 
     closeConfirmationModal();
     showNotification('Order placed successfully!');
     
-    // Clear cart
     cart.length = 0;
     saveCart();
     updateCartCount();
     
-    // Redirect to thank you page or order tracking
     setTimeout(() => {
       window.location.href = `order-status.html?orderId=${orderId}`;
     }, 2000);
