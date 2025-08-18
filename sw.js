@@ -1,6 +1,5 @@
-// sw.js
-const CACHE_NAME = 'bake-and-grill-v4';
-const OFFLINE_URL = 'offline.html';
+const CACHE_NAME = 'bake-and-grill-v5';
+const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -22,8 +21,12 @@ const PRECACHE_URLS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(cache => {
+        console.log('Opened cache');
+        return cache.addAll(PRECACHE_URLS);
+      })
       .then(() => self.skipWaiting())
+      .catch(err => console.error('Cache addAll error:', err))
   );
 });
 
@@ -33,6 +36,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -43,42 +47,59 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match(OFFLINE_URL))
-    );
-    return;
-  }
-  
+
+  // Skip non-http requests (like chrome-extension://)
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then(cache => cache.put(event.request, responseToCache));
+    caches.match(event.request)
+      .then(cachedResponse => {
+        // Return cached response if found
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        return response;
+
+        // For navigation requests, return offline page if fetch fails
+        if (event.request.mode === 'navigate') {
+          return fetch(event.request)
+            .catch(() => caches.match(OFFLINE_URL));
+        }
+
+        // For all other requests, try network first
+        return fetch(event.request)
+          .then(response => {
+            // Check if we received a valid response
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone the response for caching
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then(cache => cache.put(event.request, responseToCache))
+              .catch(err => console.error('Cache put error:', err));
+
+            return response;
+          })
+          .catch(() => {
+            // If fetch fails and this is an image request, return a placeholder
+            if (event.request.headers.get('Accept').includes('image')) {
+              return new Response(
+                '<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#eee"/><text x="50" y="50" font-family="Arial" font-size="10" text-anchor="middle" fill="#aaa">Image not available offline</text></svg>',
+                { headers: { 'Content-Type': 'image/svg+xml' } }
+              );
+            }
+            return caches.match(OFFLINE_URL);
+          });
       })
-      .catch(() => caches.match(event.request))
   );
 });
 
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// Background push notifications with proper JSON parsing
 self.addEventListener('push', (event) => {
   let payload;
   try {
     payload = event.data?.json();
   } catch (e) {
-    // Fallback for non-JSON payload
     payload = {
       notification: {
         title: 'New Update',
@@ -95,7 +116,14 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(title, {
       body,
       icon: '/icons/icon-192x192.png',
+      badge: '/icons/badge.png',
       data
     })
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
