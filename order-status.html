@@ -61,7 +61,6 @@
 
   <script type="module">
     import { db, onSnapshot, doc, formatPrice, getNotificationPreferences, updateNotificationPreferences } from './shared.js';
-    import { firebase } from './firebase-config.js';
     
     document.addEventListener('DOMContentLoaded', async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -75,13 +74,12 @@
       loadOrderStatus(orderId);
       
       // Load notification preferences
-      const phoneNumber = await getOrderPhoneNumber(orderId); // You'll need to implement this
+      const phoneNumber = await getOrderPhoneNumber(orderId);
       if (phoneNumber) {
         const prefs = await getNotificationPreferences(phoneNumber);
         
         document.getElementById('enableNotifications').checked = prefs.statusUpdates;
         
-        // Toggle event
         document.getElementById('enableNotifications').addEventListener('change', async (e) => {
           await updateNotificationPreferences(phoneNumber, {
             ...prefs,
@@ -89,17 +87,15 @@
           });
           
           if (e.target.checked) {
-            alert('You will now receive updates about this order');
+            showNotification('You will now receive updates about this order');
           }
         });
       }
       
-      // Load notification history
       loadOrderNotifications(orderId);
     });
     
     async function getOrderPhoneNumber(orderId) {
-      // Implement this function to retrieve phone number from order
       try {
         const orderRef = doc(db, 'orders', orderId);
         const orderDoc = await getDoc(orderRef);
@@ -131,31 +127,36 @@
     }
     
     async function loadOrderNotifications(orderId) {
-      const notificationsRef = firebase.firestore().collection('notifications')
-        .where('orderId', '==', orderId)
-        .orderBy('timestamp', 'desc')
-        .limit(5);
-      
-      const snapshot = await notificationsRef.get();
-      const container = document.getElementById('notificationList');
-      
-      if (snapshot.empty) {
-        container.innerHTML = '<p>No updates yet</p>';
-        return;
+      try {
+        const notificationsRef = collection(db, 'notifications')
+          .where('orderId', '==', orderId)
+          .orderBy('timestamp', 'desc')
+          .limit(5);
+        
+        const snapshot = await getDocs(notificationsRef);
+        const container = document.getElementById('notificationList');
+        
+        if (snapshot.empty) {
+          container.innerHTML = '<p>No updates yet</p>';
+          return;
+        }
+        
+        container.innerHTML = '';
+        snapshot.forEach(doc => {
+          const notif = doc.data();
+          const item = document.createElement('div');
+          item.className = 'notification-item';
+          item.innerHTML = `
+            <p><strong>${notif.title}</strong></p>
+            <p>${notif.body}</p>
+            <small>${notif.timestamp?.toDate().toLocaleString() || ''}</small>
+          `;
+          container.appendChild(item);
+        });
+      } catch (error) {
+        console.error('Error loading notifications:', error);
+        document.getElementById('notificationList').innerHTML = '<p>Error loading updates</p>';
       }
-      
-      container.innerHTML = '';
-      snapshot.forEach(doc => {
-        const notif = doc.data();
-        const item = document.createElement('div');
-        item.className = 'notification-item';
-        item.innerHTML = `
-          <p><strong>${notif.title}</strong></p>
-          <p>${notif.body}</p>
-          <small>${notif.timestamp?.toDate().toLocaleString() || ''}</small>
-        `;
-        container.appendChild(item);
-      });
     }
     
     function renderOrderStatus(order) {
