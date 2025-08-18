@@ -1,3 +1,4 @@
+// shared.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { 
   getFirestore, collection, doc, setDoc, getDoc, updateDoc, 
@@ -301,6 +302,76 @@ async function sendOrderUpdateWithFallback(orderId, phoneNumber, message) {
   }
 }
 
+// PWA Features
+function initPwaFeatures() {
+  // Handle PWA install prompt
+  let deferredPrompt;
+  
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const installContainer = document.getElementById('installContainer');
+    if (installContainer) {
+      installContainer.style.display = 'block';
+    }
+  });
+
+  const installButton = document.getElementById('installButton');
+  if (installButton) {
+    installButton.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+      } else {
+        console.log('User dismissed the install prompt');
+      }
+      
+      deferredPrompt = null;
+      const installContainer = document.getElementById('installContainer');
+      if (installContainer) {
+        installContainer.style.display = 'none';
+      }
+    });
+  }
+
+  const dismissInstall = document.getElementById('dismissInstall');
+  if (dismissInstall) {
+    dismissInstall.addEventListener('click', () => {
+      const installContainer = document.getElementById('installContainer');
+      if (installContainer) {
+        installContainer.style.display = 'none';
+      }
+    });
+  }
+
+  // Show iOS install instructions for Safari
+  const isIos = () => {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    return /iphone|ipad|ipod/.test(userAgent);
+  };
+
+  const isInStandaloneMode = () => 
+    ('standalone' in window.navigator) && (window.navigator.standalone);
+
+  if (isIos() && !isInStandaloneMode()) {
+    const iosInstallGuide = document.getElementById('iosInstallGuide');
+    if (iosInstallGuide) {
+      iosInstallGuide.style.display = 'block';
+    }
+
+    const closeIosGuide = document.getElementById('closeIosGuide');
+    if (closeIosGuide) {
+      closeIosGuide.addEventListener('click', () => {
+        iosInstallGuide.style.display = 'none';
+      });
+    }
+  }
+}
+
 export { 
   db,
   messaging,
@@ -320,5 +391,6 @@ export {
   addDoc,
   collection,
   doc,
-  setDoc
+  setDoc,
+  initPwaFeatures
 };

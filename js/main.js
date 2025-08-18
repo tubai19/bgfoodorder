@@ -1,3 +1,4 @@
+// main.js
 import { initPwaFeatures, showNotification, updateCartCount } from './shared.js';
 
 function initCommon() {
@@ -52,13 +53,18 @@ document.addEventListener('DOMContentLoaded', () => {
   initPwaFeatures();
   
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.ready.then(registration => {
-      registration.update().then(() => {
-        if (registration.waiting) {
-          showNotification('New version available! Refresh to update.', 'info');
-        }
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => {
+        console.log('ServiceWorker registration successful');
+        registration.update().then(() => {
+          if (registration.waiting) {
+            showNotification('New version available! Refresh to update.', 'info');
+          }
+        });
+      })
+      .catch(err => {
+        console.error('ServiceWorker registration failed:', err);
       });
-    });
   }
 });
 
