@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel – Bake & Grill</title>
+  <meta name="description" content="Bake & Grill Admin Dashboard">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="admin-styles.css">
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <h1><i class="fas fa-utensils"></i> Bake & Grill Admin</h1>
+      <p>Order Management System</p>
+      <div class="header-controls">
+        <span id="currentTime"></span>
+        <button id="logoutBtn" class="btn danger-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+      </div>
+    </header>
+
+    <div class="admin-content">
+      <aside class="sidebar">
+        <nav>
+          <ul>
+            <li class="active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
+            <li data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</li>
+            <li data-section="notifications"><i class="fas fa-bell"></i> Notifications</li>
+            <li data-section="settings"><i class="fas fa-cog"></i> Settings</li>
+          </ul>
+        </nav>
+      </aside>
+
+      <main class="main-content">
+        <!-- Dashboard Section -->
+        <section id="dashboardSection" class="content-section">
+          <div class="section-header">
+            <h2><i class="fas fa-tachometer-alt"></i> Dashboard Overview</h2>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <h3>Today's Orders</h3>
+              <p id="todayOrders">0</p>
+            </div>
+            <div class="stat-card">
+              <h3>Revenue</h3>
+              <p id="todayRevenue">₹0.00</p>
+            </div>
+            <div class="stat-card">
+              <h3>Active Users</h3>
+              <p id="activeUsers">0</p>
+            </div>
+            <div class="stat-card">
+              <h3>Notification Reach</h3>
+              <p id="notificationReach">0%</p>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="salesChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Orders Section -->
+        <section id="ordersSection" class="content-section" style="display:none;">
+          <div class="section-header">
+            <h2><i class="fas fa-clipboard-list"></i> Recent Orders</h2>
+            <div class="filters">
+              <select id="orderFilter">
+                <option value="all">All Orders</option>
+                <option value="pending">Pending</option>
+                <option value="preparing">Preparing</option>
+                <option value="delivering">Out for Delivery</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <input type="text" id="orderSearch" placeholder="Search orders...">
+            </div>
+          </div>
+          <div class="orders-list" id="ordersListContainer">
+            <div class="loading">Loading orders...</div>
+          </div>
+          <button id="loadMoreOrders" class="btn secondary-btn" style="display:none;">
+            <i class="fas fa-spinner fa-spin loading-spinner"></i> Load More Orders
+          </button>
+        </section>
+
+        <!-- Notifications Section -->
+        <section id="notificationsSection" class="content-section" style="display:none;">
+          <div class="section-header">
+            <h2><i class="fas fa-bell"></i> Customer Notifications</h2>
+          </div>
+          
+          <div class="notification-preferences">
+            <h3><i class="fas fa-cog"></i> Default Notification Preferences</h3>
+            <div class="preference-option">
+              <input type="checkbox" id="defaultStatusUpdates" checked>
+              <label for="defaultStatusUpdates">Order status updates</label>
+            </div>
+            <div class="preference-option">
+              <input type="checkbox" id="defaultSpecialOffers" checked>
+              <label for="defaultSpecialOffers">Special offers</label>
+            </div>
+            <button id="savePreferencesBtn" class="btn primary-btn"><i class="fas fa-save"></i> Save Defaults</button>
+          </div>
+          
+          <form id="notificationForm" class="admin-form">
+            <div class="form-group">
+              <label for="notificationTitle">Title</label>
+              <input type="text" id="notificationTitle" placeholder="Notification title" required>
+            </div>
+            <div class="form-group">
+              <label for="notificationBody">Message</label>
+              <textarea id="notificationBody" placeholder="Notification message" required></textarea>
+            </div>
+            <div class="form-group">
+              <label for="notificationType">Notification Type</label>
+              <select id="notificationType">
+                <option value="general">General Announcement</option>
+                <option value="promotion">Special Offer</option>
+                <option value="status_update">Status Update</option>
+              </select>
+            </div>
+            <button type="submit" class="btn primary-btn" id="sendNotificationBtn">
+              <i class="fas fa-paper-plane"></i> Send Notification
+            </button>
+          </form>
+          
+          <div class="notification-history">
+            <h3><i class="fas fa-history"></i> Recent Notifications</h3>
+            <div id="notificationsList" class="notifications-list">
+              <div class="loading">Loading notifications...</div>
+            </div>
+          </div>
+          
+          <div class="notification-status">
+            FCM Status: <span id="fcmStatus">Initializing...</span>
+          </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settingsSection" class="content-section" style="display:none;">
+          <div class="section-header">
+            <h2><i class="fas fa-cog"></i> Shop Settings</h2>
+          </div>
+          <form id="settingsForm" class="admin-form">
+            <div class="form-group toggle-group">
+              <label>Shop Status</label>
+              <label class="switch">
+                <input type="checkbox" id="shopStatusToggle">
+                <span class="slider round"></span>
+              </label>
+              <span id="shopStatusText">Closed</span>
+            </div>
+            
+            <div class="form-group">
+              <label>Business Hours</label>
+              <div class="time-inputs">
+                <input type="time" id="openingTime">
+                <span>to</span>
+                <input type="time" id="closingTime">
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="deliveryRadius">Delivery Radius (km)</label>
+              <input type="number" id="deliveryRadius" min="1" max="20" value="8">
+            </div>
+            
+            <div class="form-group">
+              <label for="minDeliveryOrder">Minimum Delivery Order (₹)</label>
+              <input type="number" id="minDeliveryOrder" min="0" value="200">
+            </div>
+            
+            <div class="form-group">
+              <label>Delivery Charges</label>
+              <div class="delivery-charge-grid">
+                <div class="charge-item">
+                  <label>Under 4km</label>
+                  <input type="number" id="chargeUnder4km" min="0" value="0">
+                </div>
+                <div class="charge-item">
+                  <label>4-6km</label>
+                  <input type="number" id="charge4to6km" min="0" value="20">
+                </div>
+                <div class="charge-item">
+                  <label>6-8km</label>
+                  <input type="number" id="charge6to8km" min="0" value="30">
+                </div>
+                <div class="charge-item">
+                  <label>Free above (₹)</label>
+                  <input type="number" id="freeDeliveryThreshold" min="0" value="500">
+                </div>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn primary-btn" id="saveSettingsBtn">
+              <i class="fas fa-save"></i> Save Settings
+            </button>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Order Detail Modal -->
+  <div id="orderDetailModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Order Details</h3>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="modal-body" id="orderDetailContent">
+        <!-- Content will be loaded dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn cancel-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <i class="fas fa-spinner fa-spin"></i>
+      <p>Processing...</p>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-messaging-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-analytics-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+  <script src="admin-notifications.js"></script>
+  <script src="admin-script.js"></script>
+</body>
+</html>

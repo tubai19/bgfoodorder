@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bake & Grill – Fresh Pizza, Burgers & Sandwiches Delivery</title>
+  <meta name="description" content="Order delicious pizzas, burgers, sandwiches from Bake & Grill">
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#e63946">
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Bake & Grill">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="mobile-view">
+  
+  <header class="mobile-header">
+    <div class="logo-container">
+      <div class="logo">Bake & Grill</div>
+      <div class="mobile-cart-icon" id="mobileCartBtn">
+        <i class="fas fa-shopping-cart"></i>
+        <span class="cart-badge">0</span>
+      </div>
+    </div>
+    <div class="tagline">Delicious fresh food delivered to your doorstep</div>
+  </header>
+
+  <section class="mobile-hero">
+    <div class="hero-content">
+      <h1>🍕 Bake & Grill</h1>
+      <p>Fresh pizzas, burgers & sandwiches in Sanjua, Bakhrahat</p>
+      <a href="menu.html" class="mobile-cta-btn">View Menu</a>
+    </div>
+  </section>
+
+  <div id="statusBanner" class="status-banner">
+    <div id="shopStatusBanner" class="status-item">
+      <i class="fas fa-store"></i> <span id="shopStatusText">Shop: Open (4PM-10PM)</span>
+    </div>
+    <div id="deliveryStatusBanner" class="status-item">
+      <i class="fas fa-truck"></i> <span id="deliveryStatusText">Delivery: Available (8km radius)</span>
+    </div>
+  </div>
+
+  <div class="mobile-container">
+    <div class="featured-categories">
+      <h2>Our Menu Categories</h2>
+      <div class="category-grid">
+        <a href="menu.html#Veg-Pizzas" class="category-card">
+          <div class="category-icon">🍕</div>
+          <h3>Veg Pizzas</h3>
+        </a>
+        <a href="menu.html#Non-Veg-Pizzas" class="category-card">
+          <div class="category-icon">🍗</div>
+          <h3>Non-Veg Pizzas</h3>
+        </a>
+        <a href="menu.html#Burgers" class="category-card">
+          <div class="category-icon">🍔</div>
+          <h3>Burgers</h3>
+        </a>
+        <a href="menu.html#Sandwiches" class="category-card">
+          <div class="category-icon">🥪</div>
+          <h3>Sandwiches</h3>
+        </a>
+        <a href="menu.html#Combos" class="category-card">
+          <div class="category-icon">🎁</div>
+          <h3>Combos (Pickup Only)</h3>
+        </a>
+      </div>
+    </div>
+
+    <div class="mobile-delivery-info">
+      <div class="delivery-header">
+        <h4><i class="fas fa-info-circle"></i> Delivery Information</h4>
+        <i class="fas fa-chevron-down"></i>
+      </div>
+      <div class="delivery-content">
+        <ul>
+          <li><strong>Minimum order for delivery: ₹200</strong></li>
+          <li><strong>Combos are not available for delivery (pickup only)</strong></li>
+          <li>Delivery charges:
+            <ul>
+              <li>Free for orders under 4km</li>
+              <li>₹20 for 4-6km</li>
+              <li>₹30 for 6-8km</li>
+              <li>Free for orders above ₹500</li>
+            </ul>
+          </li>
+          <li>Delivery only available within 8km radius</li>
+          <li>Delivery time estimate: 20 minutes preparation + 8 minutes per km travel</li>
+          <li>Location: Sanjua, Bakhrahat - 743377</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="testimonials">
+      <h2>What Our Customers Say</h2>
+      <div class="testimonial-slider">
+        <div class="testimonial">
+          <div class="rating">
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+          </div>
+          <p>"The best pizza in town! Always fresh and delicious."</p>
+          <div class="customer">- Rahul S.</div>
+        </div>
+        <div class="testimonial">
+          <div class="rating">
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+            <i class="fas fa-star"></i>
+          </div>
+          <p>"Fast delivery and amazing burgers. My go-to place for quick bites."</p>
+          <div class="customer">- Priya M.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PWA Install Prompts -->
+  <div id="installContainer" class="install-container" style="display: none;">
+    <div class="install-prompt">
+      <img src="/icons/icon-96x96.png" alt="Bake & Grill" class="install-icon">
+      <div class="install-text">
+        <h3>Install Bake & Grill</h3>
+        <p>Get the best experience with our app on your home screen</p>
+      </div>
+      <button id="installButton" class="install-button">Install</button>
+      <button id="dismissInstall" class="dismiss-button">&times;</button>
+    </div>
+  </div>
+
+  <div id="iosInstallGuide" class="ios-install-guide" style="display: none;">
+    <div class="ios-install-content">
+      <h3>Add Bake & Grill to Home Screen</h3>
+      <ol>
+        <li>Tap the <i class="fas fa-share"></i> Share button</li>
+        <li>Select "Add to Home Screen"</li>
+        <li>Tap "Add" in the top right</li>
+      </ol>
+      <button id="closeIosGuide" class="ios-close-btn">Got it!</button>
+    </div>
+  </div>
+
+  <footer class="mobile-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3><i class="fas fa-phone"></i> Contact Us</h3>
+        <p><a href="tel:+918240266267">+91 8240266267</a></p>
+        <p><a href="mailto:orders@bakeandgrill.com">orders@bakeandgrill.com</a></p>
+      </div>
+      <div class="footer-section">
+        <h3><i class="fas fa-clock"></i> Opening Hours</h3>
+        <p>4:00 PM - 10:00 PM</p>
+        <p>Monday to Sunday</p>
+      </div>
+      <div class="footer-section">
+        <h3><i class="fas fa-map-marker-alt"></i> Location</h3>
+        <p>Sanjua, Bakhrahat - 743377</p>
+        <p>Near Joka Metro Station</p>
+      </div>
+      <div class="footer-bottom">
+        <a href="checkout.html" class="mobile-history-btn"><i class="fas fa-history"></i> Order History</a>
+        <div class="social-links">
+          <a href="#" aria-label="Facebook"><i class="fab fa-facebook"></i></a>
+          <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+          <a href="#" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+        </div>
+        <div class="footer-nav">
+          <a href="index.html">Home</a>
+          <a href="menu.html">Menu</a>
+          <a href="checkout.html">Checkout</a>
+        </div>
+        <p>&copy; 2025 Bake & Grill. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <div class="mobile-notification" id="notification">
+    <i class="fas fa-check-circle"></i>
+    <span id="notificationText">Item added to cart!</span>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/shared.js"></script>
+</body>
+</html>

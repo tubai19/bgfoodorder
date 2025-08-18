@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login – Bake & Grill</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #e63946;
+      --dark-color: #1d3557;
+      --light-color: #f8f9fa;
+      --danger-color: #e76f51;
+      --border-radius: 8px;
+      --shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #f5f5f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .login-container {
+      background-color: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 400px;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .logo {
+      color: var(--primary-color);
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      color: var(--dark-color);
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.2rem;
+      text-align: left;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #555;
+      font-weight: 500;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 0.8rem;
+      border: none;
+      border-radius: var(--border-radius);
+      background-color: var(--primary-color);
+      color: white;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 1rem;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+    }
+
+    .error-message {
+      color: var(--danger-color);
+      margin-top: 1rem;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .loading {
+      display: none;
+      margin-top: 1rem;
+    }
+
+    .loading i {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    .password-toggle {
+      position: relative;
+    }
+
+    .password-toggle i {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="logo">
+      <i class="fas fa-utensils"></i>
+    </div>
+    <h1>Bake & Grill Admin Login</h1>
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="admin@example.com" required>
+      </div>
+      
+      <div class="form-group password-toggle">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+        <i class="fas fa-eye" id="togglePassword"></i>
+      </div>
+      
+      <button type="submit" class="btn" id="loginBtn">
+        <i class="fas fa-sign-in-alt"></i> Login
+      </button>
+      
+      <div class="loading" id="loading">
+        <i class="fas fa-spinner"></i> Authenticating...
+      </div>
+      
+      <div class="error-message" id="errorMessage"></div>
+    </form>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+  
+  <script>
+    // Firebase Configuration (must match admin-script.js)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
+      authDomain: "bakeandgrill-44c25.firebaseapp.com",
+      projectId: "bakeandgrill-44c25",
+      storageBucket: "bakeandgrill-44c25.appspot.com",
+      messagingSenderId: "713279633359",
+      appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
+      measurementId: "G-SLG2R88J72"
+    };
+
+    // Initialize Firebase
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const auth = firebase.auth();
+
+    // DOM Elements
+    const loginForm = document.getElementById('loginForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const loading = document.getElementById('loading');
+    const errorMessage = document.getElementById('errorMessage');
+    const togglePassword = document.getElementById('togglePassword');
+
+    // Toggle password visibility
+    togglePassword.addEventListener('click', function() {
+      const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+      passwordInput.setAttribute('type', type);
+      this.classList.toggle('fa-eye-slash');
+    });
+
+    // Form submission
+    loginForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+      
+      // Validate inputs
+      if (!email || !password) {
+        showError('Please enter both email and password');
+        return;
+      }
+      
+      try {
+        // Show loading state
+        loginBtn.style.display = 'none';
+        loading.style.display = 'block';
+        errorMessage.textContent = '';
+        
+        // Sign in with Firebase
+        await auth.signInWithEmailAndPassword(email, password);
+        
+        // Redirect to admin panel
+        window.location.href = 'admin.html';
+        
+      } catch (error) {
+        // Handle errors
+        let message = 'Login failed. Please try again.';
+        
+        switch(error.code) {
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
+            message = 'Invalid email or password';
+            break;
+          case 'auth/too-many-requests':
+            message = 'Account temporarily disabled due to many failed attempts';
+            break;
+          case 'auth/user-disabled':
+            message = 'This account has been disabled';
+            break;
+        }
+        
+        showError(message);
+      } finally {
+        // Reset UI
+        loginBtn.style.display = 'block';
+        loading.style.display = 'none';
+      }
+    });
+
+    function showError(message) {
+      errorMessage.textContent = message;
+      setTimeout(() => {
+        errorMessage.textContent = '';
+      }, 5000);
+    }
+
+    // Check if user is already logged in
+    auth.onAuthStateChanged(user => {
+      if (user && user.email === "suvradeep.pal93@gmail.com") {
+        window.location.href = 'admin.html';
+      }
+    });
+  </script>
+</body>
+</html>
