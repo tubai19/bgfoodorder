@@ -2,7 +2,8 @@ import {
   cart, saveCart, updateCartCount, showNotification, formatPrice, validateOrder,
   requestNotificationPermission, updateNotificationPreferences, sendOrderNotification,
   serverTimestamp, GeoPoint, addDoc, collection, doc, setDoc, db,
-  getNotificationPreferences, sendOrderUpdateWithFallback
+  getNotificationPreferences, sendOrderUpdateWithFallback,
+  query, where, orderBy, limit, getDocs
 } from './shared.js';
 
 const elements = {
@@ -99,6 +100,67 @@ function setupEventListeners() {
   }
   if (elements.notifyOffers) {
     elements.notifyOffers.addEventListener('change', saveNotificationPreferences);
+  }
+
+  // Add event listener for phone number input to load order history
+  elements.phoneNumber.addEventListener('input', debounce(() => {
+    if (elements.phoneNumber.value.trim().length === 10) {
+      loadOrderHistory();
+      setupNotificationPreferences();
+    }
+  }, 500));
+}
+
+async function loadOrderHistory() {
+  const phone = elements.phoneNumber.value.trim();
+  if (!phone) return;
+
+  try {
+    const ordersRef = collection(db, 'orders');
+    const q = query(ordersRef, 
+      where('phoneNumber', '==', phone),
+      orderBy('timestamp', 'desc'),
+      limit(5)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const orderHistoryList = document.getElementById('orderHistoryList');
+    
+    if (querySnapshot.empty) {
+      orderHistoryList.innerHTML = '<p class="no-orders">No previous orders found</p>';
+      return;
+    }
+
+    let html = '';
+    querySnapshot.forEach((doc) => {
+      const order = doc.data();
+      const orderDate = order.timestamp?.toDate() || new Date();
+      
+      html += `
+        <div class="mobile-order-item">
+          <div class="order-header">
+            <span class="order-id">#${order.id}</span>
+            <span class="order-date">${orderDate.toLocaleDateString()}</span>
+          </div>
+          <div class="order-summary">
+            ${order.items.slice(0, 2).map(item => 
+              `${item.quantity}x ${item.name}${item.variant ? ` (${item.variant})` : ''}`
+            ).join(', ')}
+            ${order.items.length > 2 ? ` +${order.items.length - 2} more` : ''}
+          </div>
+          <div class="order-footer">
+            <span class="order-total">${formatPrice(order.total)}</span>
+            <span class="order-status ${order.status}">${order.status}</span>
+          </div>
+        </div>
+      `;
+    });
+
+    orderHistoryList.innerHTML = html;
+  } catch (error) {
+    console.error('Error loading order history:', error);
+    document.getElementById('orderHistoryList').innerHTML = 
+      '<p class="error-message">Failed to load order history</p>';
   }
 }
 
