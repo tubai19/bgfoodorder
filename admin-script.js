@@ -14,16 +14,9 @@ const app = firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 const analytics = firebase.analytics();
-const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
-let messaging;
 
-// Initialize messaging if supported
-(async () => {
-  if (firebase.messaging.isSupported()) {
-    messaging = firebase.messaging();
-    setupMessageHandling();
-  }
-})();
+// Initialize Admin Notifications
+const adminNotifications = new AdminNotifications(db, auth);
 
 // DOM Elements
 const elements = {
@@ -75,7 +68,6 @@ const state = {
   orders: [],
   notifications: [],
   salesChart: null,
-  fcmToken: null,
   lastOrderId: null,
   debounceTimer: null,
   lastVisibleOrder: null,
@@ -121,7 +113,7 @@ async function safeFirebaseOperation(operation) {
     return await operation();
   } catch (error) {
     console.error('Firebase operation failed:', error);
-    showNotification(`Operation failed: ${error.message}`, 'error');
+    adminNotifications.showNotification(`Operation failed: ${error.message}`, 'error');
     logAdminAction('firebase_error', { error: error.message });
     return null;
   }
@@ -172,18 +164,6 @@ function hideModal(modal) {
   document.body.style.overflow = 'auto';
 }
 
-function showNotification(message, type = 'success') {
-  const notification = document.createElement('div');
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  
-  setTimeout(() => {
-    notification.classList.add('fade-out');
-    setTimeout(() => notification.remove(), 300);
-  }, 3000);
-}
-
 function playNotificationSound() {
   const sound = new Audio('https://assets.mixkit.co/active_storage/sfx/989/989-preview.mp3');
   sound.volume = 0.3;
@@ -231,17 +211,13 @@ function renderOrderCard(order) {
       <button class="btn info-btn action-btn" data-action="details" data-order="${order.id}">
         <i class="fas fa-eye"></i> Details
       </button>
+      ${order.status !== 'completed' && order.status !== 'cancelled' ? `
+        <button class="btn info-btn resend-btn" data-order="${order.id}">
+          <i class="fas fa-bell"></i> Resend Notification
+        </button>
+      ` : ''}
     </div>
   `;
-  
-  // Add resend notification button
-  if (order.status !== 'completed' && order.status !== 'cancelled') {
-    const resendBtn = document.createElement('button');
-    resendBtn.className = 'btn info-btn';
-    resendBtn.innerHTML = '<i class="fas fa-bell"></i> Resend Notification';
-    resendBtn.addEventListener('click', () => resendOrderNotification(order.id));
-    orderCard.querySelector('.order-actions').appendChild(resendBtn);
-  }
   
   elements.ordersListContainer.appendChild(orderCard);
   
@@ -258,6 +234,12 @@ function renderOrderCard(order) {
       }
     });
   });
+
+  // Add event listener to resend button
+  const resendBtn = orderCard.querySelector('.resend-btn');
+  if (resendBtn) {
+    resendBtn.addEventListener('click', () => resendOrderNotification(order.id));
+  }
 }
 
 async function resendOrderNotification(orderId) {
@@ -265,7 +247,7 @@ async function resendOrderNotification(orderId) {
   const orderSnap = await safeFirebaseOperation(() => orderRef.get());
   
   if (!orderSnap || !orderSnap.exists) {
-    showNotification('Order not found', 'error');
+    adminNotifications.showNotification('Order not found', 'error');
     return;
   }
   
@@ -278,31 +260,25 @@ async function resendOrderNotification(orderId) {
   };
 
   try {
-    const token = await getAdminToken();
-    if (!token) return;
+    const success = await adminNotifications.sendNotificationToUser(
+      order.phoneNumber,
+      'Order Update',
+      `Order #${orderId}: ${statusMessages[order.status]}`,
+      {
+        type: 'status_update',
+        orderId: orderId,
+        click_action: `https://${window.location.hostname}/order-status.html?orderId=${orderId}`
+      }
+    );
 
-    await fetch('/api/send-notification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        phoneNumber: order.phoneNumber,
-        title: 'Order Update',
-        body: `Order #${orderId}: ${statusMessages[order.status]}`,
-        data: {
-          type: 'status_update',
-          orderId: orderId,
-          click_action: `https://${window.location.hostname}/order-status.html?orderId=${orderId}`
-        }
-      })
-    });
-
-    showNotification('Notification resent successfully');
-    logAdminAction('notification_resent', { orderId, status: order.status });
+    if (success) {
+      adminNotifications.showNotification('Notification resent successfully');
+      logAdminAction('notification_resent', { orderId, status: order.status });
+    } else {
+      adminNotifications.showNotification('Failed to resend notification', 'error');
+    }
   } catch (error) {
-    showNotification('Failed to resend notification', 'error');
+    adminNotifications.showNotification('Failed to resend notification', 'error');
     console.error('Resend failed:', error);
     logAdminAction('notification_resend_error', { orderId, error: error.message });
   }
@@ -461,7 +437,7 @@ function setupRealtimeListeners() {
       if (state.lastOrderId !== latestOrder.id) {
         if (state.lastOrderId !== null) {
           playNotificationSound();
-          showNotification('New order received!');
+          adminNotifications.showNotification('New order received!');
           logAdminAction('new_order_received', { orderId: latestOrder.id });
         }
         state.lastOrderId = latestOrder.id;
@@ -646,79 +622,6 @@ function renderNotification(notification) {
 }
 
 // ====================== NOTIFICATION FUNCTIONS ======================
-function setupMessageHandling() {
-  firebase.messaging().onMessage((payload) => {
-    showNotification(payload.notification?.body || 'New message');
-    playNotificationSound();
-  });
-}
-
-async function initializeMessaging() {
-  try {
-    if (!messaging) {
-      elements.fcmStatus.textContent = 'Not supported in this browser';
-      return;
-    }
-    
-    const permission = await Notification.requestPermission();
-    
-    if (permission !== 'granted') {
-      elements.fcmStatus.textContent = 'Notifications blocked';
-      return;
-    }
-    
-    const token = await messaging.getToken({
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: await navigator.serviceWorker.ready
-    });
-    
-    if (token) {
-      state.fcmToken = token;
-      elements.fcmStatus.textContent = 'Ready to send notifications';
-      await saveAdminToken(token);
-    } else {
-      elements.fcmStatus.textContent = 'No token available';
-    }
-  } catch (error) {
-    console.error('Messaging error:', error);
-    elements.fcmStatus.textContent = 'Error initializing';
-    logAdminAction('messaging_init_error', { error: error.message });
-  }
-}
-
-async function saveAdminToken(token) {
-  try {
-    await db.collection('adminTokens').doc(state.currentUser.uid).set({
-      token,
-      email: state.currentUser.email,
-      lastActive: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-  } catch (error) {
-    console.error('Error saving token:', error);
-    logAdminAction('token_save_error', { error: error.message });
-  }
-}
-
-async function getAdminToken() {
-  try {
-    if (!auth.currentUser) {
-      throw new Error('No authenticated user');
-    }
-    
-    const token = await auth.currentUser.getIdToken();
-    if (!token) {
-      throw new Error('Failed to get ID token');
-    }
-    return token;
-    
-  } catch (error) {
-    console.error('Error getting admin token:', error);
-    logAdminAction('admin_token_fetch_error', { error: error.message });
-    showNotification('Failed to authenticate. Please refresh the page.', 'error');
-    return null;
-  }
-}
-
 async function sendNotification(e) {
   e.preventDefault();
   
@@ -727,7 +630,7 @@ async function sendNotification(e) {
   const type = elements.notificationType.value;
   
   if (!title || !body) {
-    showNotification('Please enter both title and message', 'error');
+    adminNotifications.showNotification('Please enter both title and message', 'error');
     return;
   }
   
@@ -735,85 +638,19 @@ async function sendNotification(e) {
   setLoading(elements.sendNotificationBtn, true);
   
   try {
-    const token = await getAdminToken();
-    if (!token) {
-      showNotification('Authentication failed. Please try again.', 'error');
-      return;
+    const successCount = await adminNotifications.sendBroadcastNotification(title, body, type);
+    
+    if (successCount > 0) {
+      adminNotifications.showNotification(`Notification sent to ${successCount} users!`);
+      elements.notificationForm.reset();
+      loadNotifications();
+      logAdminAction('notification_sent', { type, recipientCount: successCount });
+    } else {
+      adminNotifications.showNotification('No eligible recipients found', 'warning');
     }
-
-    await safeFirebaseOperation(() => 
-      db.collection('adminNotifications').add({
-        title,
-        body,
-        type,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        sentBy: state.currentUser.email
-      })
-    );
-    
-    const tokensSnapshot = await safeFirebaseOperation(() => 
-      db.collection('fcmTokens').get()
-    );
-    
-    if (!tokensSnapshot) return;
-    
-    const batch = db.batch();
-    let notificationCount = 0;
-    
-    tokensSnapshot.forEach(doc => {
-      const userPrefs = doc.data().preferences || state.defaultPreferences;
-      const shouldSend = type === 'status_update' ? userPrefs.statusUpdates !== false : 
-                       type === 'promotion' ? userPrefs.specialOffers !== false : true;
-      
-      if (shouldSend) {
-        notificationCount++;
-        const notificationRef = db.collection('notifications').doc();
-        batch.set(notificationRef, {
-          title,
-          body,
-          type,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          phoneNumber: doc.data().phoneNumber,
-          sentBy: state.currentUser.email
-        });
-        
-        fetch('/api/send-notification', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            phoneNumber: doc.data().phoneNumber,
-            title,
-            body,
-            data: {
-              type,
-              click_action: `https://${window.location.hostname}`
-            }
-          })
-        }).catch(error => {
-          console.error('Error sending notification:', error);
-          logAdminAction('fcm_send_error', { 
-            phoneNumber: doc.data().phoneNumber, 
-            error: error.message 
-          });
-        });
-      }
-    });
-    
-    await safeFirebaseOperation(() => batch.commit());
-    
-    showNotification(`Notification sent to ${notificationCount} users!`);
-    elements.notificationForm.reset();
-    loadNotifications();
-    logAdminAction('notification_sent', { 
-      type, 
-      recipientCount: notificationCount 
-    });
   } catch (error) {
     console.error('Error sending notification:', error);
-    showNotification('Failed to send notification', 'error');
+    adminNotifications.showNotification('Failed to send notification', 'error');
     logAdminAction('notification_send_error', { error: error.message });
   } finally {
     showLoadingOverlay(false);
@@ -826,30 +663,21 @@ async function sendTestNotification() {
   if (!phoneNumber) return;
 
   try {
-    const token = await getAdminToken();
-    if (!token) return;
+    const success = await adminNotifications.sendNotificationToUser(
+      phoneNumber,
+      'Test Notification',
+      'This is a test notification from Bake & Grill',
+      { type: 'test' }
+    );
 
-    await fetch('/api/send-notification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        phoneNumber: phoneNumber,
-        title: 'Test Notification',
-        body: 'This is a test notification from Bake & Grill',
-        data: {
-          type: 'test',
-          click_action: `https://${window.location.hostname}`
-        }
-      })
-    });
-
-    showNotification('Test notification sent');
-    logAdminAction('test_notification_sent', { phoneNumber });
+    if (success) {
+      adminNotifications.showNotification('Test notification sent');
+      logAdminAction('test_notification_sent', { phoneNumber });
+    } else {
+      adminNotifications.showNotification('Failed to send test notification', 'error');
+    }
   } catch (error) {
-    showNotification('Failed to send test notification', 'error');
+    adminNotifications.showNotification('Failed to send test notification', 'error');
     console.error('Test failed:', error);
     logAdminAction('test_notification_error', { error: error.message });
   }
@@ -895,9 +723,7 @@ async function updateOrderStatus(orderId, newStatus) {
     }
 
     if (notificationTitle && notificationBody) {
-      const token = await getAdminToken();
-      if (!token) return;
-
+      // Save notification to Firestore
       await db.collection('notifications').add({
         title: notificationTitle,
         body: notificationBody,
@@ -908,40 +734,24 @@ async function updateOrderStatus(orderId, newStatus) {
         read: false
       });
 
-      const tokensQuery = db.collection('fcmTokens')
-        .where('phoneNumber', '==', order.phoneNumber)
-        .where('preferences.statusUpdates', '==', true);
-      const tokensSnapshot = await tokensQuery.get();
-      
-      if (!tokensSnapshot.empty) {
-        const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
-        
-        await fetch('/api/send-notifications', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            title: notificationTitle,
-            body: notificationBody,
-            type: 'status_update',
-            tokens,
-            data: {
-              orderId,
-              status: newStatus,
-              click_action: `https://${window.location.hostname}/order-status.html?orderId=${orderId}`
-            }
-          })
-        });
-      }
+      // Send notification
+      await adminNotifications.sendNotificationToUser(
+        order.phoneNumber,
+        notificationTitle,
+        notificationBody,
+        {
+          orderId,
+          status: newStatus,
+          click_action: `https://${window.location.hostname}/order-status.html?orderId=${orderId}`
+        }
+      );
     }
 
-    showNotification('Order status updated successfully');
+    adminNotifications.showNotification('Order status updated successfully');
     logAdminAction('order_status_updated', { orderId, newStatus });
   } catch (error) {
     console.error('Error updating order status:', error);
-    showNotification('Failed to update order status', 'error');
+    adminNotifications.showNotification('Failed to update order status', 'error');
     logAdminAction('order_status_update_error', { orderId, error: error.message });
   } finally {
     const button = document.querySelector(`[data-order="${orderId}"][data-action="${newStatus}"]`);
@@ -985,11 +795,11 @@ async function saveSettings(e) {
       type: 'shop_status'
     });
     
-    showNotification('Settings saved successfully');
+    adminNotifications.showNotification('Settings saved successfully');
     logAdminAction('settings_updated', { settings });
   } catch (error) {
     console.error('Error saving settings:', error);
-    showNotification('Failed to save settings', 'error');
+    adminNotifications.showNotification('Failed to save settings', 'error');
     logAdminAction('settings_update_error', { error: error.message });
   } finally {
     showLoadingOverlay(false);
@@ -1009,12 +819,12 @@ async function saveDefaultPreferences() {
   try {
     await db.collection('settings').doc('notificationPreferences').set(preferences);
     
-    showNotification('Default preferences saved');
+    adminNotifications.showNotification('Default preferences saved');
     state.defaultPreferences = preferences;
     logAdminAction('preferences_updated', { preferences });
   } catch (error) {
     console.error("Error saving preferences:", error);
-    showNotification('Failed to save preferences', 'error');
+    adminNotifications.showNotification('Failed to save preferences', 'error');
     logAdminAction('preferences_update_error', { error: error.message });
   } finally {
     setLoading(elements.savePreferencesBtn, false);
@@ -1106,22 +916,12 @@ async function handleLogout() {
   showLoadingOverlay(true);
   
   try {
-    if (state.fcmToken) {
-      try {
-        await messaging.deleteToken(state.fcmToken);
-        await db.collection('adminTokens').doc(state.currentUser.uid).delete();
-      } catch (error) {
-        console.error('Error removing token:', error);
-        logAdminAction('token_removal_error', { error: error.message });
-      }
-    }
-    
     await auth.signOut();
     logAdminAction('logout');
     window.location.href = '/admin-login.html';
   } catch (error) {
     console.error('Logout error:', error);
-    showNotification('Logout failed', 'error');
+    adminNotifications.showNotification('Logout failed', 'error');
     logAdminAction('logout_error', { error: error.message });
   } finally {
     showLoadingOverlay(false);
@@ -1131,7 +931,7 @@ async function handleLogout() {
 // ====================== INITIALIZATION ======================
 function checkCompatibility() {
   if (!('serviceWorker' in navigator)) {
-    showNotification('Some features may not work in your browser. Please update.', 'warning');
+    adminNotifications.showNotification('Some features may not work in your browser. Please update.', 'warning');
   }
   if (!window.Notification) {
     elements.fcmStatus.textContent = 'Notifications not supported';
@@ -1150,8 +950,6 @@ function renderNotificationStatus() {
     </button>
   `;
   document.getElementById('dashboardSection').appendChild(statusSection);
-
-  document.getElementById('testNotificationBtn').addEventListener('click', sendTestNotification);
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
@@ -1163,7 +961,6 @@ document.addEventListener('DOMContentLoaded', async function() {
       setupRealtimeListeners();
       loadDashboardData();
       loadDefaultPreferences();
-      initializeMessaging();
       updateCurrentTime();
       setInterval(updateCurrentTime, 1000);
       renderNotificationStatus();
