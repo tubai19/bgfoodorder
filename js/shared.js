@@ -1,43 +1,34 @@
-// shared.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { initializeApp } from "firebase/app";
 import { 
   getFirestore, collection, doc, setDoc, getDoc, updateDoc, 
   query, where, getDocs, writeBatch, serverTimestamp, 
   onSnapshot, limit, addDoc, GeoPoint
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+} from "firebase/firestore";
 import { 
   getMessaging, getToken, onMessage, isSupported, deleteToken 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
-import { 
-  getFunctions, httpsCallable 
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
+} from "firebase/messaging";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { firebaseConfig, VAPID_KEY } from "./firebase-config.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBuBmCQvvNVFsH2x6XGrHXrgZyULB1_qH8",
-  authDomain: "bakeandgrill-44c25.firebaseapp.com",
-  projectId: "bakeandgrill-44c25",
-  storageBucket: "bakeandgrill-44c25.appspot.com",
-  messagingSenderId: "713279633359",
-  appId: "1:713279633359:web:ba6bcd411b1b6be7b904ba",
-  measurementId: "G-SLG2R88J72"
-};
-
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const functions = getFunctions(app);
-const VAPID_KEY = "BGF2rBiAxvlRiqHmvDYEH7_OXxWLl0zIv9IS-2Ky9letx3l4bOyQXRF901lfKw0P7fQIREHaER4QKe4eY34g1AY";
 let messaging;
 
-// Initialize Firebase Messaging
-(async () => {
+// Initialize Firebase Messaging if supported
+const initializeMessaging = async () => {
   if (await isSupported()) {
     messaging = getMessaging(app);
     setupMessageHandling();
   }
-})();
+};
+initializeMessaging();
 
-// Message handling setup
+// Message handling
 function setupMessageHandling() {
+  if (!messaging) return;
+  
   onMessage(messaging, (payload) => {
     console.log('Message received:', payload);
     showNotification(
@@ -50,15 +41,6 @@ function setupMessageHandling() {
       playNotificationSound();
     }
   });
-}
-
-// Format price for display
-function formatPrice(amount) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0
-  }).format(amount).replace('₹', '₹ ');
 }
 
 // Notification functions
@@ -213,7 +195,6 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
   try {
     console.log(`Attempting to send notification for order ${orderId} to ${phoneNumber}`);
     
-    // Get user's FCM tokens with status updates enabled
     const tokensQuery = query(
       collection(db, 'fcmTokens'),
       where('phoneNumber', '==', phoneNumber),
@@ -229,7 +210,6 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
 
     const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
     
-    // Call Cloud Function to send notification
     const sendNotification = httpsCallable(functions, 'sendNotification');
     await sendNotification({
       tokens,
@@ -242,10 +222,8 @@ async function sendOrderNotification(orderId, phoneNumber, title, body) {
       }
     });
 
-    // Log successful notification
     await logNotificationStatus(orderId, phoneNumber, "sent");
     
-    // Save notification to database
     await addDoc(collection(db, 'notifications'), {
       title,
       body,
@@ -280,7 +258,6 @@ async function logNotificationStatus(orderId, phoneNumber, status, error = "") {
 }
 
 async function sendOrderUpdateWithFallback(orderId, phoneNumber, message) {
-  // First try push notification
   const pushSent = await sendOrderNotification(
     orderId, 
     phoneNumber, 
@@ -288,7 +265,6 @@ async function sendOrderUpdateWithFallback(orderId, phoneNumber, message) {
     message
   );
   
-  // If push fails, try SMS fallback
   if (!pushSent) {
     try {
       await httpsCallable(functions, 'sendSMS')({
@@ -304,7 +280,6 @@ async function sendOrderUpdateWithFallback(orderId, phoneNumber, message) {
 
 // PWA Features
 function initPwaFeatures() {
-  // Handle PWA install prompt
   let deferredPrompt;
   
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -348,7 +323,6 @@ function initPwaFeatures() {
     });
   }
 
-  // Show iOS install instructions for Safari
   const isIos = () => {
     const userAgent = window.navigator.userAgent.toLowerCase();
     return /iphone|ipad|ipod/.test(userAgent);
