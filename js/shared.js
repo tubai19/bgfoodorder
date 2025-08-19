@@ -297,7 +297,7 @@ async function sendOrderUpdateWithFallback(orderId, phoneNumber, message) {
     try {
       await httpsCallable(functions, 'sendSMS')({
         phoneNumber,
-        message: `[Bake & Grill] ${message}`
+        message: `[BG Pizzo] ${message}`
       });
       console.log('Sent SMS fallback notification');
     } catch (smsError) {

@@ -525,7 +525,7 @@ function sendWhatsAppMessage(orderId) {
   const orderStatusUrl = `${window.location.origin}/order-status.html?orderId=${orderId}`;
   
   const messageParts = [
-    `*NEW ORDER - BAKE & GRILL*`,
+    `*NEW ORDER - BG Pizzo*`,
     ``,
     `*Order ID:* #${orderId}`,
     `*Customer Name:* ${elements.customerName.value}`,
