@@ -2356,107 +2356,25 @@ input[name="orderType"]:disabled + span {
   color: #0C5460;
 }
 
+.mobile-category-nav {
+  display: flex;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+}
+
+.mobile-category-nav::-webkit-scrollbar {
+  display: none;
+}
 .order-status.delivered {
   background: #D4EDDA;
   color: #155724;
 }
 
-/* WhatsApp Options Modal */
-.whatsapp-options {
-  padding: 15px;
-}
 
-.whatsapp-options p {
-  margin-bottom: 15px;
-  text-align: center;
-  color: #666;
-}
-
-.whatsapp-option-btn {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 15px;
-  margin-bottom: 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: var(--border-radius);
-  background: white;
-  text-align: left;
-  transition: all 0.2s ease;
-}
-
-.whatsapp-option-btn:hover {
-  background: #f9f9f9;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.whatsapp-option-btn i:first-child {
-  font-size: 24px;
-  margin-right: 15px;
-  color: #25D366;
-}
-
-.whatsapp-option-btn i:last-child {
-  margin-left: auto;
-  color: #999;
-}
-
-.whatsapp-option-btn h3 {
-  margin: 0 0 5px 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.whatsapp-option-btn p {
-  margin: 0;
-  font-size: 14px;
-  color: #666;
-  text-align: left;
-}
-
-/* Enhanced order summary in confirmation modal */
-.summary-section {
-  margin-bottom: 15px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.summary-section:last-child {
-  border-bottom: none;
-}
-
-.summary-section h3 {
-  margin: 0 0 10px 0;
-  color: #e63946;
-  font-size: 16px;
-}
-
-.summary-items {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.summary-items li {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  border-bottom: 1px dashed #eee;
-}
-
-.summary-items li:last-child {
-  border-bottom: none;
-}
-
-.summary-total {
-  font-weight: bold;
-  font-size: 18px;
-  color: #e63946;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 2px solid #eee;
-}
 .order-status.cancelled {
   background: #F8D7DA;
   color: #721C24;
