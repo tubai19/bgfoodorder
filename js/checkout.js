@@ -31,12 +31,16 @@ const elements = {
   geocodingLoading: document.getElementById('geocodingLoading'),
   notifyStatus: document.getElementById('notifyStatus'),
   notifyOffers: document.getElementById('notifyOffers'),
-  notificationStatus: document.getElementById('notificationStatus')
+  notificationStatus: document.getElementById('notificationStatus'),
+  whatsappOptionsModal: document.getElementById('whatsappOptionsModal'),
+  shareWithCustomer: document.getElementById('shareWithCustomer'),
+  shareForSelf: document.getElementById('shareForSelf')
 };
 
 let map;
 let marker;
 let userLocation = null;
+let currentOrderId = null;
 const shopLocation = { lat: 22.3908, lng: 88.2189 };
 const freeDeliveryThreshold = 500;
 const minimumOrderValue = 200;
@@ -85,12 +89,21 @@ function setupEventListeners() {
   elements.deliveryShareLocationBtn.addEventListener('click', shareCurrentLocation);
   elements.deliveryShowManualLocBtn.addEventListener('click', showManualLocation);
   elements.manualDeliveryAddress.addEventListener('input', debounce(geocodeAddress, 500));
-  elements.confirmOrderBtn.addEventListener('click', confirmOrder);
+  elements.confirmOrderBtn.addEventListener('click', showWhatsAppOptions);
   elements.cancelOrderBtn.addEventListener('click', closeConfirmationModal);
-  document.querySelector('.close-modal').addEventListener('click', closeConfirmationModal);
+  document.querySelectorAll('.close-modal').forEach(closeBtn => {
+    closeBtn.addEventListener('click', (e) => {
+      const modal = e.target.closest('.mobile-modal');
+      if (modal) modal.style.display = 'none';
+    });
+  });
+  
   window.addEventListener('click', (e) => {
     if (e.target === elements.orderConfirmationModal) {
       closeConfirmationModal();
+    }
+    if (e.target === elements.whatsappOptionsModal) {
+      elements.whatsappOptionsModal.style.display = 'none';
     }
   });
 
@@ -99,6 +112,23 @@ function setupEventListeners() {
   }
   if (elements.notifyOffers) {
     elements.notifyOffers.addEventListener('change', saveNotificationPreferences);
+  }
+  
+  // WhatsApp sharing options
+  if (elements.shareWithCustomer) {
+    elements.shareWithCustomer.addEventListener('click', () => {
+      sendWhatsAppMessage(currentOrderId, 'customer');
+      elements.whatsappOptionsModal.style.display = 'none';
+      completeOrderProcess();
+    });
+  }
+  
+  if (elements.shareForSelf) {
+    elements.shareForSelf.addEventListener('click', () => {
+      sendWhatsAppMessage(currentOrderId, 'self');
+      elements.whatsappOptionsModal.style.display = 'none';
+      completeOrderProcess();
+    });
   }
 }
 
@@ -513,7 +543,19 @@ function closeConfirmationModal() {
   elements.orderConfirmationModal.style.display = 'none';
 }
 
-function sendWhatsAppMessage(orderId) {
+function showWhatsAppOptions() {
+  // First save the order to get an order ID
+  saveOrderToDatabase().then(orderId => {
+    if (orderId) {
+      currentOrderId = orderId;
+      elements.whatsappOptionsModal.style.display = 'block';
+    } else {
+      showNotification('Failed to create order. Please try again.', 'error');
+    }
+  });
+}
+
+function sendWhatsAppMessage(orderId, recipientType) {
   const orderType = getOrderType();
   const totals = calculateTotal();
   const distance = orderType === 'Delivery' ? calculateDistance(
@@ -525,7 +567,7 @@ function sendWhatsAppMessage(orderId) {
   const orderStatusUrl = `${window.location.origin}/order-status.html?orderId=${orderId}`;
   
   const messageParts = [
-    `*NEW ORDER - BG Pizzo*`,
+    `*${recipientType === 'customer' ? 'NEW ORDER - BG Pizzo' : 'YOUR ORDER CONFIRMATION - BG Pizzo'}*`,
     ``,
     `*Order ID:* #${orderId}`,
     `*Customer Name:* ${elements.customerName.value}`,
@@ -606,12 +648,15 @@ function sendWhatsAppMessage(orderId) {
     `Track your order status: ${orderStatusUrl}`
   );
 
+  // Different phone numbers based on recipient type
+  const phoneNumber = recipientType === 'customer' ? '918240266267' : elements.phoneNumber.value;
+  
   const encodedMessage = encodeURIComponent(messageParts.join('\n'));
-  const whatsappUrl = `https://wa.me/918240266267?text=${encodedMessage}`;
+  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
   window.open(whatsappUrl, '_blank');
 }
 
-async function confirmOrder() {
+async function saveOrderToDatabase() {
   const orderType = getOrderType();
   const totals = calculateTotal();
   const distance = orderType === 'Delivery' ? calculateDistance(
@@ -670,20 +715,23 @@ async function confirmOrder() {
       }
     }
 
-    sendWhatsAppMessage(orderId);
-
-    closeConfirmationModal();
-    showNotification('Order placed successfully!');
-    
-    cart.length = 0;
-    saveCart();
-    updateCartCount();
-    
-    setTimeout(() => {
-      window.location.href = `order-status.html?orderId=${orderId}`;
-    }, 2000);
+    return orderId;
   } catch (error) {
-    console.error('Error confirming order:', error);
-    showNotification('Failed to place order. Please try again.', 'error');
+    console.error('Error saving order:', error);
+    showNotification('Failed to save order. Please try again.', 'error');
+    return null;
   }
+}
+
+function completeOrderProcess() {
+  closeConfirmationModal();
+  showNotification('Order placed successfully!');
+  
+  cart.length = 0;
+  saveCart();
+  updateCartCount();
+  
+  setTimeout(() => {
+    window.location.href = `order-status.html?orderId=${currentOrderId}`;
+  }, 2000);
 }
