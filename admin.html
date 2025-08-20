@@ -25,6 +25,7 @@
           <ul>
             <li class="active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
             <li data-section="orders"><i class="fas fa-clipboard-list"></i> Orders</li>
+            <li data-section="inventory"><i class="fas fa-box"></i> Inventory</li>
             <li data-section="notifications"><i class="fas fa-bell"></i> Notifications</li>
             <li data-section="settings"><i class="fas fa-cog"></i> Settings</li>
           </ul>
@@ -58,6 +59,41 @@
           <div class="chart-container">
             <canvas id="salesChart"></canvas>
           </div>
+          
+          <!-- Inventory Summary Card -->
+          <div class="content-section">
+            <div class="section-header">
+              <h2><i class="fas fa-box"></i> Inventory Summary</h2>
+            </div>
+            <div class="summary-stats">
+              <div class="summary-stat">
+                <span class="stat-value" id="totalItems">0</span>
+                <span class="stat-label">Total Items</span>
+              </div>
+              <div class="summary-stat">
+                <span class="stat-value" id="lowStockItems">0</span>
+                <span class="stat-label">Low Stock</span>
+              </div>
+              <div class="summary-stat">
+                <span class="stat-value" id="outOfStockItems">0</span>
+                <span class="stat-label">Out of Stock</span>
+              </div>
+              <div class="summary-stat">
+                <span class="stat-value" id="totalInventoryValue">₹0.00</span>
+                <span class="stat-label">Total Value</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Notification Status Card -->
+          <div class="content-section">
+            <h3><i class="fas fa-bell"></i> Notification System</h3>
+            <p>FCM Status: <span id="fcmStatus">Active</span></p>
+            <p>Last Notification: <span id="lastNotificationTime">Loading...</span></p>
+            <button id="testNotificationBtn" class="btn">
+              <i class="fas fa-paper-plane"></i> Send Test Notification
+            </button>
+          </div>
         </section>
 
         <!-- Orders Section -->
@@ -82,6 +118,38 @@
           <button id="loadMoreOrders" class="btn secondary-btn" style="display:none;">
             <i class="fas fa-spinner fa-spin loading-spinner"></i> Load More Orders
           </button>
+        </section>
+
+        <!-- Inventory Section -->
+        <section id="inventorySection" class="content-section" style="display:none;">
+          <div class="section-header">
+            <h2><i class="fas fa-box"></i> Inventory Management</h2>
+            <button id="addItemBtn" class="btn primary-btn">
+              <i class="fas fa-plus"></i> Add New Item
+            </button>
+          </div>
+          
+          <div class="inventory-controls">
+            <div class="filters">
+              <select id="categoryFilter">
+                <option value="all">All Categories</option>
+                <option value="baked">Baked Goods</option>
+                <option value="grilled">Grilled Items</option>
+                <option value="beverages">Beverages</option>
+                <option value="sides">Sides</option>
+              </select>
+              <select id="stockFilter">
+                <option value="all">All Stock Levels</option>
+                <option value="low">Low Stock</option>
+                <option value="out">Out of Stock</option>
+              </select>
+              <input type="text" id="inventorySearch" placeholder="Search inventory...">
+            </div>
+          </div>
+          
+          <div class="inventory-grid" id="inventoryGrid">
+            <div class="loading">Loading inventory...</div>
+          </div>
         </section>
 
         <!-- Notifications Section -->
@@ -130,10 +198,6 @@
             <div id="notificationsList" class="notifications-list">
               <div class="loading">Loading notifications...</div>
             </div>
-          </div>
-          
-          <div class="notification-status">
-            FCM Status: <span id="fcmStatus">Initializing...</span>
           </div>
         </section>
 
@@ -214,6 +278,116 @@
       </div>
       <div class="modal-footer">
         <button class="btn cancel-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Item Modal -->
+  <div id="addItemModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="itemModalTitle">Add Inventory Item</h3>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <form id="itemForm" class="admin-form">
+          <input type="hidden" id="itemId">
+          <div class="form-group">
+            <label for="itemName">Item Name *</label>
+            <input type="text" id="itemName" required>
+          </div>
+          <div class="form-group">
+            <label for="itemCategory">Category *</label>
+            <select id="itemCategory" required>
+              <option value="baked">Baked Goods</option>
+              <option value="grilled">Grilled Items</option>
+              <option value="beverages">Beverages</option>
+              <option value="sides">Sides</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="itemPrice">Price (₹) *</label>
+            <input type="number" id="itemPrice" min="0" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label for="itemCost">Cost (₹) *</label>
+            <input type="number" id="itemCost" min="0" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label for="itemStock">Current Stock *</label>
+            <input type="number" id="itemStock" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="minStock">Minimum Stock Level *</label>
+            <input type="number" id="minStock" min="0" required>
+          </div>
+          <div class="form-group">
+            <label for="itemUnit">Unit</label>
+            <input type="text" id="itemUnit" placeholder="e.g., pieces, kg, liters">
+          </div>
+          <div class="form-group">
+            <label for="itemDescription">Description</label>
+            <textarea id="itemDescription" rows="3"></textarea>
+          </div>
+          <div class="form-group toggle-group">
+            <label>Item Active</label>
+            <label class="switch">
+              <input type="checkbox" id="itemActive" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn cancel-btn" data-dismiss="modal">Cancel</button>
+        <button id="saveItemBtn" class="btn primary-btn">Save Item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock Adjustment Modal -->
+  <div id="stockModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Adjust Stock</h3>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <form id="stockForm" class="admin-form">
+          <input type="hidden" id="adjustItemId">
+          <input type="hidden" id="adjustItemName">
+          <div class="form-group">
+            <label for="adjustmentType">Adjustment Type *</label>
+            <select id="adjustmentType" required>
+              <option value="add">Add Stock</option>
+              <option value="remove">Remove Stock</option>
+              <option value="set">Set Stock Level</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="adjustmentQuantity">Quantity *</label>
+            <input type="number" id="adjustmentQuantity" min="1" required>
+          </div>
+          <div class="form-group">
+            <label for="adjustmentReason">Reason *</label>
+            <select id="adjustmentReason" required>
+              <option value="restock">Restock</option>
+              <option value="sale">Sale</option>
+              <option value="waste">Waste/Spoilage</option>
+              <option value="damaged">Damaged</option>
+              <option value="correction">Stock Correction</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="adjustmentNotes">Notes</label>
+            <textarea id="adjustmentNotes" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn cancel-btn" data-dismiss="modal">Cancel</button>
+        <button id="saveAdjustmentBtn" class="btn primary-btn">Save Adjustment</button>
       </div>
     </div>
   </div>
