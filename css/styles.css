@@ -2117,6 +2117,158 @@ input[name="orderType"]:disabled + span {
   .variant-option {
     margin-bottom: 5px;
   }
+/* Add these to your existing styles.css */
+
+/* PWA Install Prompts */
+.install-container {
+  position: fixed;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 1000;
+  padding: 0 15px;
+  animation: slideUp 0.3s ease-out;
+}
+
+.install-prompt {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  max-width: 500px;
+  width: 100%;
+}
+
+.install-icon {
+  width: 40px;
+  height: 40px;
+  margin-right: 12px;
+}
+
+.install-text {
+  flex-grow: 1;
+}
+
+.install-text h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.install-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.install-button {
+  background-color: #e63946;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-left: 12px;
+  transition: background-color 0.2s;
+}
+
+.install-button:hover {
+  background-color: #c1121f;
+}
+
+.dismiss-button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #999;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 0 4px;
+}
+
+/* iOS Install Guide */
+.ios-install-guide {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.ios-install-content {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 400px;
+  text-align: center;
+}
+
+.ios-install-content h3 {
+  color: #e63946;
+  margin-bottom: 15px;
+}
+
+.ios-install-content ol {
+  text-align: left;
+  margin: 20px 0;
+  padding-left: 20px;
+}
+
+.ios-install-content li {
+  margin-bottom: 10px;
+}
+
+.ios-close-btn {
+  background-color: #e63946;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* Animation */
+@keyframes slideUp {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* PWA specific styles */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .mobile-header {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Hide install prompt when cart is open */
+.mobile-cart-drawer.open ~ .install-container {
+  display: none !important;
+}
+
 }
 
 .mobile-modal-btn {
@@ -2142,6 +2294,182 @@ input[name="orderType"]:disabled + span {
 
 .confirm-btn:hover {
   background-color: var(--purple-dark);
+}
+
+.mobile-order-history {
+  margin-top: 10px;
+}
+
+.mobile-order-item {
+  background: white;
+  border-radius: var(--border-radius);
+  padding: 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.order-id {
+  font-weight: bold;
+}
+
+.order-date {
+  color: #666;
+  font-size: 0.9em;
+}
+
+.order-summary {
+  color: #444;
+  margin-bottom: 8px;
+  font-size: 0.95em;
+}
+
+.order-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-total {
+  font-weight: bold;
+}
+
+.order-status {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.order-status.pending {
+  background: #FFF3CD;
+  color: #856404;
+}
+
+.order-status.preparing {
+  background: #D1ECF1;
+  color: #0C5460;
+}
+
+.order-status.delivered {
+  background: #D4EDDA;
+  color: #155724;
+}
+
+/* WhatsApp Options Modal */
+.whatsapp-options {
+  padding: 15px;
+}
+
+.whatsapp-options p {
+  margin-bottom: 15px;
+  text-align: center;
+  color: #666;
+}
+
+.whatsapp-option-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 15px;
+  margin-bottom: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: var(--border-radius);
+  background: white;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.whatsapp-option-btn:hover {
+  background: #f9f9f9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.whatsapp-option-btn i:first-child {
+  font-size: 24px;
+  margin-right: 15px;
+  color: #25D366;
+}
+
+.whatsapp-option-btn i:last-child {
+  margin-left: auto;
+  color: #999;
+}
+
+.whatsapp-option-btn h3 {
+  margin: 0 0 5px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.whatsapp-option-btn p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+  text-align: left;
+}
+
+/* Enhanced order summary in confirmation modal */
+.summary-section {
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-section:last-child {
+  border-bottom: none;
+}
+
+.summary-section h3 {
+  margin: 0 0 10px 0;
+  color: #e63946;
+  font-size: 16px;
+}
+
+.summary-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.summary-items li {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.summary-items li:last-child {
+  border-bottom: none;
+}
+
+.summary-total {
+  font-weight: bold;
+  font-size: 18px;
+  color: #e63946;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid #eee;
+}
+.order-status.cancelled {
+  background: #F8D7DA;
+  color: #721C24;
+}
+
+.no-orders, .error-message {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.error-message {
+  color: #721C24;
 }
 
 .clear-btn {
