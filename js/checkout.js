@@ -33,8 +33,10 @@ const elements = {
   notifyOffers: document.getElementById('notifyOffers'),
   notificationStatus: document.getElementById('notificationStatus'),
   whatsappOptionsModal: document.getElementById('whatsappOptionsModal'),
-  shareWithCustomer: document.getElementById('shareWithCustomer'),
-  shareForSelf: document.getElementById('shareForSelf')
+  whatsappShareModal: document.getElementById('whatsappShareModal'),
+  whatsappShareMessage: document.getElementById('whatsappShareMessage'),
+  whatsappShareBtn: document.getElementById('whatsappShareBtn'),
+  whatsappShareLaterBtn: document.getElementById('whatsappShareLaterBtn')
 };
 
 let map;
@@ -89,8 +91,20 @@ function setupEventListeners() {
   elements.deliveryShareLocationBtn.addEventListener('click', shareCurrentLocation);
   elements.deliveryShowManualLocBtn.addEventListener('click', showManualLocation);
   elements.manualDeliveryAddress.addEventListener('input', debounce(geocodeAddress, 500));
-  elements.confirmOrderBtn.addEventListener('click', showWhatsAppOptions);
+  elements.confirmOrderBtn.addEventListener('click', confirmOrder);
   elements.cancelOrderBtn.addEventListener('click', closeConfirmationModal);
+  
+  // WhatsApp sharing buttons
+  elements.whatsappShareBtn.addEventListener('click', () => {
+    shareOrderViaWhatsApp();
+    elements.whatsappShareModal.style.display = 'none';
+    completeOrderProcess();
+  });
+  
+  elements.whatsappShareLaterBtn.addEventListener('click', () => {
+    showNotification('Please share your order via WhatsApp to complete the process', 'warning');
+  });
+  
   document.querySelectorAll('.close-modal').forEach(closeBtn => {
     closeBtn.addEventListener('click', (e) => {
       const modal = e.target.closest('.mobile-modal');
@@ -102,8 +116,10 @@ function setupEventListeners() {
     if (e.target === elements.orderConfirmationModal) {
       closeConfirmationModal();
     }
-    if (e.target === elements.whatsappOptionsModal) {
-      elements.whatsappOptionsModal.style.display = 'none';
+    if (e.target === elements.whatsappShareModal) {
+      // Don't allow closing the WhatsApp modal by clicking outside
+      // Users must share the order to proceed
+      showNotification('Please share your order via WhatsApp to complete your order', 'warning');
     }
   });
 
@@ -112,23 +128,6 @@ function setupEventListeners() {
   }
   if (elements.notifyOffers) {
     elements.notifyOffers.addEventListener('change', saveNotificationPreferences);
-  }
-  
-  // WhatsApp sharing options
-  if (elements.shareWithCustomer) {
-    elements.shareWithCustomer.addEventListener('click', () => {
-      sendWhatsAppMessage(currentOrderId, 'customer');
-      elements.whatsappOptionsModal.style.display = 'none';
-      completeOrderProcess();
-    });
-  }
-  
-  if (elements.shareForSelf) {
-    elements.shareForSelf.addEventListener('click', () => {
-      sendWhatsAppMessage(currentOrderId, 'self');
-      elements.whatsappOptionsModal.style.display = 'none';
-      completeOrderProcess();
-    });
   }
 }
 
@@ -491,18 +490,6 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
 function updateDistanceAndTime() {
   if (!userLocation) return;
   
@@ -511,227 +498,174 @@ function updateDistanceAndTime() {
     userLocation.lat, userLocation.lng
   );
   
-  const deliveryTimeMinutes = Math.round(distance * minutesPerKm);
-  const totalTimeMinutes = basePrepTime + deliveryTimeMinutes;
-  
   elements.distanceText.textContent = `Distance: ${distance.toFixed(1)} km`;
   
-  if (distance > 8) {
-    elements.timeEstimateText.textContent = `Delivery not available (beyond 8 km)`;
-    elements.placeOrderBtn.disabled = true;
-    elements.placeOrderBtn.title = "Delivery not available beyond 8 km";
-  } else {
-    elements.timeEstimateText.textContent = `Estimated time: ${totalTimeMinutes} min (${basePrepTime} min prep + ${deliveryTimeMinutes} min delivery)`;
-    elements.placeOrderBtn.disabled = false;
-    elements.placeOrderBtn.title = "";
-  }
-
-  elements.deliveryDistanceDisplay.style.display = "block";
-  elements.deliveryTimeEstimate.style.display = "block";
+  const deliveryTime = calculateDeliveryTime(distance);
+  elements.timeEstimateText.textContent = `Estimated time: ${deliveryTime} min`;
+  
+  elements.deliveryDistanceDisplay.style.display = 'block';
+  elements.deliveryTimeEstimate.style.display = 'block';
 }
 
-function debounce(func, wait) {
-  let timeout;
-  return function() {
-    const context = this, args = arguments;
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(context, args), wait);
-  };
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+  return distance;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180);
+}
+
+function calculateDeliveryTime(distance) {
+  const travelTime = distance * minutesPerKm;
+  return Math.round(basePrepTime + travelTime);
 }
 
 function closeConfirmationModal() {
   elements.orderConfirmationModal.style.display = 'none';
 }
 
-function showWhatsAppOptions() {
-  // First save the order to get an order ID
-  saveOrderToDatabase().then(orderId => {
-    if (orderId) {
-      currentOrderId = orderId;
-      elements.whatsappOptionsModal.style.display = 'block';
-    } else {
-      showNotification('Failed to create order. Please try again.', 'error');
-    }
-  });
+async function confirmOrder() {
+  const orderData = prepareOrderData();
+  const orderId = await saveOrderToFirestore(orderData);
+  
+  if (orderId) {
+    currentOrderId = orderId;
+    await sendOrderUpdateWithFallback(orderData, orderId);
+    showWhatsAppShareModal(orderData, orderId);
+    closeConfirmationModal();
+  } else {
+    showNotification('Failed to place order. Please try again.', 'error');
+  }
 }
 
-function sendWhatsAppMessage(orderId, recipientType) {
+function prepareOrderData() {
   const orderType = getOrderType();
   const totals = calculateTotal();
-  const distance = orderType === 'Delivery' ? calculateDistance(
-    shopLocation.lat, shopLocation.lng,
-    userLocation.lat, userLocation.lng
-  ) : 0;
   
-  // Construct the order status URL
-  const orderStatusUrl = `${window.location.origin}/order-status.html?orderId=${orderId}`;
-  
-  const messageParts = [
-    `*${recipientType === 'customer' ? 'NEW ORDER - BG Pizzo' : 'YOUR ORDER CONFIRMATION - BG Pizzo'}*`,
-    ``,
-    `*Order ID:* #${orderId}`,
-    `*Customer Name:* ${elements.customerName.value}`,
-    `*Phone:* ${elements.phoneNumber.value}`,
-    `*Order Type:* ${orderType}`,
-    `*Track your order:* ${orderStatusUrl}`
-  ];
-
-  if (orderType === 'Delivery') {
-    const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
-    const address = elements.manualDeliveryAddress.value || 'Current Location';
-    
-    messageParts.push(
-      `*Delivery Address:* ${address}`,
-      `*Location:* ${mapsLink}`,
-      `*Distance:* ${distance.toFixed(1)} km`
-    );
-    
-    if (totals.subtotal > freeDeliveryThreshold) {
-      messageParts.push(`*Delivery Charge:* Free (order above ₹${freeDeliveryThreshold})`);
-    } else if (distance <= 4) {
-      messageParts.push(`*Delivery Charge:* Free (0-4 km)`);
-    } else if (distance <= 6) {
-      messageParts.push(`*Delivery Charge:* ₹20 (4-6 km)`);
-    } else if (distance <= 8) {
-      messageParts.push(`*Delivery Charge:* ₹30 (6-8 km)`);
-    }
-    
-    messageParts.push(`*Estimated Time:* ${basePrepTime + Math.round(distance * minutesPerKm)} minutes`);
-  }
-  
-  messageParts.push(
-    ``,
-    `*ORDER ITEMS:*`
-  );
-  
-  cart.forEach(item => {
-    messageParts.push(`- ${item.quantity}x ${item.name}${item.variant ? ` (${item.variant})` : ''} - ${formatPrice(item.price * item.quantity)}`);
-    if (orderType === 'Delivery' && item.category === 'Combos') {
-      messageParts.push(`  (PICKUP ONLY - NOT INCLUDED IN DELIVERY)`);
-    }
-  });
-  
-  messageParts.push(
-    ``,
-    `*SUBTOTAL:* ${formatPrice(totals.subtotal)}`
-  );
-  
-  if (orderType === 'Delivery') {
-    messageParts.push(`*DELIVERY CHARGE:* ${formatPrice(totals.deliveryCharge)}`);
-  }
-  
-  messageParts.push(
-    `*TOTAL AMOUNT:* ${formatPrice(totals.grandTotal)}`,
-    ``
-  );
-  
-  if (elements.orderNotes.value) {
-    messageParts.push(
-      `*SPECIAL INSTRUCTIONS:*`,
-      `${elements.orderNotes.value}`,
-      ``
-    );
-  }
-
-  if (elements.notifyStatus || elements.notifyOffers) {
-    messageParts.push(
-      `*NOTIFICATION PREFERENCES:*`,
-      `Order Updates: ${elements.notifyStatus?.checked ? 'Yes' : 'No'}`,
-      `Special Offers: ${elements.notifyOffers?.checked ? 'Yes' : 'No'}`,
-      ``
-    );
-  }
-  
-  messageParts.push(
-    `*Order Time:* ${new Date().toLocaleString()}`,
-    ``,
-    `Track your order status: ${orderStatusUrl}`
-  );
-
-  // Different phone numbers based on recipient type
-  const phoneNumber = recipientType === 'customer' ? '918240266267' : elements.phoneNumber.value;
-  
-  const encodedMessage = encodeURIComponent(messageParts.join('\n'));
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
-  window.open(whatsappUrl, '_blank');
+  return {
+    customerName: elements.customerName.value.trim(),
+    phoneNumber: elements.phoneNumber.value.trim(),
+    orderType: orderType,
+    items: cart.map(item => ({
+      name: item.name,
+      variant: item.variant,
+      quantity: item.quantity,
+      price: item.price
+    })),
+    subtotal: totals.subtotal,
+    deliveryCharge: totals.deliveryCharge,
+    grandTotal: totals.grandTotal,
+    notes: elements.orderNotes.value.trim(),
+    status: 'pending',
+    createdAt: serverTimestamp(),
+    notifyStatus: elements.notifyStatus?.checked || false,
+    notifyOffers: elements.notifyOffers?.checked || false,
+    ...(orderType === 'Delivery' && {
+      deliveryAddress: elements.manualDeliveryAddress.value || 'Current Location',
+      location: new GeoPoint(userLocation.lat, userLocation.lng),
+      estimatedDeliveryTime: calculateDeliveryTime(
+        calculateDistance(
+          shopLocation.lat, shopLocation.lng,
+          userLocation.lat, userLocation.lng
+        )
+      )
+    })
+  };
 }
 
-async function saveOrderToDatabase() {
-  const orderType = getOrderType();
-  const totals = calculateTotal();
-  const distance = orderType === 'Delivery' ? calculateDistance(
-    shopLocation.lat, shopLocation.lng,
-    userLocation.lat, userLocation.lng
-  ) : 0;
-  
-  const orderNumber = Math.floor(100000 + Math.random() * 900000);
-  const orderId = `BG-${orderNumber}`;
-  
+async function saveOrderToFirestore(orderData) {
   try {
-    const orderRef = doc(collection(db, 'orders'), orderId);
-    await setDoc(orderRef, {
-      id: orderId,
-      customerName: elements.customerName.value,
-      phoneNumber: elements.phoneNumber.value,
-      orderType: orderType,
-      items: cart.map(item => ({
-        name: item.name,
-        variant: item.variant,
-        price: item.price,
-        quantity: item.quantity,
-        category: item.category
-      })),
-      subtotal: totals.subtotal,
-      deliveryCharge: orderType === 'Delivery' ? totals.deliveryCharge : 0,
-      total: totals.grandTotal,
-      status: 'pending',
-      timestamp: serverTimestamp(),
-      ...(orderType === 'Delivery' && userLocation && {
-        deliveryAddress: elements.manualDeliveryAddress.value || 'Current Location',
-        location: new GeoPoint(userLocation.lat, userLocation.lng),
-        distance: distance
-      }),
-      notificationPreferences: {
-        statusUpdates: elements.notifyStatus?.checked || false,
-        specialOffers: elements.notifyOffers?.checked || false
-      },
-      specialInstructions: elements.orderNotes.value || ''
-    });
-
-    if (elements.notifyStatus?.checked) {
-      try {
-        if (Notification.permission !== 'granted') {
-          await Notification.requestPermission();
-        }
-
-        await saveNotificationPreferences();
-        await sendOrderUpdateWithFallback(
-          orderId,
-          elements.phoneNumber.value,
-          `Your order #${orderId} has been received! Status: Preparing`
-        );
-      } catch (error) {
-        console.error('Notification setup failed:', error);
-      }
-    }
-
-    return orderId;
+    const docRef = await addDoc(collection(db, 'orders'), orderData);
+    return docRef.id;
   } catch (error) {
     console.error('Error saving order:', error);
-    showNotification('Failed to save order. Please try again.', 'error');
     return null;
   }
 }
 
-function completeOrderProcess() {
-  closeConfirmationModal();
-  showNotification('Order placed successfully!');
+function showWhatsAppShareModal(orderData, orderId) {
+  const orderSummary = generateWhatsAppMessage(orderData, orderId);
+  elements.whatsappShareMessage.textContent = orderSummary;
+  elements.whatsappShareModal.style.display = 'block';
+}
+
+function generateWhatsAppMessage(orderData, orderId) {
+  const orderType = orderData.orderType;
+  const totals = calculateTotal();
   
+  let message = `New Order #${orderId}\n`;
+  message += `Customer: ${orderData.customerName}\n`;
+  message += `Phone: ${orderData.phoneNumber}\n`;
+  message += `Order Type: ${orderType}\n\n`;
+  message += `Items:\n`;
+  
+  orderData.items.forEach(item => {
+    message += `${item.quantity}x ${item.name}`;
+    if (item.variant) message += ` (${item.variant})`;
+    message += ` - ₹${item.price * item.quantity}\n`;
+  });
+  
+  message += `\nSubtotal: ₹${totals.subtotal}\n`;
+  
+  if (orderType === 'Delivery') {
+    message += `Delivery Charge: ₹${totals.deliveryCharge}\n`;
+  }
+  
+  message += `Total: ₹${totals.grandTotal}\n`;
+  
+  if (orderData.notes) {
+    message += `\nNotes: ${orderData.notes}\n`;
+  }
+  
+  if (orderType === 'Delivery') {
+    message += `\nDelivery Address: ${orderData.deliveryAddress}\n`;
+    message += `Estimated Delivery Time: ${orderData.estimatedDeliveryTime} minutes\n`;
+  }
+  
+  return message;
+}
+
+function shareOrderViaWhatsApp() {
+  const orderSummary = generateWhatsAppMessage(prepareOrderData(), currentOrderId);
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(orderSummary)}`;
+  window.open(whatsappUrl, '_blank');
+  
+  // Complete the order process after sharing
+  completeOrderProcess();
+}
+
+function completeOrderProcess() {
+  // Clear cart and redirect to thank you page
   cart.length = 0;
   saveCart();
   updateCartCount();
   
+  showNotification('Order placed successfully!', 'success');
+  
   setTimeout(() => {
-    window.location.href = `order-status.html?orderId=${currentOrderId}`;
-  }, 2000);
+    window.location.href = `thankyou.html?orderId=${currentOrderId}`;
+  }, 1500);
 }
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+export { calculateDistance, calculateDeliveryTime };
