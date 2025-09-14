@@ -406,7 +406,7 @@ function sendWhatsAppMessage(orderId, recipientType) {
   const message = encodeURIComponent(messageParts.join('\n'));
   
   // Use different WhatsApp numbers based on recipient
-  const whatsappNumber = recipientType === 'customer' ? '919876543210' : '919876543210';
+  const whatsappNumber = recipientType === 'customer' ? '918240266267' : '918240266267';
   
   // Open WhatsApp with the message
   window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
