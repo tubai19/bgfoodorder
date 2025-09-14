@@ -15,23 +15,16 @@ const elements = {
   deliveryChargeDisplay: document.getElementById('deliveryChargeDisplay'),
   mobileLiveTotal: document.getElementById('mobileLiveTotal'),
   deliveryShareLocationBtn: document.getElementById('deliveryShareLocationBtn'),
-  manualLocationFields: document.getElementById('manualLocationFields'),
-  deliveryShowManualLocBtn: document.getElementById('deliveryShowManualLocBtn'),
-  manualDeliveryAddress: document.getElementById('manualDeliveryAddress'),
-  addressMap: document.getElementById('addressMap'),
   currentLocStatusMsg: document.getElementById('currentLocStatusMsg'),
   deliveryDistanceDisplay: document.getElementById('deliveryDistanceDisplay'),
   distanceText: document.getElementById('distanceText'),
   deliveryTimeEstimate: document.getElementById('deliveryTimeEstimate'),
   timeEstimateText: document.getElementById('timeEstimateText'),
-  geocodingLoading: document.getElementById('geocodingLoading'),
   notifyStatus: document.getElementById('notifyStatus'),
   notifyOffers: document.getElementById('notifyOffers'),
   notificationStatus: document.getElementById('notificationStatus')
 };
 
-let map;
-let marker;
 let userLocation = null;
 let currentOrderId = null;
 const shopLocation = { lat: 22.3908, lng: 88.2189 };
@@ -80,8 +73,6 @@ function setupEventListeners() {
   });
 
   elements.deliveryShareLocationBtn.addEventListener('click', shareCurrentLocation);
-  elements.deliveryShowManualLocBtn.addEventListener('click', showManualLocation);
-  elements.manualDeliveryAddress.addEventListener('input', debounce(geocodeAddress, 500));
   
   if (elements.notifyStatus) {
     elements.notifyStatus.addEventListener('change', saveNotificationPreferences);
@@ -255,7 +246,6 @@ async function shareCurrentLocation() {
       elements.currentLocStatusMsg.textContent = 'Location received!';
       elements.currentLocStatusMsg.style.color = 'green';
       elements.deliveryShareLocationBtn.style.display = 'none';
-      elements.deliveryShowManualLocBtn.style.display = 'inline-block';
       
       updateDistanceAndTime();
       updateOrderSummary();
@@ -287,100 +277,6 @@ function handleLocationError(error) {
   
   elements.currentLocStatusMsg.textContent = errorMessage;
   elements.currentLocStatusMsg.style.color = 'red';
-}
-
-function showManualLocation() {
-  elements.deliveryShowManualLocBtn.style.display = 'none';
-  elements.manualLocationFields.style.display = 'block';
-  initMap();
-}
-
-function initMap() {
-  if (map) return;
-  
-  map = L.map(elements.addressMap).setView([shopLocation.lat, shopLocation.lng], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-  
-  map.on('click', (e) => {
-    if (marker) map.removeLayer(marker);
-    
-    marker = L.marker(e.latlng).addTo(map)
-      .bindPopup('Your delivery location')
-      .openPopup();
-    
-    userLocation = { lat: e.latlng.lat, lng: e.latlng.lng };
-    reverseGeocode(e.latlng.lat, e.latlng.lng);
-    updateDistanceAndTime();
-    updateOrderSummary();
-  });
-  
-  const geocoder = L.Control.geocoder({
-    defaultMarkGeocode: false,
-    position: 'topright'
-  }).addTo(map);
-  
-  geocoder.on('markgeocode', (e) => {
-    const { center, name } = e.geocode;
-    if (marker) map.removeLayer(marker);
-    
-    marker = L.marker(center).addTo(map)
-      .bindPopup(name)
-      .openPopup();
-    
-    map.setView(center, 16);
-    elements.manualDeliveryAddress.value = name;
-    userLocation = { lat: center.lat, lng: center.lng };
-    updateDistanceAndTime();
-    updateOrderSummary();
-  });
-}
-
-async function geocodeAddress() {
-  const address = elements.manualDeliveryAddress.value;
-  if (!address || address.length < 3) return;
-  
-  elements.geocodingLoading.style.display = 'block';
-  
-  try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-    const data = await response.json();
-    
-    elements.geocodingLoading.style.display = 'none';
-    
-    if (data && data.length > 0) {
-      const firstResult = data[0];
-      const lat = parseFloat(firstResult.lat);
-      const lon = parseFloat(firstResult.lon);
-      
-      if (marker) map.removeLayer(marker);
-      
-      marker = L.marker([lat, lon]).addTo(map)
-        .bindPopup(firstResult.display_name)
-        .openPopup();
-      
-      map.setView([lat, lon], 16);
-      userLocation = { lat, lng: lon };
-      elements.manualDeliveryAddress.value = firstResult.display_name;
-      updateDistanceAndTime();
-      updateOrderSummary();
-    }
-  } catch (error) {
-    elements.geocodingLoading.style.display = 'none';
-    console.error('Geocoding error:', error);
-  }
-}
-
-async function reverseGeocode(lat, lng) {
-  try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-    const data = await response.json();
-    
-    if (data.display_name) {
-      elements.manualDeliveryAddress.value = data.display_name;
-    }
-  } catch (error) {
-    console.error('Reverse geocoding error:', error);
-  }
 }
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -422,15 +318,6 @@ function updateDistanceAndTime() {
   elements.deliveryTimeEstimate.style.display = "block";
 }
 
-function debounce(func, wait) {
-  let timeout;
-  return function() {
-    const context = this, args = arguments;
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(context, args), wait);
-  };
-}
-
 function sendWhatsAppMessage(orderId, recipientType) {
   const orderType = getOrderType();
   const totals = calculateTotal();
@@ -454,11 +341,9 @@ function sendWhatsAppMessage(orderId, recipientType) {
 
   if (orderType === 'Delivery') {
     const mapsLink = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
-    const address = elements.manualDeliveryAddress.value || 'Current Location';
     
     messageParts.push(
-      `*Delivery Address:* ${address}`,
-      `*Location:* ${mapsLink}`,
+      `*Delivery Location:* ${mapsLink}`,
       `*Distance:* ${distance.toFixed(1)} km`
     );
     
@@ -514,7 +399,7 @@ function sendWhatsAppMessage(orderId, recipientType) {
   const message = encodeURIComponent(messageParts.join('\n'));
   
   // Use different WhatsApp numbers based on recipient
-  const whatsappNumber = recipientType === 'customer' ? '918240266267' : '918240266267';
+  const whatsappNumber = recipientType === 'customer' ? '919876543210' : '919876543210';
   
   // Open WhatsApp with the message
   window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
@@ -550,7 +435,6 @@ async function saveOrderToDatabase() {
 
   if (orderType === 'Delivery') {
     orderData.deliveryLocation = new GeoPoint(userLocation.lat, userLocation.lng);
-    orderData.deliveryAddress = elements.manualDeliveryAddress.value || 'Current Location';
     orderData.distance = distance;
     orderData.estimatedTime = basePrepTime + Math.round(distance * minutesPerKm);
   }
